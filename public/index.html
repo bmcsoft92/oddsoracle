@@ -1,0 +1,906 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>OddsOracle — Expert Betting System</title>
+  <link rel="stylesheet" href="css/styles.css" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+</head>
+<body>
+
+  <!-- SIDEBAR -->
+  <aside class="sidebar" id="sidebar">
+    <div class="logo">
+      <span class="logo-icon">🔮</span>
+      <span class="logo-text">OddsOracle</span>
+      <span class="logo-tag">PRO</span>
+    </div>
+    <nav class="nav">
+      <span class="nav-section-label">Principal</span>
+      <button class="nav-item active" data-tab="dashboard">
+        <span class="nav-icon">📊</span><span>Dashboard</span>
+      </button>
+      <button class="nav-item" data-tab="prematch">
+        <span class="nav-icon">🎯</span><span>Pré-Match</span>
+      </button>
+      <button class="nav-item" data-tab="live">
+        <span class="nav-icon">⚡</span><span>Live Betting</span>
+      </button>
+      <span class="nav-section-label">Gestion</span>
+      <button class="nav-item" data-tab="bankroll">
+        <span class="nav-icon">💰</span><span>Bankroll</span>
+      </button>
+      <button class="nav-item" data-tab="journal">
+        <span class="nav-icon">📋</span><span>Journal</span>
+      </button>
+      <button class="nav-item" data-tab="settings">
+        <span class="nav-icon">⚙️</span><span>Paramètres</span>
+      </button>
+    </nav>
+    <div class="sidebar-footer">
+      <div class="version-info">v3.0 · Roland-Garros Edition</div>
+      <div class="session-stats" id="sidebar-stats">
+        <div class="stat-mini"><span>ROI</span><strong id="mini-roi">—</strong></div>
+        <div class="stat-mini"><span>Bankroll</span><strong id="mini-bankroll">—</strong></div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- MAIN CONTENT -->
+  <main class="main-content" id="main-content">
+
+    <!-- ===== DASHBOARD ===== -->
+    <section class="tab-content active" id="tab-dashboard">
+      <div class="page-header">
+        <h1>Dashboard</h1>
+        <div class="header-meta" id="current-datetime"></div>
+      </div>
+
+      <div class="alert-banner" id="alert-banner" style="display:none"></div>
+
+      <div class="stats-grid">
+        <div class="stat-card stat-card-accent">
+          <span class="stat-icon">💎</span>
+          <div class="stat-label">Bankroll Totale</div>
+          <div class="stat-value" id="dash-bankroll">0 €</div>
+          <div class="stat-sub" id="dash-bankroll-sub">—</div>
+        </div>
+        <div class="stat-card stat-card-green">
+          <span class="stat-icon">📈</span>
+          <div class="stat-label">ROI Global</div>
+          <div class="stat-value" id="dash-roi">0%</div>
+          <div class="stat-sub" id="dash-paris-count">0 paris</div>
+        </div>
+        <div class="stat-card stat-card-yellow">
+          <span class="stat-icon">🎯</span>
+          <div class="stat-label">Taux de Réussite</div>
+          <div class="stat-value" id="dash-winrate">0%</div>
+          <div class="stat-sub" id="dash-win-loss">0W / 0L</div>
+        </div>
+        <div class="stat-card stat-card-cyan">
+          <span class="stat-icon">🔥</span>
+          <div class="stat-label">Séquence Actuelle</div>
+          <div class="stat-value" id="dash-streak">—</div>
+          <div class="stat-sub" id="dash-streak-sub">—</div>
+        </div>
+      </div>
+
+      <div class="dashboard-grid">
+        <div class="card">
+          <div class="card-header">
+            <h2>📉 Évolution de la Bankroll</h2>
+          </div>
+          <div class="chart-container">
+            <canvas id="chart-bankroll"></canvas>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <h2>🥧 Répartition Bankroll</h2>
+          </div>
+          <div class="chart-container chart-small">
+            <canvas id="chart-allocation"></canvas>
+          </div>
+          <div class="allocation-details" id="allocation-details">
+            <div class="alloc-row">
+              <span>Pré-match (70%)</span>
+              <strong id="alloc-prematch">0 €</strong>
+            </div>
+            <div class="alloc-row">
+              <span>Live (30%)</span>
+              <strong id="alloc-live">0 €</strong>
+            </div>
+            <div class="alloc-row warning" id="alloc-stop-row">
+              <span>Stop-loss journalier</span>
+              <strong id="alloc-stoploss">0 €</strong>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <h2>🕐 Derniers Paris</h2>
+          </div>
+          <div id="recent-bets-list" class="bets-list">
+            <div class="empty-state">Aucun pari enregistré</div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <h2>📌 Règles Actives</h2>
+          </div>
+          <div class="rules-list" id="active-rules">
+            <div class="rule-item rule-ok">✅ Stop-loss journalier respecté</div>
+            <div class="rule-item rule-ok">✅ Limite paris live OK</div>
+            <div class="rule-item rule-ok">✅ Budget live séparé</div>
+            <div class="rule-item rule-info" id="rule-streak">ℹ️ Aucune série de pertes</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== PRÉ-MATCH ===== -->
+    <section class="tab-content" id="tab-prematch">
+      <div class="page-header">
+        <h1>Analyse Pré-Match</h1>
+        <button class="btn btn-secondary" id="btn-new-analysis">Réinitialiser</button>
+      </div>
+
+      <div class="two-col">
+        <!-- Left: Form -->
+        <div class="card form-card" id="prematch-form-card">
+          <div class="card-header">
+            <h2>📋 Données du Match</h2>
+          </div>
+
+          <form id="prematch-form">
+            <div class="form-section">
+              <h3>Contexte</h3>
+              <div class="form-row">
+                <div class="form-group">
+                  <label>Sport</label>
+                  <select id="pm-sport" class="form-control">
+                    <option value="tennis">🎾 Tennis</option>
+                    <option value="football">⚽ Football</option>
+                    <option value="basketball">🏀 Basketball</option>
+                  </select>
+                </div>
+                <div class="form-group">
+                  <label>Tournoi</label>
+                  <input type="text" id="pm-tournament" class="form-control" placeholder="ex: Roland-Garros 2026" />
+                </div>
+              </div>
+              <div class="form-row">
+                <div class="form-group">
+                  <label>Surface</label>
+                  <select id="pm-surface" class="form-control">
+                    <option value="clay">Terre battue</option>
+                    <option value="hard">Dur</option>
+                    <option value="grass">Gazon</option>
+                    <option value="indoor">Indoor</option>
+                    <option value="neutral">Neutre / N/A</option>
+                  </select>
+                </div>
+                <div class="form-group">
+                  <label>Format</label>
+                  <select id="pm-format" class="form-control">
+                    <option value="bo3">Best-of-3</option>
+                    <option value="bo5">Best-of-5</option>
+                    <option value="90">2 × 45 min</option>
+                    <option value="4q">4 quarts</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            <div class="form-section">
+              <h3>Joueurs / Équipes</h3>
+              <div class="players-grid">
+                <div class="player-block">
+                  <div class="player-label">Joueur A</div>
+                  <input type="text" id="pm-playerA" class="form-control" placeholder="Nom" />
+                  <div class="form-row mt-8">
+                    <div class="form-group">
+                      <label>Classement Elo</label>
+                      <input type="number" id="pm-eloA" class="form-control" placeholder="ex: 2100" />
+                    </div>
+                    <div class="form-group">
+                      <label>Forme (0-10)</label>
+                      <input type="number" id="pm-formeA" class="form-control" min="0" max="10" placeholder="7" />
+                    </div>
+                  </div>
+                  <div class="form-row">
+                    <div class="form-group">
+                      <label>Matchs/7j</label>
+                      <input type="number" id="pm-matchesA" class="form-control" min="0" max="10" placeholder="2" />
+                    </div>
+                    <div class="form-group">
+                      <label>Cote actuelle</label>
+                      <input type="number" id="pm-coteA" class="form-control" step="0.01" placeholder="1.75" />
+                    </div>
+                  </div>
+                </div>
+                <div class="vs-divider">VS</div>
+                <div class="player-block">
+                  <div class="player-label">Joueur B</div>
+                  <input type="text" id="pm-playerB" class="form-control" placeholder="Nom" />
+                  <div class="form-row mt-8">
+                    <div class="form-group">
+                      <label>Classement Elo</label>
+                      <input type="number" id="pm-eloB" class="form-control" placeholder="ex: 1950" />
+                    </div>
+                    <div class="form-group">
+                      <label>Forme (0-10)</label>
+                      <input type="number" id="pm-formeB" class="form-control" min="0" max="10" placeholder="6" />
+                    </div>
+                  </div>
+                  <div class="form-row">
+                    <div class="form-group">
+                      <label>Matchs/7j</label>
+                      <input type="number" id="pm-matchesB" class="form-control" min="0" max="10" placeholder="3" />
+                    </div>
+                    <div class="form-group">
+                      <label>Cote actuelle</label>
+                      <input type="number" id="pm-coteB" class="form-control" step="0.01" placeholder="2.10" />
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="form-section">
+              <h3>Head-to-Head</h3>
+              <div class="form-row">
+                <div class="form-group">
+                  <label>Victoires A (global)</label>
+                  <input type="number" id="pm-h2hA" class="form-control" min="0" placeholder="3" />
+                </div>
+                <div class="form-group">
+                  <label>Victoires B (global)</label>
+                  <input type="number" id="pm-h2hB" class="form-control" min="0" placeholder="1" />
+                </div>
+              </div>
+              <div class="form-row">
+                <div class="form-group">
+                  <label>Victoires A (surface)</label>
+                  <input type="number" id="pm-h2hA-surf" class="form-control" min="0" placeholder="2" />
+                </div>
+                <div class="form-group">
+                  <label>Victoires B (surface)</label>
+                  <input type="number" id="pm-h2hB-surf" class="form-control" min="0" placeholder="0" />
+                </div>
+              </div>
+            </div>
+
+            <div class="form-section">
+              <h3>Signaux Contextuels</h3>
+              <div class="signals-grid">
+                <label class="signal-check">
+                  <input type="checkbox" id="sig-injuryA" />
+                  <span>⚠️ Blessure / Kiné A</span>
+                </label>
+                <label class="signal-check">
+                  <input type="checkbox" id="sig-injuryB" />
+                  <span>⚠️ Blessure / Kiné B</span>
+                </label>
+                <label class="signal-check">
+                  <input type="checkbox" id="sig-homeA" />
+                  <span>🏠 Avantage domicile A</span>
+                </label>
+                <label class="signal-check">
+                  <input type="checkbox" id="sig-negativePressA" />
+                  <span>📰 Pression médiatique A</span>
+                </label>
+                <label class="signal-check">
+                  <input type="checkbox" id="sig-nightSession" />
+                  <span>🌙 Night session</span>
+                </label>
+                <label class="signal-check">
+                  <input type="checkbox" id="sig-steamMove" />
+                  <span>📈 Steam move détecté</span>
+                </label>
+              </div>
+              <div class="form-row mt-8">
+                <div class="form-group">
+                  <label>Ajustement manuel A (%)</label>
+                  <input type="number" id="pm-adjA" class="form-control" min="-20" max="20" placeholder="0" />
+                </div>
+                <div class="form-group">
+                  <label>Ajustement manuel B (%)</label>
+                  <input type="number" id="pm-adjB" class="form-control" min="-20" max="20" placeholder="0" />
+                </div>
+              </div>
+            </div>
+
+            <button type="button" class="btn btn-primary btn-full" id="btn-analyze-prematch">
+              🔮 Analyser le match
+            </button>
+          </form>
+        </div>
+
+        <!-- Right: Results -->
+        <div class="card" id="prematch-result-card">
+          <div class="card-header">
+            <h2>🧠 Résultat de l'Analyse</h2>
+          </div>
+          <div id="prematch-result">
+            <div class="empty-state">
+              <div style="font-size:3rem;margin-bottom:1rem">🔮</div>
+              <div>Complétez le formulaire et lancez l'analyse pour voir les résultats.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== LIVE BETTING ===== -->
+    <section class="tab-content" id="tab-live">
+      <div class="page-header">
+        <h1>Live Betting</h1>
+        <div class="live-controls">
+          <div class="api-status-bar" id="api-status-bar">
+            <div class="api-dot unknown" id="api-dot"></div>
+            <span id="api-status-text">Connexion...</span>
+            <span id="quota-display"></span>
+          </div>
+          <span class="live-indicator" id="live-dot">LIVE</span>
+          <button class="btn btn-sm btn-secondary" id="btn-live-setup">Préparer fiche</button>
+        </div>
+      </div>
+
+      <!-- Sélecteur de match live -->
+      <div class="card match-selector-card">
+        <div class="card-header">
+          <h2>📡 Sélectionner un match en direct</h2>
+          <button class="btn btn-sm btn-secondary" id="btn-refresh-matches">🔄 Actualiser</button>
+        </div>
+        <div class="match-select-row">
+          <div class="form-group">
+            <label>Sport</label>
+            <select id="live-sport-select" class="form-control">
+              <option value="tennis_atp">🎾 Tennis ATP</option>
+              <option value="tennis_wta">🎾 Tennis WTA</option>
+              <option value="soccer_france_ligue1">⚽ Ligue 1</option>
+              <option value="soccer_epl">⚽ Premier League</option>
+              <option value="soccer_europe_champs">⚽ Champions League</option>
+              <option value="basketball_nba">🏀 NBA</option>
+              <option value="basketball_euroleague">🏀 Euroleague</option>
+            </select>
+          </div>
+          <div class="form-group" style="flex:2">
+            <label>Match</label>
+            <select id="live-match-select" class="form-control">
+              <option value="">— Cliquer sur Actualiser pour charger les matchs —</option>
+            </select>
+          </div>
+          <div>
+            <button class="btn btn-primary" id="btn-load-match">⚡ Charger</button>
+          </div>
+        </div>
+        <div class="quota-badge" id="quota-badge"></div>
+      </div>
+
+      <div class="live-grid">
+        <!-- Match Status -->
+        <div class="card live-status-card">
+          <div class="card-header">
+            <h2>🔴 Score Live</h2>
+          </div>
+          <div class="live-match-header" id="live-match-header">
+            <div class="live-player" id="live-pA-name">Joueur A</div>
+            <div class="live-score" id="live-score-display">— — —</div>
+            <div class="live-player" id="live-pB-name">Joueur B</div>
+          </div>
+          <div class="live-score-input">
+            <div class="form-row">
+              <div class="form-group">
+                <label>Joueur A</label>
+                <input type="text" id="live-playerA" class="form-control" placeholder="Nom joueur A" />
+              </div>
+              <div class="form-group">
+                <label>Joueur B</label>
+                <input type="text" id="live-playerB" class="form-control" placeholder="Nom joueur B" />
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label>Sets A</label>
+                <input type="number" id="live-setsA" class="form-control" min="0" max="3" value="0" />
+              </div>
+              <div class="form-group">
+                <label>Sets B</label>
+                <input type="number" id="live-setsB" class="form-control" min="0" max="3" value="0" />
+              </div>
+              <div class="form-group">
+                <label>Set actuel</label>
+                <input type="number" id="live-setNum" class="form-control" min="1" max="5" value="1" />
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label>Jeux A (set actuel)</label>
+                <input type="number" id="live-gamesA" class="form-control" min="0" max="7" value="0" />
+              </div>
+              <div class="form-group">
+                <label>Jeux B (set actuel)</label>
+                <input type="number" id="live-gamesB" class="form-control" min="0" max="7" value="0" />
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label>Cote live A</label>
+                <input type="number" id="live-coteA" class="form-control" step="0.01" placeholder="2.10" />
+              </div>
+              <div class="form-group">
+                <label>Cote live B</label>
+                <input type="number" id="live-coteB" class="form-control" step="0.01" placeholder="1.75" />
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label>P base A (pré-match %)</label>
+                <input type="number" id="live-pbaseA" class="form-control" min="0" max="100" placeholder="60" />
+              </div>
+              <div class="form-group">
+                <label>Minutes jouées</label>
+                <input type="number" id="live-minutes" class="form-control" min="0" placeholder="45" />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Signal Detection -->
+        <div class="card">
+          <div class="card-header"><h2>⚠️ Détection de Signaux</h2></div>
+          <div class="signals-live">
+            <button class="signal-btn signal-critical" id="sig-kine" data-player="A">
+              🚨 Appel Kiné (J.A)
+            </button>
+            <button class="signal-btn signal-critical" id="sig-kineB" data-player="B">
+              🚨 Appel Kiné (J.B)
+            </button>
+            <button class="signal-btn signal-warning" id="sig-breakA">
+              📍 Break J.A
+            </button>
+            <button class="signal-btn signal-warning" id="sig-breakB">
+              📍 Break J.B
+            </button>
+            <button class="signal-btn signal-info" id="sig-momentumA">
+              🔥 Momentum J.A (+3 jeux)
+            </button>
+            <button class="signal-btn signal-info" id="sig-momentumB">
+              🔥 Momentum J.B (+3 jeux)
+            </button>
+            <button class="signal-btn signal-market" id="sig-coteMove">
+              📈 Mouvement cote &gt;15%
+            </button>
+            <button class="signal-btn signal-market" id="sig-suspension">
+              ⏸️ Suspension cotes
+            </button>
+            <button class="signal-btn signal-danger" id="sig-boiterie">
+              🦵 Boiterie visible
+            </button>
+          </div>
+          <div class="form-row mt-8">
+            <button class="btn btn-primary btn-full" id="btn-calc-live">⚡ Calculer Alerte Live</button>
+          </div>
+        </div>
+
+        <!-- Live Alert Output -->
+        <div class="card live-alert-card" id="live-alert-card">
+          <div class="card-header">
+            <h2>🔔 Alerte Live</h2>
+            <span class="countdown" id="countdown" style="display:none">⏱️ <span id="countdown-val">10</span>s</span>
+          </div>
+          <div id="live-alert-output">
+            <div class="empty-state">
+              <div style="font-size:2.5rem;margin-bottom:1rem">⚡</div>
+              <div>Déclenchez un signal ou calculez une alerte live</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Live Fiche -->
+        <div class="card" id="live-fiche-card">
+          <div class="card-header">
+            <h2>📄 Fiche de Déclenchement</h2>
+            <button class="btn btn-sm btn-secondary" id="btn-gen-fiche">Générer</button>
+          </div>
+          <div id="live-fiche-output">
+            <div class="empty-state">Générez la fiche avant le match</div>
+          </div>
+        </div>
+
+        <!-- Live Rules -->
+        <div class="card">
+          <div class="card-header"><h2>📌 Règles Live Actives</h2></div>
+          <div class="live-rules">
+            <div class="live-rule"><span class="rule-num">R1</span><span>10 secondes max par décision</span></div>
+            <div class="live-rule"><span class="rule-num">R2</span><span>Stream obligatoire avant pari</span></div>
+            <div class="live-rule"><span class="rule-num">R3</span><span>Ne pas attendre après suspension</span></div>
+            <div class="live-rule"><span class="rule-num">R4</span><span>Pas de récupération live</span></div>
+            <div class="live-rule"><span class="rule-num">R5</span><span>Kiné = pari contre immédiatement</span></div>
+            <div class="live-rule"><span class="rule-num">R6</span><span>Mises live -40% vs pré-match</span></div>
+            <div class="live-rule"><span class="rule-num">R7</span><span>Max 2 matchs en live simultanés</span></div>
+            <div class="live-rule"><span class="rule-num">R8</span><span>Budget live séparé (30% bankroll)</span></div>
+          </div>
+          <div class="live-counter">
+            <div class="form-group">
+              <label>Paris live actifs (max 2)</label>
+              <div class="counter-control">
+                <button class="btn btn-sm btn-secondary" id="btn-live-minus">−</button>
+                <span id="live-active-count" class="counter-val">0</span>
+                <button class="btn btn-sm btn-primary" id="btn-live-plus">+</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- ===== BANKROLL ===== -->
+    <section class="tab-content" id="tab-bankroll">
+      <div class="page-header">
+        <h1>Gestion Bankroll</h1>
+      </div>
+
+      <div class="bankroll-grid">
+        <!-- Kelly Calculator -->
+        <div class="card">
+          <div class="card-header"><h2>🧮 Calculateur Kelly</h2></div>
+          <div class="kelly-form">
+            <div class="form-row">
+              <div class="form-group">
+                <label>Mode</label>
+                <select id="kelly-mode" class="form-control">
+                  <option value="prematch">Pré-match (Kelly 1/4)</option>
+                  <option value="live">Live (Kelly 1/6)</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label>Probabilité réelle (%)</label>
+                <input type="number" id="kelly-prob" class="form-control" min="0" max="100" placeholder="60" />
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label>Cote proposée</label>
+                <input type="number" id="kelly-cote" class="form-control" step="0.01" placeholder="1.85" />
+              </div>
+              <div class="form-group">
+                <label>Bankroll concernée (€)</label>
+                <input type="number" id="kelly-bankroll" class="form-control" placeholder="700" />
+              </div>
+            </div>
+            <button class="btn btn-primary btn-full" id="btn-kelly-calc">Calculer la mise</button>
+            <div class="kelly-result" id="kelly-result">
+              <div class="empty-state">Entrez les paramètres et calculez</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Bankroll Setup -->
+        <div class="card">
+          <div class="card-header"><h2>⚙️ Configuration Bankroll</h2></div>
+          <div class="form-group">
+            <label>Bankroll initiale (€)</label>
+            <input type="number" id="br-initial" class="form-control" placeholder="1000" />
+          </div>
+          <div class="form-group">
+            <label>Bankroll actuelle (€)</label>
+            <input type="number" id="br-current" class="form-control" placeholder="1000" />
+          </div>
+          <button class="btn btn-primary btn-full mt-8" id="btn-br-save">Enregistrer</button>
+
+          <div class="br-breakdown" id="br-breakdown">
+            <div class="breakdown-item">
+              <span>Budget Pré-match (70%)</span>
+              <strong id="br-prematch-budget">—</strong>
+            </div>
+            <div class="breakdown-item">
+              <span>Budget Live (30%)</span>
+              <strong id="br-live-budget">—</strong>
+            </div>
+            <div class="breakdown-item warning">
+              <span>Stop-loss journalier (-15%)</span>
+              <strong id="br-stoploss">—</strong>
+            </div>
+            <div class="breakdown-item danger">
+              <span>Stop-loss hebdo (-25%)</span>
+              <strong id="br-stoploss-week">—</strong>
+            </div>
+            <div class="breakdown-item success">
+              <span>Protection gains (+20%)</span>
+              <strong id="br-protect-gains">—</strong>
+            </div>
+          </div>
+        </div>
+
+        <!-- Stop-loss Tracker -->
+        <div class="card">
+          <div class="card-header"><h2>🛡️ Suivi Stop-Loss</h2></div>
+          <div class="stoploss-tracker" id="stoploss-tracker">
+            <div class="sl-row">
+              <span>Pertes aujourd'hui</span>
+              <div class="sl-bar-container">
+                <div class="sl-bar" id="sl-bar-daily"></div>
+              </div>
+              <strong id="sl-daily-val">0 €</strong>
+            </div>
+            <div class="sl-row">
+              <span>Pertes cette semaine</span>
+              <div class="sl-bar-container">
+                <div class="sl-bar sl-bar-week" id="sl-bar-week"></div>
+              </div>
+              <strong id="sl-week-val">0 €</strong>
+            </div>
+            <div class="sl-row">
+              <span>Série pertes live</span>
+              <div class="live-losses-dots" id="live-losses-dots">
+                <span class="loss-dot inactive">●</span>
+                <span class="loss-dot inactive">●</span>
+                <span class="loss-dot inactive">●</span>
+              </div>
+              <strong id="sl-live-streak">0/3</strong>
+            </div>
+          </div>
+          <div class="form-row mt-8">
+            <button class="btn btn-sm btn-warning" id="btn-reset-daily">Reset journalier</button>
+            <button class="btn btn-sm btn-secondary" id="btn-reset-weekly">Reset hebdo</button>
+          </div>
+        </div>
+
+        <!-- Edge Calculator -->
+        <div class="card">
+          <div class="card-header"><h2>🔬 Calculateur d'Edge</h2></div>
+          <div class="edge-form">
+            <div class="form-row">
+              <div class="form-group">
+                <label>Cote J1 (bookmaker)</label>
+                <input type="number" id="edge-cote1" class="form-control" step="0.01" placeholder="1.85" />
+              </div>
+              <div class="form-group">
+                <label>Cote J2 (bookmaker)</label>
+                <input type="number" id="edge-cote2" class="form-control" step="0.01" placeholder="2.10" />
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label>Probabilité réelle J1 (%)</label>
+                <input type="number" id="edge-prob" class="form-control" min="0" max="100" placeholder="58" />
+              </div>
+            </div>
+            <button class="btn btn-primary btn-full" id="btn-edge-calc">Calculer l'Edge</button>
+            <div class="edge-result" id="edge-result">
+              <div class="empty-state">Entrez les paramètres</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== JOURNAL ===== -->
+    <section class="tab-content" id="tab-journal">
+      <div class="page-header">
+        <h1>Journal des Paris</h1>
+        <button class="btn btn-primary" id="btn-add-bet">+ Ajouter un pari</button>
+      </div>
+
+      <!-- Add Bet Form (inline) -->
+      <div class="card" id="add-bet-form" style="display:none; margin-bottom:1.5rem">
+        <div class="card-header">
+          <h2>➕ Nouveau Pari</h2>
+          <button class="btn btn-sm btn-secondary" id="btn-cancel-bet">Annuler</button>
+        </div>
+        <form id="journal-form">
+          <div class="form-row">
+            <div class="form-group">
+              <label>Date</label>
+              <input type="date" id="j-date" class="form-control" />
+            </div>
+            <div class="form-group">
+              <label>Sport</label>
+              <select id="j-sport" class="form-control">
+                <option value="tennis">🎾 Tennis</option>
+                <option value="football">⚽ Football</option>
+                <option value="basketball">🏀 Basketball</option>
+              </select>
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>Match</label>
+              <input type="text" id="j-match" class="form-control" placeholder="ex: Djokovic vs Alcaraz" />
+            </div>
+            <div class="form-group">
+              <label>Type</label>
+              <select id="j-type" class="form-control">
+                <option value="prematch">Pré-match</option>
+                <option value="live">Live</option>
+              </select>
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>Marché</label>
+              <input type="text" id="j-market" class="form-control" placeholder="ex: Vainqueur match" />
+            </div>
+            <div class="form-group">
+              <label>Sélection</label>
+              <input type="text" id="j-selection" class="form-control" placeholder="ex: Djokovic" />
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>Cote</label>
+              <input type="number" id="j-cote" class="form-control" step="0.01" placeholder="1.85" />
+            </div>
+            <div class="form-group">
+              <label>Mise (€)</label>
+              <input type="number" id="j-stake" class="form-control" placeholder="40" />
+            </div>
+            <div class="form-group">
+              <label>Edge estimé (%)</label>
+              <input type="number" id="j-edge" class="form-control" placeholder="8" />
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>Résultat</label>
+              <select id="j-result" class="form-control">
+                <option value="pending">⏳ En attente</option>
+                <option value="win">✅ Gagné</option>
+                <option value="loss">❌ Perdu</option>
+                <option value="void">↩️ Annulé</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>Raisonnement (bref)</label>
+              <input type="text" id="j-reason" class="form-control" placeholder="ex: Fatigue adverse, edge +9%" />
+            </div>
+          </div>
+          <button type="button" class="btn btn-primary" id="btn-save-bet">Enregistrer le pari</button>
+        </form>
+      </div>
+
+      <!-- Filters -->
+      <div class="card journal-filters">
+        <div class="form-row">
+          <div class="form-group">
+            <label>Filtrer par sport</label>
+            <select id="filter-sport" class="form-control">
+              <option value="all">Tous</option>
+              <option value="tennis">🎾 Tennis</option>
+              <option value="football">⚽ Football</option>
+              <option value="basketball">🏀 Basketball</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Filtrer par type</label>
+            <select id="filter-type" class="form-control">
+              <option value="all">Tous</option>
+              <option value="prematch">Pré-match</option>
+              <option value="live">Live</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Filtrer par résultat</label>
+            <select id="filter-result" class="form-control">
+              <option value="all">Tous</option>
+              <option value="win">Gagnés</option>
+              <option value="loss">Perdus</option>
+              <option value="pending">En attente</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <!-- Stats Summary -->
+      <div class="stats-grid" id="journal-stats-grid">
+        <div class="stat-card stat-card-accent">
+          <div class="stat-label">Total Misé</div>
+          <div class="stat-value" id="j-total-staked">0 €</div>
+        </div>
+        <div class="stat-card stat-card-green">
+          <div class="stat-label">P&L Net</div>
+          <div class="stat-value" id="j-pnl">0 €</div>
+        </div>
+        <div class="stat-card stat-card-yellow">
+          <div class="stat-label">ROI</div>
+          <div class="stat-value" id="j-roi">0%</div>
+        </div>
+        <div class="stat-card stat-card-cyan">
+          <div class="stat-label">W / L</div>
+          <div class="stat-value" id="j-wl">0 / 0</div>
+        </div>
+      </div>
+
+      <!-- Journal Table -->
+      <div class="card">
+        <div class="journal-table-container">
+          <table class="journal-table" id="journal-table">
+            <thead>
+              <tr>
+                <th>Date</th>
+                <th>Sport</th>
+                <th>Match</th>
+                <th>Type</th>
+                <th>Marché</th>
+                <th>Sélection</th>
+                <th>Cote</th>
+                <th>Mise</th>
+                <th>Edge</th>
+                <th>P&L</th>
+                <th>Résultat</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody id="journal-tbody">
+              <tr><td colspan="12" class="empty-state">Aucun pari enregistré</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== SETTINGS ===== -->
+    <section class="tab-content" id="tab-settings">
+      <div class="page-header">
+        <h1>Paramètres</h1>
+      </div>
+      <div class="settings-grid">
+        <div class="card">
+          <div class="card-header"><h2>📐 Règles de Paris</h2></div>
+          <div class="form-group">
+            <label>Edge minimum pré-match (%)</label>
+            <input type="number" id="set-edge-prematch" class="form-control" value="5" />
+          </div>
+          <div class="form-group">
+            <label>Edge minimum live (%)</label>
+            <input type="number" id="set-edge-live" class="form-control" value="8" />
+          </div>
+          <div class="form-group">
+            <label>Stop-loss journalier (%)</label>
+            <input type="number" id="set-sl-daily" class="form-control" value="15" />
+          </div>
+          <div class="form-group">
+            <label>Stop-loss hebdomadaire (%)</label>
+            <input type="number" id="set-sl-weekly" class="form-control" value="25" />
+          </div>
+          <div class="form-group">
+            <label>Protection gains à (%)</label>
+            <input type="number" id="set-protect" class="form-control" value="20" />
+          </div>
+          <button class="btn btn-primary btn-full mt-8" id="btn-save-settings">Sauvegarder</button>
+        </div>
+        <div class="card">
+          <div class="card-header"><h2>ℹ️ À propos</h2></div>
+          <div class="about-content">
+            <div class="about-logo">🔮 OddsOracle</div>
+            <div class="about-version">Version 3.0 — Premium Design</div>
+            <div class="about-desc">Système expert de prédiction de paris sportifs combinant analyse quantitative, veille marché et gestion bankroll rigoureuse.</div>
+            <div class="about-stat">Conçu sur l'expérience terrain Roland-Garros 2026</div>
+            <div class="about-stat">ROI initial : +26% · Bankroll 520€ → 656€</div>
+            <div class="about-stat">5 paris gagnés sur 12 · 7 jours</div>
+            <hr class="divider" />
+            <button class="btn btn-danger btn-full" id="btn-reset-all">⚠️ Réinitialiser toutes les données</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <script src="js/models.js"></script>
+  <script src="js/bankroll.js"></script>
+  <script src="js/api.js"></script>
+  <script src="js/prematch.js"></script>
+  <script src="js/live.js"></script>
+  <script src="js/journal.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>

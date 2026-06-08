@@ -1,0 +1,18 @@
+services:
+  - type: web
+    name: oddsoracle
+    env: node
+    plan: free
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: ODDS_API_KEY
+        sync: false   # ← à renseigner dans le dashboard Render
+      - key: RENDER_EXTERNAL_URL
+        fromService:
+          type: web
+          name: oddsoracle
+          property: host
