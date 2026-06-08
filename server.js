@@ -1,6 +1,6 @@
 /**
- * OddsOracle — Backend Server
- * Express + The Odds API proxy + SSE live updates + keep-alive
+ * OddsOracle -- Backend Server v3.0
+ * Express + The Odds API proxy + SSE live updates + Scanner IA + keep-alive
  */
 
 'use strict';
@@ -13,218 +13,158 @@ const https      = require('https');
 const app  = express();
 const PORT = process.env.PORT || 3000;
 
-// ──────────────────────────────────────────────
-// CONFIG
-// ──────────────────────────────────────────────
 const ODDS_API_KEY  = process.env.ODDS_API_KEY  || '';
 const ODDS_API_BASE = 'https://api.the-odds-api.com/v4';
 
-// Sports suivis par OddsOracle
 const SPORTS = [
-  { key: 'tennis_atp',            label: 'Tennis ATP',         icon: '🎾' },
-  { key: 'tennis_wta',            label: 'Tennis WTA',         icon: '🎾' },
-  { key: 'soccer_france_ligue1',  label: 'Ligue 1',            icon: '⚽' },
-  { key: 'soccer_epl',            label: 'Premier League',     icon: '⚽' },
-  { key: 'soccer_europe_champs',  label: 'Champions League',   icon: '⚽' },
-  { key: 'basketball_nba',        label: 'NBA',                icon: '🏀' },
-  { key: 'basketball_euroleague', label: 'Euroleague',         icon: '🏀' },
+  { key: 'tennis_atp',            label: 'Tennis ATP',       icon: 'T' },
+  { key: 'tennis_wta',            label: 'Tennis WTA',       icon: 'T' },
+  { key: 'soccer_france_ligue1',  label: 'Ligue 1',          icon: 'F' },
+  { key: 'soccer_epl',            label: 'Premier League',   icon: 'F' },
+  { key: 'soccer_europe_champs',  label: 'Champions League', icon: 'F' },
+  { key: 'basketball_nba',        label: 'NBA',              icon: 'B' },
+  { key: 'basketball_euroleague', label: 'Euroleague',       icon: 'B' },
 ];
 
-// Bookmakers à afficher (priorité)
 const BOOKMAKERS = ['betclic', 'unibet', 'pinnacle', 'winamax', 'bet365'];
 
-// ──────────────────────────────────────────────
-// CACHE IN-MEMORY (évite de brûler les quotas API)
-// ──────────────────────────────────────────────
+// ── CACHE ──
 class Cache {
   constructor() { this._store = new Map(); }
-
   set(key, value, ttlSeconds) {
-    this._store.set(key, {
-      value,
-      expiresAt: Date.now() + ttlSeconds * 1000
-    });
+    this._store.set(key, { value, expiresAt: Date.now() + ttlSeconds * 1000 });
   }
-
   get(key) {
     const entry = this._store.get(key);
     if (!entry) return null;
     if (Date.now() > entry.expiresAt) { this._store.delete(key); return null; }
     return entry.value;
   }
-
-  del(key)   { this._store.delete(key); }
-  size()     { return this._store.size; }
+  del(key) { this._store.delete(key); }
+  size()   { return this._store.size; }
 }
 
 const cache = new Cache();
 
-// ──────────────────────────────────────────────
-// SUIVI QUOTA API
-// ──────────────────────────────────────────────
 let apiUsage = {
-  requestsUsed:    0,
+  requestsUsed: 0,
   requestsRemaining: null,
   lastReset: new Date().toISOString(),
 };
 
-// ──────────────────────────────────────────────
-// HELPER: Fetch depuis The Odds API
-// ──────────────────────────────────────────────
+// ── HELPER: Fetch Odds API ──
 function oddsApiFetch(endpoint, params = {}) {
   return new Promise((resolve, reject) => {
     if (!ODDS_API_KEY) {
-      reject(new Error('ODDS_API_KEY non configurée. Voir .env.example'));
+      reject(new Error('ODDS_API_KEY non configuree. Voir .env.example'));
       return;
     }
-
-    const queryParams = new URLSearchParams({
-      apiKey: ODDS_API_KEY,
-      ...params
-    });
-
+    const queryParams = new URLSearchParams({ apiKey: ODDS_API_KEY, ...params });
     const url = `${ODDS_API_BASE}${endpoint}?${queryParams}`;
-    console.log(`[API] GET ${endpoint}`);
-
+    console.log('[API] GET ' + endpoint);
     https.get(url, (res) => {
-      // Mettre à jour le suivi de quota depuis les headers
       if (res.headers['x-requests-used']) {
         apiUsage.requestsUsed      = parseInt(res.headers['x-requests-used']);
         apiUsage.requestsRemaining = parseInt(res.headers['x-requests-remaining']);
       }
-
       let data = '';
       res.on('data', chunk => data += chunk);
       res.on('end', () => {
-        if (res.statusCode === 401) {
-          reject(new Error('Clé API invalide ou expirée'));
-          return;
-        }
-        if (res.statusCode === 422) {
-          reject(new Error('Sport non disponible ou paramètre invalide'));
-          return;
-        }
-        if (res.statusCode !== 200) {
-          reject(new Error(`Erreur API ${res.statusCode}: ${data}`));
-          return;
-        }
-        try {
-          resolve(JSON.parse(data));
-        } catch(e) {
-          reject(new Error('Réponse API invalide (JSON mal formé)'));
-        }
+        if (res.statusCode === 401) { reject(new Error('Cle API invalide ou expiree')); return; }
+        if (res.statusCode === 422) { reject(new Error('Sport non disponible ou parametre invalide')); return; }
+        if (res.statusCode !== 200) { reject(new Error('Erreur API ' + res.statusCode)); return; }
+        try { resolve(JSON.parse(data)); }
+        catch(e) { reject(new Error('Reponse API invalide (JSON mal forme)')); }
       });
     }).on('error', reject);
   });
 }
 
-// ──────────────────────────────────────────────
-// MIDDLEWARE
-// ──────────────────────────────────────────────
+// ── HELPERS ──
+function formatBookmakers(bookmakers) {
+  return bookmakers
+    .filter(bk => BOOKMAKERS.includes(bk.key))
+    .map(bk => {
+      const h2h = bk.markets && bk.markets.find(m => m.key === 'h2h');
+      if (!h2h) return null;
+      return {
+        key:        bk.key,
+        title:      bk.title,
+        odds:       (h2h.outcomes || []).map(o => ({ name: o.name, price: o.price })),
+        lastUpdate: bk.last_update,
+      };
+    })
+    .filter(Boolean);
+}
+
+function extractBestOdds(bookmakers) {
+  const bestByOutcome = {};
+  bookmakers.forEach(bk => {
+    const h2h = bk.markets && bk.markets.find(m => m.key === 'h2h');
+    if (!h2h) return;
+    (h2h.outcomes || []).forEach(o => {
+      if (!bestByOutcome[o.name] || o.price > bestByOutcome[o.name].price) {
+        bestByOutcome[o.name] = { price: o.price, bookmaker: bk.title };
+      }
+    });
+  });
+  return bestByOutcome;
+}
+
+// ── MIDDLEWARE ──
 app.use(cors());
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
-// ──────────────────────────────────────────────
-// ROUTES API
-// ──────────────────────────────────────────────
+// ── ROUTES ──
 
-/**
- * GET /health
- * Keep-alive endpoint (ping par Render / UptimeRobot)
- */
 app.get('/health', (req, res) => {
-  res.json({
-    status: 'ok',
-    uptime: Math.floor(process.uptime()),
-    apiUsage,
-    cacheSize: cache.size(),
-    timestamp: new Date().toISOString(),
-  });
+  res.json({ status: 'ok', uptime: Math.floor(process.uptime()), apiUsage, cacheSize: cache.size(), timestamp: new Date().toISOString() });
 });
 
-/**
- * GET /api/sports
- * Liste des sports disponibles (mise en cache 24h)
- */
 app.get('/api/sports', async (req, res) => {
   const cacheKey = 'sports_list';
-  const cached = cache.get(cacheKey);
+  const cached   = cache.get(cacheKey);
   if (cached) return res.json({ data: cached, cached: true });
-
-  try {
-    // Retourner la liste statique configurée (économise des req API)
-    const data = SPORTS;
-    cache.set(cacheKey, data, 86400); // 24h
-    res.json({ data, cached: false });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
+  cache.set(cacheKey, SPORTS, 86400);
+  res.json({ data: SPORTS, cached: false });
 });
 
-/**
- * GET /api/events?sport=tennis_atp
- * Matchs à venir + en cours pour un sport (cache 30 min)
- */
 app.get('/api/events', async (req, res) => {
   const sport    = req.query.sport || 'tennis_atp';
-  const cacheKey = `events_${sport}`;
+  const cacheKey = 'events_' + sport;
   const cached   = cache.get(cacheKey);
-
   if (cached) return res.json({ data: cached, cached: true, apiUsage });
-
   try {
-    const events = await oddsApiFetch(`/sports/${sport}/events`, {
-      dateFormat: 'iso',
-    });
-
-    // Filtrer: seulement matchs dans les prochaines 48h ou en cours
-    const now   = Date.now();
-    const h48   = now + 48 * 3600 * 1000;
+    const events = await oddsApiFetch('/sports/' + sport + '/events', { dateFormat: 'iso' });
+    const now = Date.now();
+    const h48 = now + 48 * 3600 * 1000;
     const relevant = events.filter(e => {
       const t = new Date(e.commence_time).getTime();
-      return t >= now - 3600 * 1000 && t <= h48; // -1h pour matchs en cours
+      return t >= now - 3600 * 1000 && t <= h48;
     });
-
-    cache.set(cacheKey, relevant, 1800); // 30 min
+    cache.set(cacheKey, relevant, 1800);
     res.json({ data: relevant, cached: false, apiUsage });
   } catch (err) {
     console.error('[events]', err.message);
-    // Fallback: retourner les données en cache même expirées
-    const stale = cache.get(`${cacheKey}_stale`);
+    const stale = cache.get(cacheKey + '_stale');
     if (stale) return res.json({ data: stale, cached: true, stale: true, error: err.message, apiUsage });
     res.status(500).json({ error: err.message, apiUsage });
   }
 });
 
-/**
- * GET /api/odds?sport=tennis_atp&eventId=abc123
- * Cotes d'un événement ou de tous les matchs d'un sport (cache 15 min)
- * Bookmakers prioritaires: Betclic, Pinnacle, Winamax, Unibet, Bet365
- */
 app.get('/api/odds', async (req, res) => {
-  const sport   = req.query.sport   || 'tennis_atp';
-  const eventId = req.query.eventId || null;
-  const cacheKey = `odds_${sport}_${eventId || 'all'}`;
+  const sport    = req.query.sport   || 'tennis_atp';
+  const eventId  = req.query.eventId || null;
+  const cacheKey = 'odds_' + sport + '_' + (eventId || 'all');
   const cached   = cache.get(cacheKey);
-
   if (cached) return res.json({ data: cached, cached: true, apiUsage });
-
   try {
-    const params = {
-      regions:    'eu',
-      markets:    'h2h',
-      oddsFormat: 'decimal',
-      bookmakers: BOOKMAKERS.join(','),
-    };
-
+    const params   = { regions: 'eu', markets: 'h2h', oddsFormat: 'decimal', bookmakers: BOOKMAKERS.join(',') };
     const endpoint = eventId
-      ? `/sports/${sport}/events/${eventId}/odds`
-      : `/sports/${sport}/odds`;
-
+      ? '/sports/' + sport + '/events/' + eventId + '/odds'
+      : '/sports/' + sport + '/odds';
     const raw = await oddsApiFetch(endpoint, params);
-
-    // Normaliser: extraire la meilleure cote par bookmaker
     const normalized = (Array.isArray(raw) ? raw : [raw]).map(event => ({
       id:           event.id,
       sport:        event.sport_key,
@@ -234,45 +174,30 @@ app.get('/api/odds', async (req, res) => {
       bookmakers:   formatBookmakers(event.bookmakers || []),
       bestOdds:     extractBestOdds(event.bookmakers || []),
     }));
-
-    cache.set(cacheKey, normalized, 900); // 15 min
-    // Garder copie "stale" pour fallback
-    cache.set(`${cacheKey}_stale`, normalized, 7200);
-
+    cache.set(cacheKey, normalized, 900);
+    cache.set(cacheKey + '_stale', normalized, 7200);
     res.json({ data: normalized, cached: false, apiUsage });
   } catch (err) {
     console.error('[odds]', err.message);
-    const stale = cache.get(`${cacheKey}_stale`);
+    const stale = cache.get(cacheKey + '_stale');
     if (stale) return res.json({ data: stale, cached: true, stale: true, error: err.message, apiUsage });
     res.status(500).json({ error: err.message, apiUsage });
   }
 });
 
-/**
- * GET /api/scores?sport=tennis_atp&daysFrom=1
- * Scores live et récents (cache 2 min)
- */
 app.get('/api/scores', async (req, res) => {
   const sport    = req.query.sport    || 'tennis_atp';
   const daysFrom = req.query.daysFrom || '1';
-  const cacheKey = `scores_${sport}_${daysFrom}`;
+  const cacheKey = 'scores_' + sport + '_' + daysFrom;
   const cached   = cache.get(cacheKey);
-
   if (cached) return res.json({ data: cached, cached: true, apiUsage });
-
   try {
-    const scores = await oddsApiFetch(`/sports/${sport}/scores`, {
-      daysFrom,
-      dateFormat: 'iso',
-    });
-
-    // Trier: matchs en cours d'abord, puis récents
+    const scores = await oddsApiFetch('/sports/' + sport + '/scores', { daysFrom, dateFormat: 'iso' });
     const sorted = scores.sort((a, b) => {
       if (a.completed === b.completed) return 0;
-      return a.completed ? 1 : -1; // en cours en premier
+      return a.completed ? 1 : -1;
     });
-
-    cache.set(cacheKey, sorted, 120); // 2 min
+    cache.set(cacheKey, sorted, 120);
     res.json({ data: sorted, cached: false, apiUsage });
   } catch (err) {
     console.error('[scores]', err.message);
@@ -280,42 +205,162 @@ app.get('/api/scores', async (req, res) => {
   }
 });
 
-/**
- * GET /api/quota
- * Suivi des requêtes API restantes
- */
 app.get('/api/quota', (req, res) => {
   res.json(apiUsage);
 });
 
-/**
- * POST /api/cache/clear
- * Vider le cache (forcer rechargement des données)
- */
+// ── SCANNER IA ──
+app.get('/api/scanner', async (req, res) => {
+  const cacheKey = 'scanner_results';
+  const cached   = cache.get(cacheKey);
+  if (cached) return res.json({ data: cached, cached: true, apiUsage, scannedAt: cached._scannedAt });
+
+  if (!ODDS_API_KEY) {
+    return res.status(503).json({ error: 'ODDS_API_KEY non configuree', apiUsage });
+  }
+
+  const opportunities = [];
+  const now = Date.now();
+  const h48 = now + 48 * 3600 * 1000;
+  let sportsScanned = 0;
+  let eventsFound   = 0;
+
+  for (const sport of SPORTS) {
+    try {
+      const oddsCacheKey = 'odds_' + sport.key + '_all';
+      let oddsData = cache.get(oddsCacheKey);
+
+      if (!oddsData) {
+        const raw = await oddsApiFetch('/sports/' + sport.key + '/odds', {
+          regions:    'eu',
+          markets:    'h2h',
+          oddsFormat: 'decimal',
+          bookmakers: BOOKMAKERS.join(','),
+        });
+        oddsData = (Array.isArray(raw) ? raw : [raw]).map(event => ({
+          id:           event.id,
+          sport:        event.sport_key,
+          homeTeam:     event.home_team,
+          awayTeam:     event.away_team,
+          commenceTime: event.commence_time,
+          bookmakers:   formatBookmakers(event.bookmakers || []),
+          bestOdds:     extractBestOdds(event.bookmakers || []),
+          _raw:         event.bookmakers || [],
+        }));
+        cache.set(oddsCacheKey, oddsData, 900);
+        cache.set(oddsCacheKey + '_stale', oddsData, 7200);
+      }
+
+      sportsScanned++;
+
+      for (const event of oddsData) {
+        const t = new Date(event.commenceTime).getTime();
+        if (t < now - 3 * 3600 * 1000 || t > h48) continue;
+        eventsFound++;
+
+        const isLive = t < now;
+        const rawBk  = event._raw || [];
+        if (rawBk.length < 2) continue;
+
+        const pinnacle = rawBk.find(function(b) { return b.key === 'pinnacle'; });
+        const sharpBk  = pinnacle || rawBk[0];
+        const sharpH2H = sharpBk && sharpBk.markets && sharpBk.markets.find(function(m) { return m.key === 'h2h'; });
+        if (!sharpH2H || !sharpH2H.outcomes || !sharpH2H.outcomes.length) continue;
+
+        const outcomes  = sharpH2H.outcomes;
+        const overround = outcomes.reduce(function(s, o) { return s + 1 / o.price; }, 0);
+        const trueProbs = {};
+        for (const o of outcomes) {
+          trueProbs[o.name] = (1 / o.price) / overround;
+        }
+
+        for (const o of outcomes) {
+          const trueProb = trueProbs[o.name];
+          let bestPrice    = 1.0;
+          let bestBookKey  = '';
+          let bestBookName = '';
+
+          for (const bk of rawBk) {
+            const bkH2H = bk.markets && bk.markets.find(function(m) { return m.key === 'h2h'; });
+            const bkOut = bkH2H && bkH2H.outcomes && bkH2H.outcomes.find(function(out) { return out.name === o.name; });
+            if (bkOut && bkOut.price > bestPrice) {
+              bestPrice    = bkOut.price;
+              bestBookKey  = bk.key;
+              bestBookName = bk.title || bk.key;
+            }
+          }
+
+          if (!bestBookKey) continue;
+
+          const edge = (trueProb * bestPrice - 1) * 100;
+          if (edge < 2) continue;
+
+          const confidence = pinnacle ? 'high' : rawBk.length >= 3 ? 'medium' : 'low';
+          const hoursLeft  = (t - now) / 3600000;
+          const urgency    = isLive ? 'live' : hoursLeft < 2 ? 'soon' : hoursLeft < 6 ? 'today' : 'upcoming';
+
+          opportunities.push({
+            sport:        sport.key,
+            sportLabel:   sport.label,
+            sportIcon:    sport.icon,
+            matchId:      event.id,
+            homeTeam:     event.homeTeam,
+            awayTeam:     event.awayTeam,
+            commenceTime: event.commenceTime,
+            isLive,
+            urgency,
+            hoursLeft:    Math.round(hoursLeft * 10) / 10,
+            selection:    o.name,
+            trueProb:     Math.round(trueProb * 1000) / 10,
+            sharpPrice:   o.price,
+            bestPrice,
+            bestBook:     bestBookName || bestBookKey,
+            edge:         Math.round(edge * 10) / 10,
+            confidence,
+            ev:           Math.round((trueProb * bestPrice - 1) * 1000) / 10,
+          });
+        }
+      }
+    } catch (err) {
+      console.warn('[scanner] ' + sport.key + ': ' + err.message);
+    }
+  }
+
+  opportunities.sort(function(a, b) {
+    if (a.isLive !== b.isLive) return a.isLive ? -1 : 1;
+    return b.edge - a.edge;
+  });
+
+  const result = {
+    opportunities: opportunities.slice(0, 25),
+    meta: { sportsScanned, eventsFound, totalOpportunities: opportunities.length },
+    _scannedAt: new Date().toISOString(),
+  };
+
+  cache.set(cacheKey, result, 900);
+  res.json({ data: result, cached: false, apiUsage, scannedAt: result._scannedAt });
+});
+
 app.post('/api/cache/clear', (req, res) => {
-  const sport = req.body?.sport;
+  const sport = req.body && req.body.sport;
   if (sport) {
     ['events', 'odds', 'scores'].forEach(type => {
-      cache.del(`${type}_${sport}_all`);
-      cache.del(`${type}_${sport}_all_stale`);
+      cache.del(type + '_' + sport + '_all');
+      cache.del(type + '_' + sport + '_all_stale');
     });
-    res.json({ ok: true, message: `Cache vidé pour ${sport}` });
+    cache.del('scanner_results');
+    res.json({ ok: true, message: 'Cache vide pour ' + sport });
   } else {
-    // Vider tout sauf sports_list
-    res.json({ ok: true, message: 'Cache vidé (prochain accès = données fraîches)' });
+    cache.del('scanner_results');
+    res.json({ ok: true, message: 'Cache vide' });
   }
 });
 
-/**
- * GET /api/stream?sport=tennis_atp
- * Server-Sent Events: envoie des mises à jour live toutes les 2 minutes
- * Utilisé uniquement pendant une session live active
- */
+// ── SSE LIVE STREAM ──
 const sseClients = new Set();
 
 app.get('/api/stream', (req, res) => {
   const sport = req.query.sport || 'tennis_atp';
-
   res.setHeader('Content-Type',  'text/event-stream');
   res.setHeader('Cache-Control', 'no-cache');
   res.setHeader('Connection',    'keep-alive');
@@ -324,54 +369,38 @@ app.get('/api/stream', (req, res) => {
   const clientId = Date.now();
   const client   = { id: clientId, res, sport };
   sseClients.add(client);
+  console.log('[SSE] Client ' + clientId + ' connected (' + sport + ') total: ' + sseClients.size);
 
-  console.log(`[SSE] Client connecté #${clientId} (${sport}) — total: ${sseClients.size}`);
+  res.write('event: connected\ndata: ' + JSON.stringify({ clientId, sport }) + '\n\n');
 
-  // Envoyer immédiatement un heartbeat
-  res.write(`event: connected\ndata: ${JSON.stringify({ clientId, sport })}\n\n`);
-
-  // Heartbeat toutes les 30s pour garder la connexion
   const heartbeat = setInterval(() => {
-    res.write(`event: heartbeat\ndata: ${new Date().toISOString()}\n\n`);
+    res.write('event: heartbeat\ndata: ' + new Date().toISOString() + '\n\n');
   }, 30000);
 
   req.on('close', () => {
     clearInterval(heartbeat);
     sseClients.delete(client);
-    console.log(`[SSE] Client déconnecté #${clientId} — total: ${sseClients.size}`);
+    console.log('[SSE] Client ' + clientId + ' disconnected');
   });
 });
 
-// ── Broadcast live scores aux clients SSE connectés
 async function broadcastScores() {
   if (sseClients.size === 0) return;
-
-  // Grouper par sport
   const sports = [...new Set([...sseClients].map(c => c.sport))];
-
   for (const sport of sports) {
     try {
-      // Utiliser le cache ou faire une requête (max 1 req/2min par sport)
-      const cacheKey = `scores_${sport}_1`;
+      const cacheKey = 'scores_' + sport + '_1';
       let data = cache.get(cacheKey);
-
       if (!data && ODDS_API_KEY) {
-        const scores = await oddsApiFetch(`/sports/${sport}/scores`, {
-          daysFrom: '1', dateFormat: 'iso'
-        });
+        const scores = await oddsApiFetch('/sports/' + sport + '/scores', { daysFrom: '1', dateFormat: 'iso' });
         data = scores;
         cache.set(cacheKey, data, 120);
       }
-
       if (!data) continue;
-
       const liveMatches = data.filter(s => !s.completed);
       const payload = JSON.stringify({ sport, liveMatches, timestamp: new Date().toISOString() });
-
       sseClients.forEach(client => {
-        if (client.sport === sport) {
-          client.res.write(`event: scores\ndata: ${payload}\n\n`);
-        }
+        if (client.sport === sport) client.res.write('event: scores\ndata: ' + payload + '\n\n');
       });
     } catch(e) {
       console.error('[broadcast]', e.message);
@@ -379,85 +408,36 @@ async function broadcastScores() {
   }
 }
 
-// Broadcaster toutes les 2 minutes si des clients sont connectés
 setInterval(broadcastScores, 120000);
 
-// ──────────────────────────────────────────────
-// HELPERS
-// ──────────────────────────────────────────────
-function formatBookmakers(bookmakers) {
-  return bookmakers
-    .filter(bk => BOOKMAKERS.includes(bk.key))
-    .map(bk => {
-      const h2h = bk.markets?.find(m => m.key === 'h2h');
-      if (!h2h) return null;
-      return {
-        key:    bk.key,
-        title:  bk.title,
-        odds:   h2h.outcomes?.map(o => ({ name: o.name, price: o.price })) || [],
-        lastUpdate: bk.last_update,
-      };
-    })
-    .filter(Boolean);
-}
-
-function extractBestOdds(bookmakers) {
-  const bestByOutcome = {};
-
-  bookmakers.forEach(bk => {
-    const h2h = bk.markets?.find(m => m.key === 'h2h');
-    if (!h2h) return;
-    h2h.outcomes?.forEach(o => {
-      if (!bestByOutcome[o.name] || o.price > bestByOutcome[o.name].price) {
-        bestByOutcome[o.name] = { price: o.price, bookmaker: bk.title };
-      }
-    });
-  });
-
-  return bestByOutcome;
-}
-
-// ──────────────────────────────────────────────
-// KEEP-ALIVE (Render free tier dort après 15 min)
-// Auto-ping toutes les 14 minutes pour rester éveillé
-// ──────────────────────────────────────────────
+// ── KEEP-ALIVE (Render free tier) ──
 if (process.env.NODE_ENV === 'production' && process.env.RENDER_EXTERNAL_URL) {
   const selfUrl = process.env.RENDER_EXTERNAL_URL;
-  console.log(`[keep-alive] Activé → ping ${selfUrl}/health toutes les 14 min`);
-
+  console.log('[keep-alive] Active -> ping ' + selfUrl + '/health every 14 min');
   setInterval(() => {
-    https.get(`${selfUrl}/health`, (res) => {
-      console.log(`[keep-alive] ping OK (${res.statusCode})`);
+    https.get(selfUrl + '/health', (res) => {
+      console.log('[keep-alive] ping OK (' + res.statusCode + ')');
     }).on('error', (e) => {
       console.error('[keep-alive] ping FAIL:', e.message);
     });
   }, 14 * 60 * 1000);
 }
 
-// ──────────────────────────────────────────────
-// SPA FALLBACK: toutes les routes non-API → index.html
-// ──────────────────────────────────────────────
+// ── SPA FALLBACK ──
 app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
-// ──────────────────────────────────────────────
-// START
-// ──────────────────────────────────────────────
+// ── START ──
 app.listen(PORT, () => {
-  console.log(`
-  ╔══════════════════════════════════════╗
-  ║   🔮 OddsOracle Server v2.0         ║
-  ║   http://localhost:${PORT}              ║
-  ╠══════════════════════════════════════╣
-  ║   API Key: ${ODDS_API_KEY ? '✅ configurée' : '❌ MANQUANTE (.env)'}         ║
-  ║   Mode: ${process.env.NODE_ENV || 'development'}                       ║
-  ╚══════════════════════════════════════╝
-  `);
-
+  console.log('');
+  console.log('  OddsOracle Server v3.0');
+  console.log('  http://localhost:' + PORT);
+  console.log('  API Key: ' + (ODDS_API_KEY ? 'OK' : 'MISSING (.env)'));
+  console.log('  Mode: ' + (process.env.NODE_ENV || 'development'));
+  console.log('');
   if (!ODDS_API_KEY) {
-    console.warn('  ⚠️  ODDS_API_KEY non définie — données live désactivées.');
-    console.warn('     → Obtenez une clé gratuite sur https://the-odds-api.com/');
-    console.warn('     → Ajoutez ODDS_API_KEY=votre_cle dans .env');
+    console.warn('  WARNING: ODDS_API_KEY not set -- live data disabled.');
+    console.warn('  Get a free key at https://the-odds-api.com/');
   }
 });

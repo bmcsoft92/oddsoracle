@@ -759,11 +759,12 @@ document.addEventListener('DOMContentLoaded', () => {
   JournalModule.init();
   SettingsModule.init();
   LiveMatchSelector.init();
+  ScannerModule.init();
 
   // Dashboard initial
   DashboardModule.refresh();
   updateDatetime();
   setInterval(updateDatetime, 60000);
 
-  console.log('🔮 OddsOracle v2.0 initialized — Live data connected');
+  console.log('OddsOracle v3.0 initialized -- Scanner IA active');
 });

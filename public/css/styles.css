@@ -881,35 +881,39 @@ select.form-control {
 .f-sep    { color: var(--text-dim); }
 .f-action { color: var(--cyan-light); font-weight: 700; }
 
-/* ── SCROLLBAR ── */
-::-webkit-scrollbar { width: 5px; height: 5px; }
-::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: var(--bg-active); border-radius: 3px; }
-::-webkit-scrollbar-thumb:hover { background: var(--border-light); }
-
-/* ── UTILS ── */
-.text-green   { color: var(--green-light) !important; }
-.text-red     { color: var(--red-light) !important; }
-.text-yellow  { color: var(--yellow-light) !important; }
-.text-cyan    { color: var(--cyan-light) !important; }
-.text-accent  { color: var(--accent-light) !important; }
-.text-muted   { color: var(--text-muted) !important; }
-.fw-bold      { font-weight: 700; }
-.mono         { font-family: var(--mono); }
-
-/* ── RESPONSIVE ── */
-@media (max-width: 1400px) { .stats-grid { grid-template-columns: repeat(2,1fr); } }
-@media (max-width: 1100px) {
-  .dashboard-grid,.two-col,.live-grid,.bankroll-grid,.settings-grid { grid-template-columns: 1fr; }
-  .live-alert-card,.live-fiche-card { grid-column: span 1; }
-  .signal-danger { grid-column: span 1; }
+/* ── SCANNER IA ── */
+.scanner-info-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: .75rem;
+  padding: .85rem 1.1rem;
+  background: var(--accent-dim);
+  border: 1px solid var(--border-glow);
+  border-radius: var(--radius-sm);
+  margin-bottom: 1.25rem;
+  font-size: .8rem;
+  color: var(--text-secondary);
+  line-height: 1.6;
 }
-@media (max-width: 768px) {
-  :root { --sidebar-w: 64px; }
-  .nav-item span:not(.nav-icon),.nav-badge,.logo-text,.logo-tag { display: none; }
-  .sidebar-footer { display: none; }
-  .main-content { padding: 1rem 1.25rem; }
-  .stats-grid { grid-template-columns: 1fr 1fr; }
-  .players-grid { grid-template-columns: 1fr; }
-  .vs-divider { display: none; }
+.scanner-filters-card { margin-bottom: 1.25rem; }
+.scanner-filters-card .card-header { display: none; }
+.scanner-filters { display: flex; gap: .75rem; align-items: flex-start; flex-wrap: wrap; }
+.scanner-filters .form-group { flex: 1; min-width: 160px; }
+.scanner-status-bar { display: flex; flex-direction: column; gap: .2rem; }
+.scanner-status { font-size: .72rem; color: var(--text-muted); }
+.scanner-status.ok    { color: var(--green); }
+.scanner-status.error { color: var(--red); }
+.scanner-meta { font-size: .65rem; color: var(--text-dim); }
+.scanner-loading {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  padding: 3rem; gap: 1rem; color: var(--text-muted); font-size: .85rem;
 }
+.scanner-spinner {
+  width: 36px; height: 36px;
+  border: 3px solid var(--border);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin .8s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+.scanner-empty,.scanner-error { text-align: center; color: var(--text-muted); padding: 3rem 1rem; font-size: .85rem; }
