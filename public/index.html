@@ -159,6 +159,21 @@
         </div>
       </div>
 
+      <!-- Barre notifications + auto-log -->
+      <div class="sc-controls-bar">
+        <div class="sc-controls-left">
+          <button class="btn btn-sm btn-secondary sc-notif-btn" id="btn-notif-toggle">🔕 Notifications OFF</button>
+          <label class="sc-toggle-label">
+            <input type="checkbox" id="scan-auto-log" />
+            <span class="sc-toggle-track"><span class="sc-toggle-thumb"></span></span>
+            <span>Auto-log journal</span>
+          </label>
+        </div>
+        <div class="sc-controls-right">
+          <span class="sc-controls-hint">Les nouvelles opportunités détectées seront notifiées et/ou enregistrées automatiquement</span>
+        </div>
+      </div>
+
       <!-- Info disclaimer -->
       <div class="scanner-info-banner">
         <span>🤖</span>
@@ -169,16 +184,36 @@
       <div class="card scanner-filters-card">
         <div class="scanner-filters">
           <div class="form-group">
-            <label>Sport</label>
+            <label>Sport <span class="quota-badge" id="sports-count-badge" style="margin-left:.35rem"></span></label>
             <select id="scan-filter-sport" class="form-control">
               <option value="all">Tous les sports</option>
-              <option value="tennis_atp">🎾 Tennis ATP</option>
-              <option value="tennis_wta">🎾 Tennis WTA</option>
-              <option value="soccer_france_ligue1">⚽ Ligue 1</option>
-              <option value="soccer_epl">⚽ Premier League</option>
-              <option value="soccer_europe_champs">⚽ Champions League</option>
-              <option value="basketball_nba">🏀 NBA</option>
-              <option value="basketball_euroleague">🏀 Euroleague</option>
+              <optgroup label="🎾 Tennis">
+                <option value="tennis_atp">Tennis ATP</option>
+                <option value="tennis_wta">Tennis WTA</option>
+              </optgroup>
+              <optgroup label="⚽ Football Europe">
+                <option value="soccer_france_ligue1">Ligue 1</option>
+                <option value="soccer_epl">Premier League</option>
+                <option value="soccer_europe_champs">Champions League</option>
+                <option value="soccer_spain_la_liga">La Liga</option>
+                <option value="soccer_italy_serie_a">Serie A</option>
+                <option value="soccer_germany_bundesliga">Bundesliga</option>
+                <option value="soccer_portugal_primeira_liga">Primeira Liga</option>
+                <option value="soccer_netherlands_eredivisie">Eredivisie</option>
+              </optgroup>
+              <optgroup label="⚽ Football Ameriques">
+                <option value="soccer_usa_mls">MLS</option>
+                <option value="soccer_colombia_primera_a">Colombia Primera A</option>
+                <option value="soccer_brazil_campeonato">Brasileirao</option>
+                <option value="soccer_argentina_primera_division">Argentina Liga</option>
+              </optgroup>
+              <optgroup label="🏀 Basketball">
+                <option value="basketball_nba">NBA</option>
+                <option value="basketball_nba_championship">NBA Playoffs</option>
+                <option value="basketball_wnba">WNBA</option>
+                <option value="basketball_euroleague">Euroleague</option>
+                <option value="basketball_ncaab">NCAA Basketball</option>
+              </optgroup>
             </select>
           </div>
           <div class="form-group">
@@ -227,6 +262,58 @@
         <div class="card form-card" id="prematch-form-card">
           <div class="card-header">
             <h2>📋 Données du Match</h2>
+          </div>
+
+          <!-- Sélecteur API -->
+          <div class="pm-api-selector">
+            <div class="pm-api-header">
+              <span class="pm-api-label">📡 Charger depuis l'API</span>
+              <span class="quota-badge" id="pm-api-badge"></span>
+            </div>
+            <div class="match-select-row">
+              <div class="form-group">
+                <label>Sport</label>
+                <select id="pm-api-sport" class="form-control">
+                  <optgroup label="🎾 Tennis">
+                    <option value="tennis_atp">Tennis ATP</option>
+                    <option value="tennis_wta">Tennis WTA</option>
+                  </optgroup>
+                  <optgroup label="⚽ Football Europe">
+                    <option value="soccer_france_ligue1">Ligue 1</option>
+                    <option value="soccer_epl">Premier League</option>
+                    <option value="soccer_europe_champs">Champions League</option>
+                    <option value="soccer_spain_la_liga">La Liga</option>
+                    <option value="soccer_italy_serie_a">Serie A</option>
+                    <option value="soccer_germany_bundesliga">Bundesliga</option>
+                    <option value="soccer_portugal_primeira_liga">Primeira Liga</option>
+                    <option value="soccer_netherlands_eredivisie">Eredivisie</option>
+                  </optgroup>
+                  <optgroup label="⚽ Football Ameriques">
+                    <option value="soccer_usa_mls">MLS</option>
+                    <option value="soccer_colombia_primera_a">Colombia Primera A</option>
+                    <option value="soccer_brazil_campeonato">Brasileirao</option>
+                    <option value="soccer_argentina_primera_division">Argentina Liga</option>
+                  </optgroup>
+                  <optgroup label="🏀 Basketball">
+                    <option value="basketball_nba">NBA</option>
+                    <option value="basketball_nba_championship">NBA Playoffs</option>
+                    <option value="basketball_wnba">WNBA</option>
+                    <option value="basketball_euroleague">Euroleague</option>
+                    <option value="basketball_ncaab">NCAA Basketball</option>
+                  </optgroup>
+                </select>
+              </div>
+              <div class="form-group" style="flex:2">
+                <label>Match</label>
+                <select id="pm-api-match" class="form-control">
+                  <option value="">-- Cliquer sur Actualiser pour charger --</option>
+                </select>
+              </div>
+              <div style="display:flex;gap:.4rem;align-items:flex-end">
+                <button type="button" class="btn btn-sm btn-secondary" id="pm-api-refresh">🔄</button>
+                <button type="button" class="btn btn-sm btn-primary" id="pm-api-load">⚡ Charger</button>
+              </div>
+            </div>
           </div>
 
           <form id="prematch-form">
@@ -434,13 +521,33 @@
           <div class="form-group">
             <label>Sport</label>
             <select id="live-sport-select" class="form-control">
-              <option value="tennis_atp">🎾 Tennis ATP</option>
-              <option value="tennis_wta">🎾 Tennis WTA</option>
-              <option value="soccer_france_ligue1">⚽ Ligue 1</option>
-              <option value="soccer_epl">⚽ Premier League</option>
-              <option value="soccer_europe_champs">⚽ Champions League</option>
-              <option value="basketball_nba">🏀 NBA</option>
-              <option value="basketball_euroleague">🏀 Euroleague</option>
+              <optgroup label="🎾 Tennis">
+                <option value="tennis_atp">Tennis ATP</option>
+                <option value="tennis_wta">Tennis WTA</option>
+              </optgroup>
+              <optgroup label="⚽ Football Europe">
+                <option value="soccer_france_ligue1">Ligue 1</option>
+                <option value="soccer_epl">Premier League</option>
+                <option value="soccer_europe_champs">Champions League</option>
+                <option value="soccer_spain_la_liga">La Liga</option>
+                <option value="soccer_italy_serie_a">Serie A</option>
+                <option value="soccer_germany_bundesliga">Bundesliga</option>
+                <option value="soccer_portugal_primeira_liga">Primeira Liga</option>
+                <option value="soccer_netherlands_eredivisie">Eredivisie</option>
+              </optgroup>
+              <optgroup label="⚽ Football Ameriques">
+                <option value="soccer_usa_mls">MLS</option>
+                <option value="soccer_colombia_primera_a">Colombia Primera A</option>
+                <option value="soccer_brazil_campeonato">Brasileirao</option>
+                <option value="soccer_argentina_primera_division">Argentina Liga</option>
+              </optgroup>
+              <optgroup label="🏀 Basketball">
+                <option value="basketball_nba">NBA</option>
+                <option value="basketball_nba_championship">NBA Playoffs</option>
+                <option value="basketball_wnba">WNBA</option>
+                <option value="basketball_euroleague">Euroleague</option>
+                <option value="basketball_ncaab">NCAA Basketball</option>
+              </optgroup>
             </select>
           </div>
           <div class="form-group" style="flex:2">
@@ -912,4 +1019,69 @@
                 <th></th>
               </tr>
             </thead>
-            <tbody id="jour
+            <tbody id="journal-tbody">
+              <tr><td colspan="12" class="empty-state">Aucun pari enregistré</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== SETTINGS ===== -->
+    <section class="tab-content" id="tab-settings">
+      <div class="page-header">
+        <h1>Paramètres</h1>
+      </div>
+      <div class="settings-grid">
+        <div class="card">
+          <div class="card-header"><h2>📐 Règles de Paris</h2></div>
+          <div class="form-group">
+            <label>Edge minimum pré-match (%)</label>
+            <input type="number" id="set-edge-prematch" class="form-control" value="5" />
+          </div>
+          <div class="form-group">
+            <label>Edge minimum live (%)</label>
+            <input type="number" id="set-edge-live" class="form-control" value="8" />
+          </div>
+          <div class="form-group">
+            <label>Stop-loss journalier (%)</label>
+            <input type="number" id="set-sl-daily" class="form-control" value="15" />
+          </div>
+          <div class="form-group">
+            <label>Stop-loss hebdomadaire (%)</label>
+            <input type="number" id="set-sl-weekly" class="form-control" value="25" />
+          </div>
+          <div class="form-group">
+            <label>Protection gains à (%)</label>
+            <input type="number" id="set-protect" class="form-control" value="20" />
+          </div>
+          <button class="btn btn-primary btn-full mt-8" id="btn-save-settings">Sauvegarder</button>
+        </div>
+        <div class="card">
+          <div class="card-header"><h2>ℹ️ À propos</h2></div>
+          <div class="about-content">
+            <div class="about-logo">🔮 OddsOracle</div>
+            <div class="about-version">Version 3.0 — Premium Design</div>
+            <div class="about-desc">Système expert de prédiction de paris sportifs combinant analyse quantitative, veille marché et gestion bankroll rigoureuse.</div>
+            <div class="about-stat">Conçu sur l'expérience terrain Roland-Garros 2026</div>
+            <div class="about-stat">ROI initial : +26% · Bankroll 520€ → 656€</div>
+            <div class="about-stat">5 paris gagnés sur 12 · 7 jours</div>
+            <hr class="divider" />
+            <button class="btn btn-danger btn-full" id="btn-reset-all">⚠️ Réinitialiser toutes les données</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <script src="js/models.js"></script>
+  <script src="js/bankroll.js"></script>
+  <script src="js/api.js"></script>
+  <script src="js/prematch.js"></script>
+  <script src="js/live.js"></script>
+  <script src="js/journal.js"></script>
+  <script src="js/scanner.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>

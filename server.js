@@ -17,18 +17,34 @@ const ODDS_API_KEY  = process.env.ODDS_API_KEY  || '';
 const ODDS_API_BASE = 'https://api.the-odds-api.com/v4';
 
 const SPORTS = [
-  { key: 'tennis_atp',            label: 'Tennis ATP',       icon: 'T' },
-  { key: 'tennis_wta',            label: 'Tennis WTA',       icon: 'T' },
-  { key: 'soccer_france_ligue1',  label: 'Ligue 1',          icon: 'F' },
-  { key: 'soccer_epl',            label: 'Premier League',   icon: 'F' },
-  { key: 'soccer_europe_champs',  label: 'Champions League', icon: 'F' },
-  { key: 'basketball_nba',        label: 'NBA',              icon: 'B' },
-  { key: 'basketball_euroleague', label: 'Euroleague',       icon: 'B' },
+  // Tennis
+  { key: 'tennis_atp',                   label: 'Tennis ATP',          icon: 'T', group: 'tennis' },
+  { key: 'tennis_wta',                   label: 'Tennis WTA',          icon: 'T', group: 'tennis' },
+  // Football -- Europe
+  { key: 'soccer_france_ligue1',         label: 'Ligue 1',             icon: 'F', group: 'football' },
+  { key: 'soccer_epl',                   label: 'Premier League',      icon: 'F', group: 'football' },
+  { key: 'soccer_europe_champs',         label: 'Champions League',    icon: 'F', group: 'football' },
+  { key: 'soccer_spain_la_liga',         label: 'La Liga',             icon: 'F', group: 'football' },
+  { key: 'soccer_italy_serie_a',         label: 'Serie A',             icon: 'F', group: 'football' },
+  { key: 'soccer_germany_bundesliga',    label: 'Bundesliga',          icon: 'F', group: 'football' },
+  { key: 'soccer_portugal_primeira_liga',label: 'Primeira Liga',       icon: 'F', group: 'football' },
+  { key: 'soccer_netherlands_eredivisie',label: 'Eredivisie',          icon: 'F', group: 'football' },
+  // Football -- Ameriques
+  { key: 'soccer_usa_mls',               label: 'MLS',                 icon: 'F', group: 'football' },
+  { key: 'soccer_colombia_primera_a',    label: 'Colombia Primera A',  icon: 'F', group: 'football' },
+  { key: 'soccer_brazil_campeonato',     label: 'Brasileirao',         icon: 'F', group: 'football' },
+  { key: 'soccer_argentina_primera_division', label: 'Argentina Liga', icon: 'F', group: 'football' },
+  // Basketball
+  { key: 'basketball_nba',               label: 'NBA',                 icon: 'B', group: 'basketball' },
+  { key: 'basketball_nba_championship',  label: 'NBA Playoffs',        icon: 'B', group: 'basketball' },
+  { key: 'basketball_wnba',              label: 'WNBA',                icon: 'B', group: 'basketball' },
+  { key: 'basketball_euroleague',        label: 'Euroleague',          icon: 'B', group: 'basketball' },
+  { key: 'basketball_ncaab',             label: 'NCAA Basketball',     icon: 'B', group: 'basketball' },
 ];
 
 const BOOKMAKERS = ['betclic', 'unibet', 'pinnacle', 'winamax', 'bet365'];
 
-// ── CACHE ──
+// -- CACHE --
 class Cache {
   constructor() { this._store = new Map(); }
   set(key, value, ttlSeconds) {
@@ -52,7 +68,7 @@ let apiUsage = {
   lastReset: new Date().toISOString(),
 };
 
-// ── HELPER: Fetch Odds API ──
+// -- HELPER: Fetch Odds API --
 function oddsApiFetch(endpoint, params = {}) {
   return new Promise((resolve, reject) => {
     if (!ODDS_API_KEY) {
@@ -80,7 +96,7 @@ function oddsApiFetch(endpoint, params = {}) {
   });
 }
 
-// ── HELPERS ──
+// -- HELPERS --
 function formatBookmakers(bookmakers) {
   return bookmakers
     .filter(bk => BOOKMAKERS.includes(bk.key))
@@ -111,12 +127,12 @@ function extractBestOdds(bookmakers) {
   return bestByOutcome;
 }
 
-// ── MIDDLEWARE ──
+// -- MIDDLEWARE --
 app.use(cors());
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
-// ── ROUTES ──
+// -- ROUTES --
 
 app.get('/health', (req, res) => {
   res.json({ status: 'ok', uptime: Math.floor(process.uptime()), apiUsage, cacheSize: cache.size(), timestamp: new Date().toISOString() });
@@ -128,6 +144,43 @@ app.get('/api/sports', async (req, res) => {
   if (cached) return res.json({ data: cached, cached: true });
   cache.set(cacheKey, SPORTS, 86400);
   res.json({ data: SPORTS, cached: false });
+});
+
+// Retourne TOUS les sports actifs sur la cle API (pour dropdown dynamique)
+app.get('/api/sports/available', async (req, res) => {
+  const cacheKey = 'sports_available';
+  const cached   = cache.get(cacheKey);
+  if (cached) return res.json({ data: cached, cached: true });
+
+  if (!ODDS_API_KEY) {
+    return res.json({ data: SPORTS, cached: false, static: true });
+  }
+
+  try {
+    const all = await oddsApiFetch('/sports', { all: 'true' });
+    const active = all.filter(s => s.active && s.has_outrights === false);
+    const mapped  = active.map(s => ({
+      key:   s.key,
+      label: s.title,
+      icon:  s.group === 'Soccer' ? 'F' : s.group === 'Basketball' ? 'B' : s.group === 'Tennis' ? 'T' : 'S',
+      group: s.group ? s.group.toLowerCase() : 'other',
+      description: s.description || '',
+    }));
+    const priority = ['tennis', 'soccer', 'basketball'];
+    mapped.sort((a, b) => {
+      const pa = priority.findIndex(p => a.group.includes(p));
+      const pb = priority.findIndex(p => b.group.includes(p));
+      const ra = pa === -1 ? 99 : pa;
+      const rb = pb === -1 ? 99 : pb;
+      if (ra !== rb) return ra - rb;
+      return a.label.localeCompare(b.label);
+    });
+    cache.set(cacheKey, mapped, 3600);
+    res.json({ data: mapped, cached: false, count: mapped.length });
+  } catch (err) {
+    console.error('[sports/available]', err.message);
+    res.json({ data: SPORTS, cached: false, static: true, error: err.message });
+  }
 });
 
 app.get('/api/events', async (req, res) => {
@@ -209,7 +262,7 @@ app.get('/api/quota', (req, res) => {
   res.json(apiUsage);
 });
 
-// ── SCANNER IA ──
+// -- SCANNER IA --
 app.get('/api/scanner', async (req, res) => {
   const cacheKey = 'scanner_results';
   const cached   = cache.get(cacheKey);
@@ -356,7 +409,7 @@ app.post('/api/cache/clear', (req, res) => {
   }
 });
 
-// ── SSE LIVE STREAM ──
+// -- SSE LIVE STREAM --
 const sseClients = new Set();
 
 app.get('/api/stream', (req, res) => {
@@ -410,7 +463,7 @@ async function broadcastScores() {
 
 setInterval(broadcastScores, 120000);
 
-// ── KEEP-ALIVE (Render free tier) ──
+// -- KEEP-ALIVE (Render free tier) --
 if (process.env.NODE_ENV === 'production' && process.env.RENDER_EXTERNAL_URL) {
   const selfUrl = process.env.RENDER_EXTERNAL_URL;
   console.log('[keep-alive] Active -> ping ' + selfUrl + '/health every 14 min');
@@ -423,12 +476,12 @@ if (process.env.NODE_ENV === 'production' && process.env.RENDER_EXTERNAL_URL) {
   }, 14 * 60 * 1000);
 }
 
-// ── SPA FALLBACK ──
+// -- SPA FALLBACK --
 app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
-// ── START ──
+// -- START --
 app.listen(PORT, () => {
   console.log('');
   console.log('  OddsOracle Server v3.0');

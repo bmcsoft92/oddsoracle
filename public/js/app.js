@@ -1,11 +1,11 @@
 /**
- * OddsOracle — Main Application Controller
+ * OddsOracle -- Main Application Controller
  * Navigation, Dashboard, Bankroll UI, Settings, Init global
  */
 
-// ─────────────────────────────────────────────
+// -----------------------------------------------------------------
 // DASHBOARD MODULE
-// ─────────────────────────────────────────────
+// -----------------------------------------------------------------
 const DashboardModule = (() => {
 
   let bankrollChart = null;
@@ -60,7 +60,7 @@ const DashboardModule = (() => {
       streakEl.style.color = streakType === 'win' ? 'var(--green)' : 'var(--red)';
       document.getElementById('dash-streak-sub').textContent = streakType === 'win' ? 'Série de victoires' : 'Série de défaites';
     } else {
-      streakEl.textContent = '—';
+      streakEl.textContent = '--';
     }
 
     // Allocation
@@ -104,7 +104,7 @@ const DashboardModule = (() => {
     // Rules list
     const ruleStreak = document.getElementById('rule-streak');
     if (streak >= 3 && streakType === 'loss') {
-      ruleStreak.textContent = '⚠️ 3 pertes consécutives — réévaluer la méthode';
+      ruleStreak.textContent = '⚠️ 3 pertes consécutives -- réévaluer la méthode';
       ruleStreak.className = 'rule-item rule-warning';
     } else {
       ruleStreak.textContent = `ℹ️ Série en cours: ${streak > 0 && streakType ? streak + 'x ' + (streakType === 'win' ? 'victoires' : 'défaites') : 'Aucune'}`;
@@ -208,9 +208,9 @@ const DashboardModule = (() => {
   return { refresh };
 })();
 
-// ─────────────────────────────────────────────
+// -----------------------------------------------------------------
 // BANKROLL UI MODULE
-// ─────────────────────────────────────────────
+// -----------------------------------------------------------------
 const BankrollUI = (() => {
   function refresh() {
     const alloc = BankrollManager.getAllocation();
@@ -335,7 +335,7 @@ const BankrollUI = (() => {
           P. implicite brute: ${(r.pImplicit*100).toFixed(1)}%<br/>
           P. corrigée (marge retirée): ${(r.pCorrected*100).toFixed(1)}%<br/>
           Marge bookmaker: ${r.margin.toFixed(1)}%<br/>
-          ${r.isStrongBet ? '🔥 STRONG VALUE BET (&gt;10%)' :
+          ${r.isStrongBet ? '\U0001f525 STRONG VALUE BET (&gt;10%)' :
             r.isValueBet  ? '✅ Value bet (&gt;5%)' :
             r.edge >= 0   ? '⚠️ Edge positif mais insuffisant' : '❌ Pas de value'}
         </div>
@@ -348,9 +348,9 @@ const BankrollUI = (() => {
   return { init, refresh };
 })();
 
-// ─────────────────────────────────────────────
+// -----------------------------------------------------------------
 // SETTINGS MODULE
-// ─────────────────────────────────────────────
+// -----------------------------------------------------------------
 const SettingsModule = (() => {
   function init() {
     const cfg = BankrollManager.getConfig();
@@ -381,9 +381,9 @@ const SettingsModule = (() => {
   return { init };
 })();
 
-// ─────────────────────────────────────────────
-// LIVE MATCH SELECTOR (données réelles The Odds API)
-// ─────────────────────────────────────────────
+// -----------------------------------------------------------------
+// LIVE MATCH SELECTOR (donnees reelles The Odds API)
+// -----------------------------------------------------------------
 const LiveMatchSelector = (() => {
   let eventsCache = [];
   let oddsCache   = {};
@@ -430,12 +430,12 @@ const LiveMatchSelector = (() => {
       eventsCache  = events;
 
       if (!events || events.length === 0) {
-        selectEl.innerHTML = '<option value="">— Aucun match disponible pour ce sport —</option>';
+        selectEl.innerHTML = '<option value="">-- Aucun match disponible pour ce sport --</option>';
         quotaBadge.textContent = 'Aucun match dans les 48h';
         return;
       }
 
-      selectEl.innerHTML = '<option value="">— Sélectionner un match —</option>';
+      selectEl.innerHTML = '<option value="">-- Sélectionner un match --</option>';
       events.forEach(ev => {
         const opt = APIClient.formatMatchOption(ev);
         const option = document.createElement('option');
@@ -447,11 +447,11 @@ const LiveMatchSelector = (() => {
 
       quotaBadge.textContent = `${events.length} match(s) chargé(s)`;
 
-      // Charger les cotes en arrière-plan
+      // Charger les cotes en arriere-plan
       loadOddsForSport(sport);
 
     } catch(e) {
-      selectEl.innerHTML = `<option value="">— Erreur: ${e.message} —</option>`;
+      selectEl.innerHTML = `<option value="">-- Erreur: ${e.message} --</option>`;
       quotaBadge.textContent = '⚠️ Clé API manquante? Voir .env';
       quotaBadge.className = 'quota-badge danger';
     }
@@ -492,7 +492,7 @@ const LiveMatchSelector = (() => {
     document.getElementById('live-playerA').value = home;
     document.getElementById('live-playerB').value = away;
 
-    // Mettre à jour l'affichage
+    // Mettre a jour l'affichage
     document.getElementById('live-pA-name').textContent = home;
     document.getElementById('live-pB-name').textContent = away;
 
@@ -505,7 +505,7 @@ const LiveMatchSelector = (() => {
 
       showToast(`✅ Match chargé: ${home} @${homeOdds?.toFixed(2) || '?'} · ${away} @${awayOdds?.toFixed(2) || '?'}`);
     } else {
-      // Essayer de charger les cotes spécifiques
+      // Essayer de charger les cotes specifiques
       try {
         const odds = await APIClient.getOdds(sport, matchId);
         if (odds && odds[0]) {
@@ -534,14 +534,14 @@ const LiveMatchSelector = (() => {
     const match = data.liveMatches.find(m => m.id === currentMatchId);
     if (!match) return;
 
-    // Mettre à jour les scores si disponibles
+    // Mettre a jour les scores si disponibles
     const scores = match.scores;
     if (scores && scores.length >= 2) {
       const scoreA = scores.find(s => s.name === document.getElementById('live-playerA').value);
       const scoreB = scores.find(s => s.name === document.getElementById('live-playerB').value);
       if (scoreA && scoreB) {
         document.getElementById('live-score-display').textContent =
-          `${scoreA.score} — ${scoreB.score}`;
+          `${scoreA.score} -- ${scoreB.score}`;
       }
     }
   }
@@ -553,13 +553,13 @@ const LiveMatchSelector = (() => {
     document.getElementById('btn-refresh-matches').addEventListener('click', loadMatches);
     document.getElementById('btn-load-match').addEventListener('click', loadSelectedMatch);
 
-    // Quand on change de sport → vider la liste
+    // Quand on change de sport => vider la liste
     document.getElementById('live-sport-select').addEventListener('change', () => {
       document.getElementById('live-match-select').innerHTML =
-        '<option value="">— Cliquer sur Actualiser —</option>';
+        '<option value="">-- Cliquer sur Actualiser --</option>';
     });
 
-    // Déconnecter SSE quand on quitte l'onglet live
+    // Deconnecter SSE quand on quitte l'onglet live
     document.querySelectorAll('.nav-item').forEach(item => {
       item.addEventListener('click', () => {
         if (item.dataset.tab !== 'live' && sseActive) {
@@ -573,9 +573,159 @@ const LiveMatchSelector = (() => {
   return { init };
 })();
 
-// ─────────────────────────────────────────────
+// -----------------------------------------------------------------
+// PREMATCH SELECTOR (donnees reelles The Odds API)
+// -----------------------------------------------------------------
+const PrematchSelector = (() => {
+
+  let eventsCache = [];
+  let oddsCache   = {};
+
+  // Estime l'Elo depuis la probabilite implicite corrigee du margin
+  // P(A) = 1 / (1 + 10^((eloB - eloA)/400))  =>  eloB - eloA = -400 * log10(1/pA - 1)
+  function estimateElo(probA) {
+    const BASE_ELO = 2000;
+    if (probA <= 0 || probA >= 1) return { eloA: BASE_ELO, eloB: BASE_ELO };
+    const diff = -400 * Math.log10(1 / probA - 1);
+    return {
+      eloA: Math.round(BASE_ELO + diff / 2),
+      eloB: Math.round(BASE_ELO - diff / 2),
+    };
+  }
+
+  async function loadMatches() {
+    const sport    = document.getElementById('pm-api-sport').value;
+    const selectEl = document.getElementById('pm-api-match');
+    const badge    = document.getElementById('pm-api-badge');
+
+    selectEl.innerHTML = '<option>Chargement...</option>';
+    if (badge) badge.textContent = '';
+
+    try {
+      const events = await APIClient.getEvents(sport);
+      eventsCache  = events || [];
+
+      if (!eventsCache.length) {
+        selectEl.innerHTML = '<option value="">-- Aucun match disponible --</option>';
+        if (badge) badge.textContent = 'Aucun match dans les 48h';
+        return;
+      }
+
+      selectEl.innerHTML = '<option value="">-- Selectionner un match --</option>';
+      eventsCache.forEach(ev => {
+        const opt    = APIClient.formatMatchOption(ev);
+        const option = document.createElement('option');
+        option.value = ev.id;
+        option.textContent = opt.label;
+        if (opt.isLive) option.style.fontWeight = '700';
+        selectEl.appendChild(option);
+      });
+
+      if (badge) badge.textContent = eventsCache.length + ' match(s) disponible(s)';
+
+      // Charger les cotes en arriere-plan
+      APIClient.getOdds(sport).then(odds => {
+        (odds || []).forEach(ev => { oddsCache[ev.id] = ev; });
+      }).catch(() => {});
+
+    } catch(e) {
+      selectEl.innerHTML = '<option value="">-- Erreur: ' + e.message + ' --</option>';
+      if (badge) { badge.textContent = 'Cle API manquante?'; badge.className = 'quota-badge danger'; }
+    }
+  }
+
+  async function loadSelectedMatch() {
+    const matchId = document.getElementById('pm-api-match').value;
+    const sport   = document.getElementById('pm-api-sport').value;
+    const badge   = document.getElementById('pm-api-badge');
+    if (!matchId) return;
+
+    const event = eventsCache.find(function(e) { return e.id === matchId; });
+    if (!event) return;
+
+    const home = event.home_team || event.homeTeam || '';
+    const away = event.away_team || event.awayTeam || '';
+
+    // Remplir les noms
+    const setVal = function(id, v) { const el = document.getElementById(id); if (el) el.value = v; };
+    setVal('pm-playerA', home);
+    setVal('pm-playerB', away);
+
+    // Detecter le sport
+    const sportMap = { tennis_atp: 'tennis', tennis_wta: 'tennis', soccer_france_ligue1: 'football', soccer_epl: 'football', soccer_europe_champs: 'football', basketball_nba: 'basketball', basketball_euroleague: 'basketball' };
+    const sportEl = document.getElementById('pm-sport');
+    if (sportEl && sportMap[sport]) sportEl.value = sportMap[sport];
+
+    // Mettre a jour le select format selon le sport
+    const formatEl = document.getElementById('pm-format');
+    if (formatEl) {
+      if (sport.includes('tennis'))         formatEl.value = 'bo3';
+      else if (sport.includes('soccer'))    formatEl.value = '90';
+      else if (sport.includes('basketball')) formatEl.value = '4q';
+    }
+
+    // Recuperer les cotes
+    let oddsData = oddsCache[matchId];
+    if (!oddsData) {
+      try {
+        const res = await APIClient.getOdds(sport, matchId);
+        oddsData = res && res[0] ? res[0] : null;
+        if (oddsData) oddsCache[matchId] = oddsData;
+      } catch(e) {}
+    }
+
+    if (oddsData) {
+      const extracted = APIClient.extractOdds(oddsData);
+      const homeOdds  = extracted.homeOdds;
+      const awayOdds  = extracted.awayOdds;
+
+      if (homeOdds) setVal('pm-coteA', homeOdds.toFixed(2));
+      if (awayOdds) setVal('pm-coteB', awayOdds.toFixed(2));
+
+      // Estimer les Elo depuis la ligne de marche
+      if (homeOdds && awayOdds) {
+        const overround = 1/homeOdds + 1/awayOdds;
+        const probA     = (1/homeOdds) / overround;
+        const elos      = estimateElo(probA);
+        setVal('pm-eloA', elos.eloA);
+        setVal('pm-eloB', elos.eloB);
+      }
+
+      // Marquer les champs comme auto-remplis
+      ['pm-playerA','pm-playerB','pm-coteA','pm-coteB','pm-eloA','pm-eloB'].forEach(function(id) {
+        const el = document.getElementById(id);
+        if (el) {
+          el.style.borderColor = 'var(--green)';
+          el.style.boxShadow   = '0 0 0 2px var(--green-dim)';
+          setTimeout(function() { el.style.borderColor = ''; el.style.boxShadow = ''; }, 3000);
+        }
+      });
+
+      if (badge) badge.textContent = 'Charge: ' + home + ' @' + (homeOdds ? homeOdds.toFixed(2) : '?') + ' / ' + away + ' @' + (awayOdds ? awayOdds.toFixed(2) : '?');
+    } else {
+      if (badge) badge.textContent = 'Noms charges (cotes indisponibles)';
+    }
+  }
+
+  function init() {
+    const refreshBtn = document.getElementById('pm-api-refresh');
+    const loadBtn    = document.getElementById('pm-api-load');
+    const sportSel   = document.getElementById('pm-api-sport');
+
+    if (refreshBtn) refreshBtn.addEventListener('click', loadMatches);
+    if (loadBtn)    loadBtn.addEventListener('click', loadSelectedMatch);
+    if (sportSel)   sportSel.addEventListener('change', function() {
+      const sel = document.getElementById('pm-api-match');
+      if (sel) sel.innerHTML = '<option value="">-- Cliquer sur Actualiser --</option>';
+    });
+  }
+
+  return { init };
+})();
+
+// -----------------------------------------------------------------
 // NAVIGATION
-// ─────────────────────────────────────────────
+// -----------------------------------------------------------------
 function initNavigation() {
   const navItems = document.querySelectorAll('.nav-item');
   const tabs     = document.querySelectorAll('.tab-content');
@@ -597,9 +747,9 @@ function initNavigation() {
   });
 }
 
-// ─────────────────────────────────────────────
+// -----------------------------------------------------------------
 // LIVE ALERT STYLES (inline CSS for dynamic elements)
-// ─────────────────────────────────────────────
+// -----------------------------------------------------------------
 function injectLiveStyles() {
   const style = document.createElement('style');
   style.textContent = `
@@ -705,9 +855,9 @@ function injectLiveStyles() {
   document.head.appendChild(style);
 }
 
-// ─────────────────────────────────────────────
+// -----------------------------------------------------------------
 // TOAST
-// ─────────────────────────────────────────────
+// -----------------------------------------------------------------
 function showToast(msg) {
   const t = document.createElement('div');
   t.textContent = msg;
@@ -726,9 +876,9 @@ function showToast(msg) {
   setTimeout(() => t.remove(), 3000);
 }
 
-// ─────────────────────────────────────────────
+// -----------------------------------------------------------------
 // DATETIME
-// ─────────────────────────────────────────────
+// -----------------------------------------------------------------
 function updateDatetime() {
   const el = document.getElementById('current-datetime');
   if (el) {
@@ -739,11 +889,11 @@ function updateDatetime() {
   }
 }
 
-// ─────────────────────────────────────────────
+// -----------------------------------------------------------------
 // INIT
-// ─────────────────────────────────────────────
+// -----------------------------------------------------------------
 document.addEventListener('DOMContentLoaded', () => {
-  // Charger les données persistantes
+  // Charger les donnees persistantes
   BankrollManager.load();
 
   // Injecter styles dynamiques
@@ -759,6 +909,7 @@ document.addEventListener('DOMContentLoaded', () => {
   JournalModule.init();
   SettingsModule.init();
   LiveMatchSelector.init();
+  PrematchSelector.init();
   ScannerModule.init();
 
   // Dashboard initial

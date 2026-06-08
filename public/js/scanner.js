@@ -1,7 +1,8 @@
 /**
- * OddsOracle — Scanner IA
+ * OddsOracle -- Scanner IA v2
  * Scan automatique de valeur sur tous les sports
  * Algorithme: edge via ligne sharp (Pinnacle) + Kelly automatique
+ * Nouveautes v2: notifications browser, auto-log journal, coherence sport, watch live
  */
 
 const ScannerModule = (() => {
@@ -11,64 +12,209 @@ const ScannerModule = (() => {
   let _bankroll         = 1000;
   const REFRESH_INTERVAL = 10 * 60 * 1000; // 10 min
 
-  // ── Icônes bookmakers
+  // IDs des opportunités deja notifiees/loggees (evite doublons sur refresh)
+  const _seenIds    = new Set();
+  const _loggedIds  = new Set();
+
+  // Parametres utilisateur
+  let _notifyEnabled  = false;
+  let _autoLogEnabled = false;
+
+  // -- Icones bookmakers (ASCII)
   const BOOK_ICONS = {
-    'Pinnacle':    '📌',
-    'Betclic':     '🔵',
-    'Unibet':      '🟢',
-    'Winamax':     '🟠',
-    'Bet365':      '🔴',
+    'Pinnacle': '[P]',
+    'Betclic':  '[BC]',
+    'Unibet':   '[UN]',
+    'Winamax':  '[WM]',
+    'Bet365':   '[B365]',
   };
 
-  // ── Badges confiance
+  // -- Badges confiance
   const CONF_META = {
     high:   { label: 'Sharp', cls: 'conf-high',   desc: 'Ligne Pinnacle (sharp money)' },
     medium: { label: 'Bon',   cls: 'conf-medium',  desc: '3+ bookmakers disponibles' },
-    low:    { label: 'Faible',cls: 'conf-low',     desc: 'Données limitées' },
+    low:    { label: 'Faible',cls: 'conf-low',     desc: 'Donnees limitees' },
   };
 
-  // ── Urgence
+  // -- Urgence
   const URGENCY_META = {
-    live:     { label: 'EN COURS', cls: 'urgency-live' },
-    soon:     { label: '< 2h',     cls: 'urgency-soon' },
-    today:    { label: 'Aujourd\'hui', cls: 'urgency-today' },
-    upcoming: { label: 'À venir',  cls: 'urgency-upcoming' },
+    live:     { label: 'EN COURS',    cls: 'urgency-live' },
+    soon:     { label: '< 2h',        cls: 'urgency-soon' },
+    today:    { label: "Aujourd'hui", cls: 'urgency-today' },
+    upcoming: { label: 'A venir',     cls: 'urgency-upcoming' },
   };
 
-  // ──────────────────────────────────────────────
+  // Map sport key -> groupe pour coherence et streaming
+  const SPORT_MAP = {
+    tennis_atp:                        'tennis',
+    tennis_wta:                        'tennis',
+    soccer_france_ligue1:              'football',
+    soccer_epl:                        'football',
+    soccer_europe_champs:              'football',
+    soccer_spain_la_liga:              'football',
+    soccer_italy_serie_a:              'football',
+    soccer_germany_bundesliga:         'football',
+    soccer_portugal_primeira_liga:     'football',
+    soccer_netherlands_eredivisie:     'football',
+    soccer_usa_mls:                    'football',
+    soccer_colombia_primera_a:         'football',
+    soccer_brazil_campeonato:          'football',
+    soccer_argentina_primera_division: 'football',
+    basketball_nba:                    'basketball',
+    basketball_nba_championship:       'basketball',
+    basketball_wnba:                   'basketball',
+    basketball_euroleague:             'basketball',
+    basketball_ncaab:                  'basketball',
+  };
+
+  // -----------------------------------------------------------------
+  // IDENTIFIANT UNIQUE D'UNE OPPORTUNITE
+  // -----------------------------------------------------------------
+  function oppId(opp) {
+    return `${opp.sport}|${opp.homeTeam}|${opp.awayTeam}|${opp.selection}`;
+  }
+
+  // -----------------------------------------------------------------
   // KELLY AUTOMATIQUE
-  // ──────────────────────────────────────────────
+  // -----------------------------------------------------------------
   function autoKelly(trueProb, bestPrice, bankroll, isLive) {
     const p = trueProb / 100;
     const q = 1 - p;
     const b = bestPrice - 1;
     const k = (p * b - q) / b;
     if (k <= 0) return null;
-    const frac = isLive ? k / 6 : k / 4;   // 1/4 prematch, 1/6 live
-    const liveMult = isLive ? 0.6 : 1;      // -40% en live
-    const portion = isLive ? bankroll * 0.3 : bankroll * 0.7;
-    const stake = Math.max(1, Math.round(portion * frac * liveMult * 10) / 10);
+    const frac     = isLive ? k / 6 : k / 4;
+    const liveMult = isLive ? 0.6 : 1;
+    const portion  = isLive ? bankroll * 0.3 : bankroll * 0.7;
+    const stake    = Math.max(1, Math.round(portion * frac * liveMult * 10) / 10);
     return {
       stake,
-      pnlWin:  Math.round((stake * (bestPrice - 1)) * 10) / 10,
-      pnlLoss: -stake,
+      pnlWin:   Math.round((stake * (bestPrice - 1)) * 10) / 10,
+      pnlLoss:  -stake,
       fraction: Math.round(frac * 1000) / 10,
     };
   }
 
-  // ──────────────────────────────────────────────
+  // -----------------------------------------------------------------
+  // NOTIFICATIONS BROWSER
+  // -----------------------------------------------------------------
+  async function requestNotificationPermission() {
+    if (!('Notification' in window)) {
+      showToast('Votre navigateur ne supporte pas les notifications');
+      return false;
+    }
+    if (Notification.permission === 'granted') return true;
+    const perm = await Notification.requestPermission();
+    return perm === 'granted';
+  }
+
+  function sendBrowserNotification(opp, kelly) {
+    if (!('Notification' in window) || Notification.permission !== 'granted') return;
+    const stakeStr = kelly ? `Mise: ${kelly.stake} EUR | ` : '';
+    const body = [
+      `${opp.selection} @ ${opp.bestPrice.toFixed(2)}`,
+      `${opp.bestBook}`,
+      `${stakeStr}Edge: +${opp.edge}%`,
+      opp.isLive ? 'MATCH EN COURS' : formatTime(opp.commenceTime),
+    ].join('\n');
+
+    const n = new Notification(
+      `[BET] ${opp.homeTeam} vs ${opp.awayTeam}`,
+      { body, tag: oppId(opp), requireInteraction: true }
+    );
+
+    n.onclick = () => {
+      window.focus();
+      const scanTab = document.querySelector('[data-tab="scanner"]');
+      if (scanTab) scanTab.click();
+      n.close();
+    };
+  }
+
+  function updateNotifButton() {
+    const btn = document.getElementById('btn-notif-toggle');
+    if (!btn) return;
+    const perm = ('Notification' in window) ? Notification.permission : 'denied';
+    if (!_notifyEnabled) {
+      btn.textContent = 'Notifications OFF';
+      btn.className   = 'btn btn-sm btn-secondary sc-notif-btn';
+    } else if (perm !== 'granted') {
+      btn.textContent = 'Autoriser notifications';
+      btn.className   = 'btn btn-sm btn-primary sc-notif-btn';
+    } else {
+      btn.textContent = 'Notifications ON';
+      btn.className   = 'btn btn-sm btn-success sc-notif-btn';
+    }
+  }
+
+  // -----------------------------------------------------------------
+  // AUTO-LOG JOURNAL
+  // -----------------------------------------------------------------
+  function autoLogToJournal(opp, kelly) {
+    if (!_autoLogEnabled) return;
+    const id = oppId(opp);
+    if (_loggedIds.has(id)) return;
+    _loggedIds.add(id);
+
+    const bet = {
+      date:      new Date().toISOString().split('T')[0],
+      sport:     SPORT_MAP[opp.sport] || 'tennis',
+      match:     `${opp.homeTeam} vs ${opp.awayTeam}`,
+      type:      opp.isLive ? 'live' : 'prematch',
+      market:    'Vainqueur match',
+      selection: opp.selection,
+      cote:      opp.bestPrice,
+      stake:     kelly ? kelly.stake : 1,
+      edge:      opp.edge,
+      result:    'pending',
+      reason:    `[AUTO] Scanner IA -- Edge ${opp.edge}% -- ${opp.bestBook} -- Prob ${opp.trueProb}%`,
+    };
+
+    JournalModule.addBet(bet);
+
+    const journalTab = document.querySelector('[data-tab="journal"]');
+    if (journalTab) {
+      let badge = journalTab.querySelector('.nav-badge');
+      if (!badge) {
+        badge = document.createElement('span');
+        badge.className = 'nav-badge';
+        journalTab.appendChild(badge);
+      }
+      const count = (parseInt(badge.textContent) || 0) + 1;
+      badge.textContent = count;
+      badge.style.display = 'inline-flex';
+    }
+  }
+
+  // -----------------------------------------------------------------
+  // COHERENCE SPORT -- sync filtre vers Live et Prematch
+  // -----------------------------------------------------------------
+  function syncSportToOtherTabs(sportKey) {
+    const liveSelect = document.getElementById('live-sport-select');
+    if (liveSelect) {
+      const opt = Array.from(liveSelect.options).find(o => o.value === sportKey);
+      if (opt) liveSelect.value = sportKey;
+    }
+    const pmSelect = document.getElementById('pm-api-sport');
+    if (pmSelect) {
+      const opt = Array.from(pmSelect.options).find(o => o.value === sportKey);
+      if (opt) pmSelect.value = sportKey;
+    }
+  }
+
+  // -----------------------------------------------------------------
   // SCAN
-  // ──────────────────────────────────────────────
+  // -----------------------------------------------------------------
   async function runScan(silent = false) {
     const btn       = document.getElementById('btn-scan');
     const container = document.getElementById('scanner-results');
     const status    = document.getElementById('scanner-status');
     const meta      = document.getElementById('scanner-meta');
 
-    if (btn) { btn.disabled = true; btn.textContent = '⏳ Scan en cours...'; }
+    if (btn) { btn.disabled = true; btn.textContent = 'Scan en cours...'; }
 
     if (!silent && container) {
-      container.innerHTML = '<div class="scanner-loading"><div class="scanner-spinner"></div><span>Analyse de tous les marchés...</span></div>';
+      container.innerHTML = '<div class="scanner-loading"><div class="scanner-spinner"></div><span>Analyse de tous les marches...</span></div>';
     }
 
     try {
@@ -78,55 +224,75 @@ const ScannerModule = (() => {
       if (!res.ok) throw new Error(json.error || 'Erreur serveur');
 
       _lastScanData = json.data;
-      _bankroll = BankrollManager.get().current || 1000;
+      _bankroll = BankrollManager.get
+        ? BankrollManager.get().current
+        : (BankrollManager.getState ? BankrollManager.getState().current : 1000) || 1000;
+
+      const opps = json.data && json.data.opportunities ? json.data.opportunities : [];
+      opps.forEach(opp => {
+        const id = oppId(opp);
+        if (!_seenIds.has(id)) {
+          _seenIds.add(id);
+          const kelly = autoKelly(opp.trueProb, opp.bestPrice, _bankroll, opp.isLive);
+          if (_notifyEnabled) sendBrowserNotification(opp, kelly);
+          autoLogToJournal(opp, kelly);
+        }
+      });
+
+      const badgeEl = document.getElementById('scanner-badge');
+      if (badgeEl) {
+        const count = opps.length;
+        badgeEl.textContent = count;
+        badgeEl.style.display = count > 0 ? 'inline-flex' : 'none';
+      }
 
       renderResults(json.data, json.scannedAt, json.cached);
 
       if (status) {
         const t = new Date(json.scannedAt).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
-        status.textContent = `Dernière analyse: ${t}${json.cached ? ' (cache)' : ''}`;
+        status.textContent = `Derniere analyse: ${t}${json.cached ? ' (cache)' : ''}`;
         status.className   = 'scanner-status ok';
       }
 
-      if (meta && json.data?.meta) {
+      if (meta && json.data && json.data.meta) {
         const m = json.data.meta;
-        meta.textContent = `${m.sportsScanned} sports · ${m.eventsFound} matchs analysés · ${m.totalOpportunities} opportunités trouvées`;
+        meta.textContent = `${m.sportsScanned} sports -- ${m.eventsFound} matchs -- ${m.totalOpportunities} opportunites`;
       }
 
     } catch (err) {
       if (container) {
         container.innerHTML = `
           <div class="scanner-error">
-            <div style="font-size:2rem;margin-bottom:.75rem">⚠️</div>
+            <div style="font-size:2rem;margin-bottom:.75rem">(!)</div>
             <strong>${err.message}</strong>
             <div style="margin-top:.5rem;font-size:.78rem;color:var(--text-muted)">
               ${err.message.includes('ODDS_API_KEY')
-                ? 'Configurez votre clé API The Odds API dans les paramètres Render.'
-                : 'Vérifiez votre connexion et réessayez.'}
+                ? 'Configurez votre cle API The Odds API dans les parametres Render.'
+                : 'Verifiez votre connexion et reessayez.'}
             </div>
           </div>`;
       }
       if (status) { status.textContent = 'Erreur de scan'; status.className = 'scanner-status error'; }
     } finally {
-      if (btn) { btn.disabled = false; btn.textContent = '🔍 Scanner maintenant'; }
+      if (btn) { btn.disabled = false; btn.textContent = 'Scanner maintenant'; }
     }
   }
 
-  // ──────────────────────────────────────────────
+  // -----------------------------------------------------------------
   // RENDER
-  // ──────────────────────────────────────────────
+  // -----------------------------------------------------------------
   function renderResults(data, scannedAt, cached) {
     const container = document.getElementById('scanner-results');
     if (!container) return;
 
-    if (!data?.opportunities?.length) {
+    if (!data || !data.opportunities || !data.opportunities.length) {
       container.innerHTML = `
         <div class="scanner-empty">
-          <div style="font-size:3rem;margin-bottom:1rem">🔍</div>
-          <strong>Aucune opportunité détectée</strong>
+          <div style="font-size:3rem;margin-bottom:1rem">[?]</div>
+          <strong>Aucune opportunite detectee</strong>
           <div style="margin-top:.5rem;color:var(--text-muted);font-size:.8rem">
             Pas de matchs avec edge positif dans les prochaines 48h.<br>
-            Réessayez plus tard ou vérifiez que votre clé API est configurée.
+            Reessayez plus tard ou verifiez que votre cle API est configuree.
           </div>
         </div>`;
       return;
@@ -138,25 +304,29 @@ const ScannerModule = (() => {
   }
 
   function renderCard(opp, rank) {
-    const kelly   = autoKelly(opp.trueProb, opp.bestPrice, _bankroll, opp.isLive);
-    const conf    = CONF_META[opp.confidence] || CONF_META.low;
-    const urgency = URGENCY_META[opp.urgency] || URGENCY_META.upcoming;
-    const bookIcon = BOOK_ICONS[opp.bestBook] || '📚';
+    const kelly    = autoKelly(opp.trueProb, opp.bestPrice, _bankroll, opp.isLive);
+    const conf     = CONF_META[opp.confidence] || CONF_META.low;
+    const urgency  = URGENCY_META[opp.urgency] || URGENCY_META.upcoming;
+    const bookName = opp.bestBook || '?';
     const edgeCls  = opp.edge >= 10 ? 'edge-very-high' : opp.edge >= 6 ? 'edge-high' : 'edge-medium';
 
     const matchTime = opp.isLive
-      ? '<span class="match-live-tag">● EN COURS</span>'
+      ? '<span class="match-live-tag">EN COURS</span>'
       : `<span class="match-time">${formatTime(opp.commenceTime)}</span>`;
 
     const selectionDisplay = opp.selection === opp.homeTeam
-      ? `🏠 ${opp.homeTeam}`
-      : `✈️ ${opp.awayTeam}`;
+      ? 'Dom. ' + opp.homeTeam
+      : 'Ext. ' + opp.awayTeam;
+
+    const isLogged = _loggedIds.has(oppId(opp));
+    const homeEsc  = opp.homeTeam.replace(/'/g, "\\'");
+    const awayEsc  = opp.awayTeam.replace(/'/g, "\\'");
 
     return `
     <div class="scanner-card ${opp.isLive ? 'scanner-card-live' : ''}" data-rank="${rank}">
       <div class="sc-header">
         <div class="sc-rank">#${rank + 1}</div>
-        <div class="sc-sport">${opp.sportIcon} ${opp.sportLabel}</div>
+        <div class="sc-sport">${opp.sportLabel || opp.sport}</div>
         <div class="sc-urgency ${urgency.cls}">${urgency.label}</div>
       </div>
 
@@ -174,7 +344,7 @@ const ScannerModule = (() => {
         <div class="sc-metric">
           <span class="sc-metric-label">Cote</span>
           <span class="sc-metric-val sc-cote">${opp.bestPrice.toFixed(2)}</span>
-          <span class="sc-metric-sub">${bookIcon} ${opp.bestBook}</span>
+          <span class="sc-metric-sub">${bookName}</span>
         </div>
         <div class="sc-metric">
           <span class="sc-metric-label">Prob. vraie</span>
@@ -196,15 +366,15 @@ const ScannerModule = (() => {
       ${kelly ? `
       <div class="sc-kelly">
         <div class="sc-kelly-header">
-          <span>🎯 Mise recommandée (Kelly ${opp.isLive ? '1/6' : '1/4'})</span>
-          <span class="sc-kelly-mode">${opp.isLive ? 'LIVE -40%' : 'PRÉ-MATCH'}</span>
+          <span>Mise recommandee (Kelly ${opp.isLive ? '1/6' : '1/4'})</span>
+          <span class="sc-kelly-mode">${opp.isLive ? 'LIVE -40%' : 'PRE-MATCH'}</span>
         </div>
         <div class="sc-kelly-body">
-          <div class="sc-kelly-stake">${kelly.stake} €</div>
+          <div class="sc-kelly-stake">${kelly.stake}</div>
           <div class="sc-kelly-detail">
-            <span>Gain si ✅ : <strong class="text-green">+${kelly.pnlWin} €</strong></span>
-            <span>Perte si ❌ : <strong class="text-red">${kelly.pnlLoss} €</strong></span>
-            <span>Fraction Kelly : ${kelly.fraction}%</span>
+            <span>Gain si gagne: <strong class="text-green">+${kelly.pnlWin} EUR</strong></span>
+            <span>Perte si perd: <strong class="text-red">${kelly.pnlLoss} EUR</strong></span>
+            <span>Fraction Kelly: ${kelly.fraction}%</span>
           </div>
         </div>
       </div>` : `
@@ -213,28 +383,42 @@ const ScannerModule = (() => {
       </div>`}
 
       <div class="sc-footer">
-        <button class="btn btn-sm btn-secondary sc-journal-btn" onclick="ScannerModule.addToJournal(${rank})">
-          + Journal
+        <button class="btn btn-sm btn-secondary sc-journal-btn ${isLogged ? 'btn-logged' : ''}"
+                onclick="ScannerModule.addToJournal(${rank})">
+          ${isLogged ? 'Logge' : '+ Journal'}
         </button>
-        <span class="sc-disclaimer">Valeur mathématique — résultats non garantis</span>
+        <div style="display:flex;gap:.4rem">
+          <button class="btn btn-sm btn-ghost sc-sport-btn"
+                  onclick="ScannerModule.focusSport('${opp.sport}')">
+            Ce sport
+          </button>
+          <button class="btn btn-sm sc-watch-btn"
+                  onclick="ScannerModule.watchMatch('${homeEsc}','${awayEsc}','${opp.sport}')">
+            Watch
+          </button>
+        </div>
       </div>
     </div>`;
   }
 
   function formatTime(isoStr) {
+    if (!isoStr) return '';
     const d = new Date(isoStr);
     return d.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' })
       + ' ' + d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
   }
 
-  // ──────────────────────────────────────────────
+  // -----------------------------------------------------------------
   // FILTRES
-  // ──────────────────────────────────────────────
+  // -----------------------------------------------------------------
   function applyFilters() {
-    if (!_lastScanData?.opportunities) return;
-    const sport   = document.getElementById('scan-filter-sport')?.value || 'all';
-    const minEdge = parseFloat(document.getElementById('scan-filter-edge')?.value || 0);
-    const onlyLive = document.getElementById('scan-filter-live')?.checked || false;
+    if (!_lastScanData || !_lastScanData.opportunities) return;
+    const sportEl  = document.getElementById('scan-filter-sport');
+    const edgeEl   = document.getElementById('scan-filter-edge');
+    const liveEl   = document.getElementById('scan-filter-live');
+    const sport    = sportEl ? sportEl.value : 'all';
+    const minEdge  = parseFloat(edgeEl ? edgeEl.value : 0);
+    const onlyLive = liveEl ? liveEl.checked : false;
 
     const filtered = _lastScanData.opportunities.filter(o => {
       if (sport !== 'all' && o.sport !== sport) return false;
@@ -247,89 +431,185 @@ const ScannerModule = (() => {
     if (!container) return;
 
     if (!filtered.length) {
-      container.innerHTML = '<div class="scanner-empty">Aucune opportunité avec ces filtres</div>';
+      container.innerHTML = '<div class="scanner-empty">Aucune opportunite avec ces filtres</div>';
       return;
     }
 
     container.innerHTML = `<div class="scanner-grid">${filtered.map((o, i) => renderCard(o, i)).join('')}</div>`;
   }
 
-  // ──────────────────────────────────────────────
-  // AJOUTER AU JOURNAL
-  // ──────────────────────────────────────────────
+  function focusSport(sportKey) {
+    const filterSel = document.getElementById('scan-filter-sport');
+    if (filterSel) { filterSel.value = sportKey; applyFilters(); }
+    syncSportToOtherTabs(sportKey);
+    showToast('Sport filtre: ' + sportKey.replace(/_/g, ' '));
+  }
+
+  // -----------------------------------------------------------------
+  // WATCH -- liens streaming par sport
+  // -----------------------------------------------------------------
+  const STREAMING_LINKS = {
+    tennis: [
+      { label: 'YouTube Live Search',  url: 'https://www.youtube.com/results?search_query={query}+live+stream' },
+      { label: 'Tennis TV (ATP)',       url: 'https://www.tennistv.com' },
+      { label: 'WTA TV',               url: 'https://www.wtatennis.com/video' },
+      { label: 'beIN Sports',          url: 'https://www.beinsports.com' },
+    ],
+    football: [
+      { label: 'YouTube Live Search',  url: 'https://www.youtube.com/results?search_query={query}+live+stream' },
+      { label: 'Canal+',               url: 'https://www.canalplus.com/sport' },
+      { label: 'beIN Sports',          url: 'https://www.beinsports.com' },
+      { label: 'DAZN',                 url: 'https://www.dazn.com' },
+    ],
+    basketball: [
+      { label: 'YouTube Live Search',  url: 'https://www.youtube.com/results?search_query={query}+live+stream' },
+      { label: 'NBA League Pass',      url: 'https://www.nba.com/watch' },
+      { label: 'WNBA League Pass',     url: 'https://www.wnba.com/watch' },
+      { label: 'DAZN',                 url: 'https://www.dazn.com' },
+    ],
+    default: [
+      { label: 'YouTube Live Search',  url: 'https://www.youtube.com/results?search_query={query}+live+stream' },
+      { label: 'Google Search',        url: 'https://www.google.com/search?q={query}+live+streaming' },
+    ],
+  };
+
+  function watchMatch(home, away, sportKey) {
+    const group = SPORT_MAP[sportKey] || 'default';
+    const links = STREAMING_LINKS[group] || STREAMING_LINKS.default;
+    const query = encodeURIComponent(home + ' ' + away);
+
+    const existing = document.getElementById('watch-overlay');
+    if (existing) existing.remove();
+
+    const overlay = document.createElement('div');
+    overlay.id = 'watch-overlay';
+
+    const linksHtml = links.map(function(l) {
+      return '<a href="' + l.url.replace('{query}', query) + '" target="_blank" rel="noopener" class="watch-link-btn">' + l.label + '</a>';
+    }).join('');
+
+    overlay.innerHTML = `
+      <div class="watch-modal">
+        <div class="watch-modal-header">
+          <span>Regarder en direct</span>
+          <button onclick="document.getElementById('watch-overlay').remove()" class="watch-close">X</button>
+        </div>
+        <div class="watch-match-title">${home} vs ${away}</div>
+        <div class="watch-disclaimer">
+          Le streaming video necessite des droits de diffusion. Ces liens vous redirigent
+          vers les plateformes legales susceptibles de diffuser ce match.
+        </div>
+        <div class="watch-links">${linksHtml}</div>
+      </div>
+    `;
+    overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:9998;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(4px)';
+    overlay.addEventListener('click', function(e) { if (e.target === overlay) overlay.remove(); });
+    document.body.appendChild(overlay);
+  }
+
+  // -----------------------------------------------------------------
+  // AJOUTER AU JOURNAL (bouton manuel)
+  // -----------------------------------------------------------------
   function addToJournal(rank) {
-    if (!_lastScanData?.opportunities) return;
+    if (!_lastScanData || !_lastScanData.opportunities) return;
     const opp   = _lastScanData.opportunities[rank];
     if (!opp) return;
     const kelly = autoKelly(opp.trueProb, opp.bestPrice, _bankroll, opp.isLive);
 
-    // Pré-remplir le formulaire journal
     const tab = document.querySelector('[data-tab="journal"]');
     if (tab) tab.click();
 
-    setTimeout(() => {
+    setTimeout(function() {
       const addBtn = document.getElementById('btn-add-bet');
       if (addBtn) addBtn.click();
 
-      setTimeout(() => {
-        const sportMap = {
-          tennis_atp: 'tennis', tennis_wta: 'tennis',
-          soccer_france_ligue1: 'football', soccer_epl: 'football', soccer_europe_champs: 'football',
-          basketball_nba: 'basketball', basketball_euroleague: 'basketball',
-        };
-
-        const setVal = (id, v) => { const el = document.getElementById(id); if(el) el.value = v; };
+      setTimeout(function() {
+        const setVal = function(id, v) { const el = document.getElementById(id); if(el) el.value = v; };
         setVal('j-date',      new Date().toISOString().split('T')[0]);
-        setVal('j-sport',     sportMap[opp.sport] || 'tennis');
-        setVal('j-match',     `${opp.homeTeam} vs ${opp.awayTeam}`);
+        setVal('j-sport',     SPORT_MAP[opp.sport] || 'tennis');
+        setVal('j-match',     opp.homeTeam + ' vs ' + opp.awayTeam);
         setVal('j-type',      opp.isLive ? 'live' : 'prematch');
         setVal('j-market',    'Vainqueur match');
         setVal('j-selection', opp.selection);
         setVal('j-cote',      opp.bestPrice);
-        setVal('j-stake',     kelly?.stake || '');
+        setVal('j-stake',     kelly ? kelly.stake : '');
         setVal('j-edge',      opp.edge);
-        setVal('j-reason',    `Scanner IA — Edge ${opp.edge}% · Prob ${opp.trueProb}% · ${opp.bestBook}`);
+        setVal('j-reason',    'Scanner IA -- Edge ' + opp.edge + '% -- Prob ' + opp.trueProb + '% -- ' + opp.bestBook);
       }, 200);
     }, 300);
   }
 
-  // ──────────────────────────────────────────────
+  // -----------------------------------------------------------------
   // AUTO-REFRESH
-  // ──────────────────────────────────────────────
+  // -----------------------------------------------------------------
   function startAutoRefresh() {
     stopAutoRefresh();
-    _autoRefreshTimer = setInterval(() => runScan(true), REFRESH_INTERVAL);
+    _autoRefreshTimer = setInterval(function() { runScan(true); }, REFRESH_INTERVAL);
   }
 
   function stopAutoRefresh() {
     if (_autoRefreshTimer) { clearInterval(_autoRefreshTimer); _autoRefreshTimer = null; }
   }
 
-  // ──────────────────────────────────────────────
+  // -----------------------------------------------------------------
   // INIT
-  // ──────────────────────────────────────────────
+  // -----------------------------------------------------------------
   function init() {
     const btn = document.getElementById('btn-scan');
-    if (btn) btn.addEventListener('click', () => runScan(false));
+    if (btn) btn.addEventListener('click', function() { runScan(false); });
 
-    // Filtres
-    ['scan-filter-sport', 'scan-filter-edge'].forEach(id => {
+    ['scan-filter-sport', 'scan-filter-edge'].forEach(function(id) {
       const el = document.getElementById(id);
-      if (el) el.addEventListener('change', applyFilters);
+      if (el) el.addEventListener('change', function() {
+        applyFilters();
+        if (id === 'scan-filter-sport' && el.value !== 'all') {
+          syncSportToOtherTabs(el.value);
+        }
+      });
     });
+
     const liveChk = document.getElementById('scan-filter-live');
     if (liveChk) liveChk.addEventListener('change', applyFilters);
 
+    const notifBtn = document.getElementById('btn-notif-toggle');
+    if (notifBtn) {
+      notifBtn.addEventListener('click', async function() {
+        if (!_notifyEnabled) {
+          const granted = await requestNotificationPermission();
+          if (granted) {
+            _notifyEnabled = true;
+            showToast('Notifications activees');
+          } else {
+            showToast('Permission notifications refusee dans le navigateur');
+          }
+        } else {
+          _notifyEnabled = false;
+          showToast('Notifications desactivees');
+        }
+        updateNotifButton();
+      });
+    }
+
+    const autoLogChk = document.getElementById('scan-auto-log');
+    if (autoLogChk) {
+      autoLogChk.addEventListener('change', function() {
+        _autoLogEnabled = autoLogChk.checked;
+        showToast(_autoLogEnabled
+          ? 'Auto-log active -- nouvelles opportunites ajoutees au journal'
+          : 'Auto-log desactive');
+      });
+    }
+
+    updateNotifButton();
     startAutoRefresh();
 
-    // Lancer un premier scan au chargement de l'onglet
     const scanTab = document.querySelector('[data-tab="scanner"]');
     if (scanTab) {
-      scanTab.addEventListener('click', () => {
+      scanTab.addEventListener('click', function() {
         if (!_lastScanData) runScan(false);
       });
     }
   }
 
-  return { init, runScan, addToJournal, applyFilters };
+  return { init, runScan, addToJournal, applyFilters, focusSport, watchMatch };
 })();
