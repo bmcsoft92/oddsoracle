@@ -605,3 +605,145 @@ option,optgroup{background:var(--bg1)}
   color:var(--red)!important;border-color:var(--red)!important;font-weight:700;
 }
 .streaming-link-primary:hover{background:var(--red)!important;color:#fff!important}
+
+/* ══════════════════════════════════════════════════════════════════
+   AUTO-DETECT BAR
+══════════════════════════════════════════════════════════════════ */
+.auto-detect-bar {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: .45rem .75rem;
+  background: rgba(0,200,100,.06);
+  border: 1px solid rgba(0,200,100,.18);
+  border-radius: 6px;
+  margin: .5rem 0 .75rem;
+  flex-wrap: wrap;
+  font-size: .75rem;
+}
+.auto-detect-text { color: var(--text-muted); flex: 1; min-width: 200px; }
+.espn-stats-row   { color: var(--blue); font-family: var(--font-mono); font-size: .72rem; flex: 2; }
+.ctx-adj-pbase    { color: var(--text-primary); font-size: .78rem; white-space: nowrap; }
+
+/* ══════════════════════════════════════════════════════════════════
+   CONTEXT GRID
+══════════════════════════════════════════════════════════════════ */
+.context-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: .75rem;
+  margin-bottom: 1rem;
+}
+@media (max-width: 900px) { .context-grid { grid-template-columns: 1fr; } }
+
+.ctx-card {
+  padding: .75rem !important;
+  background: var(--bg-card) !important;
+}
+.ctx-card-title {
+  font-size: .8rem;
+  font-weight: 700;
+  letter-spacing: .05em;
+  text-transform: uppercase;
+  color: var(--accent);
+  margin-bottom: .6rem;
+  padding-bottom: .4rem;
+  border-bottom: 1px solid var(--border);
+}
+.ctx-field {
+  display: flex;
+  flex-direction: column;
+  gap: .18rem;
+  margin-bottom: .55rem;
+}
+.ctx-field label {
+  font-size: .68rem;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: .04em;
+}
+.form-control-sm {
+  padding: .2rem .4rem;
+  font-size: .75rem;
+  height: auto;
+}
+.ctx-range {
+  width: 100%;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+.ctx-range-val {
+  font-size: .75rem;
+  color: var(--accent);
+  font-family: var(--font-mono);
+  text-align: center;
+}
+.ctx-field-cycle { flex-direction: row; align-items: center; margin-top: .25rem; }
+.ctx-cycle-label {
+  display: flex;
+  align-items: center;
+  gap: .4rem;
+  font-size: .72rem;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+.ctx-cycle-label input { accent-color: #e84; cursor: pointer; }
+
+.ctx-sel-mental option[value="optimal"]   { color: #4caf50; }
+.ctx-sel-mental option[value="fatigue"]   { color: #ff9800; }
+.ctx-sel-mental option[value="disturbed"] { color: #f44336; }
+.ctx-sel-mental option[value="crisis"]    { color: #b71c1c; }
+
+/* ══════════════════════════════════════════════════════════════════
+   PLAYER CONTEXT DATA
+══════════════════════════════════════════════════════════════════ */
+.player-ctx-data {
+  padding: .4rem 0;
+  margin-bottom: .5rem;
+  border-bottom: 1px solid var(--border);
+  min-height: 36px;
+}
+.player-ctx-name {
+  font-weight: 600;
+  font-size: .82rem;
+  color: var(--text-primary);
+}
+.player-ctx-nat {
+  font-size: .68rem;
+  color: var(--text-muted);
+  background: var(--bg-secondary);
+  padding: .1rem .3rem;
+  border-radius: 3px;
+  margin-left: .3rem;
+}
+.player-ctx-form-row {
+  display: flex;
+  align-items: center;
+  gap: .4rem;
+  margin: .3rem 0 .2rem;
+  flex-wrap: wrap;
+}
+.player-ctx-form-pct {
+  font-size: .85rem;
+  font-weight: 700;
+  font-family: var(--font-mono);
+  min-width: 36px;
+}
+.player-ctx-badges { display: flex; gap: .2rem; flex-wrap: wrap; }
+.player-ctx-record { font-size: .68rem; color: var(--text-muted); }
+
+/* Form badges W / L / D */
+.form-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px; height: 20px;
+  border-radius: 4px;
+  font-size: .68rem;
+  font-weight: 700;
+  cursor: default;
+}
+.fb-W { background: rgba(76,175,80,.25); color: #4caf50; border: 1px solid rgba(76,175,80,.4); }
+.fb-L { background: rgba(244,67,54,.25); color: #f44336; border: 1px solid rgba(244,67,54,.4); }
+.fb-D { background: rgba(158,158,158,.25); color: #9e9e9e; border: 1px solid rgba(158,158,158,.4); }
+

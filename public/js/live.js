@@ -458,5 +458,286 @@ const LiveModule = (() => {
     el.style.color = activeCount >= 2 ? 'var(--red)' : 'var(--text-primary)';
   }
 
-  return { init, updateSportContext: updateLiveSportContext };
+
+  // ═══════════════════════════════════════════════════════════════════
+  // CONTEXT FACTORS — modificateurs pBase selon état joueur/match
+  // ═══════════════════════════════════════════════════════════════════
+  const MENTAL_FACTORS = {
+    optimal:   0,
+    fatigue:   -0.05,   // -5% prob
+    disturbed: -0.10,   // -10% (conflit perso, deuil proche)
+    crisis:    -0.18,   // -18% (grave problème mental)
+  };
+  const PHYSICAL_FACTORS = {
+    optimal:   0,
+    sore:     -0.03,   // courbatures légères
+    pain:     -0.08,   // douleur
+    injury:   -0.15,   // blessure signalée
+  };
+  const SURFACE_FACTORS = {
+    preferred: +0.04,  // surface de prédilection
+    neutral:   0,
+    weak:     -0.04,   // surface défavorable
+  };
+  const FATIGUE_FACTORS = {
+    fresh:   +0.02,   // 4+ jours repos
+    normal:   0,
+    tired:   -0.04,   // 2 matchs en 3 jours
+    exhausted: -0.08, // 3+ matchs en 4 jours
+  };
+  const ROUND_FACTORS = {
+    early:    0,      // 1er/2e tour
+    quarter: +0.01,  // QF — pression symétrique
+    semi:    -0.02,  // demi: outsiders surprennent
+    final:   -0.04,  // finale: pression maximale sur favori
+  };
+  const CYCLE_FACTOR = -0.04;  // facteur cycle féminin si activé
+  const H2H_MAX      = 0.06;   // max ±6% selon H2H
+
+  // État courant du contexte (A et B)
+  let ctxA = { mental: 'optimal', physical: 'optimal', surface: 'neutral', fatigue: 'normal', cycle: false };
+  let ctxB = { mental: 'optimal', physical: 'optimal', surface: 'neutral', fatigue: 'normal', cycle: false };
+  let matchCtx = { round: 'early', h2hA: 0, h2hB: 0, weather: 'normal' };
+
+  // Calcule le delta pBase ajusté selon contexte
+  function computeContextDelta(ctx, isA) {
+    let delta = 0;
+    delta += MENTAL_FACTORS[ctx.mental]   || 0;
+    delta += PHYSICAL_FACTORS[ctx.physical] || 0;
+    delta += SURFACE_FACTORS[ctx.surface] || 0;
+    delta += FATIGUE_FACTORS[ctx.fatigue] || 0;
+    if (ctx.cycle) delta += CYCLE_FACTOR;
+    if (isA) delta += matchCtx.h2hA || 0;
+    else     delta += matchCtx.h2hB || 0;
+    delta += ROUND_FACTORS[matchCtx.round] || 0;
+    return delta;
+  }
+
+  // Retourne pBase ajusté pour joueur A (en %)
+  function getAdjustedPBase() {
+    const rawPct = parseFloat(document.getElementById('live-pbaseA').value) || 50;
+    const raw    = rawPct / 100;
+    const deltaA = computeContextDelta(ctxA, true);
+    const deltaB = computeContextDelta(ctxB, false);
+    // deltaB négatif pour B → positif pour A
+    const adjusted = Math.max(0.02, Math.min(0.98, raw + deltaA - deltaB));
+    return adjusted * 100;
+  }
+
+  // ═══════════════════════════════════════════════════════════════════
+  // AUTO-DÉTECTION ESPN
+  // ═══════════════════════════════════════════════════════════════════
+  let _autoTimer    = null;
+  let _autoMatch    = null;
+  let _autoEnabled  = false;
+  let _autoCount    = 0;
+
+  async function detectAndApplySignals() {
+    if (!_autoMatch) return;
+    const { home, away, sport } = _autoMatch;
+
+    try {
+      const r = await fetch(
+        '/api/live-signals?sport=' + encodeURIComponent(sport)
+        + '&home=' + encodeURIComponent(home)
+        + '&away=' + encodeURIComponent(away)
+      );
+      const data = await r.json();
+      _autoCount++;
+
+      const statusEl = document.getElementById('auto-detect-status');
+
+      if (!data.found) {
+        if (statusEl) statusEl.textContent = '⊕ Scan #' + _autoCount + ' — match non trouvé en live ESPN';
+        return;
+      }
+
+      // Apply detected signals (only activate, never deactivate manually-set ones)
+      const s = data.signals || {};
+      const sigMap = {
+        kineA: 'sig-kine', kineB: 'sig-kineB',
+        breakA: 'sig-breakA', breakB: 'sig-breakB',
+        momentumA: 'sig-momentumA', momentumB: 'sig-momentumB',
+        suspension: 'sig-suspension', boiterieA: 'sig-boiterie',
+      };
+      let newSignals = false;
+      Object.entries(sigMap).forEach(function(e) {
+        const key = e[0], btnId = e[1];
+        if (s[key] && !activeSignals[key]) {
+          activeSignals[key] = true;
+          newSignals = true;
+          var btn = document.getElementById(btnId);
+          if (btn) btn.classList.add('active');
+        }
+      });
+
+      // Auto-update score from ESPN
+      if (data.score) {
+        const sportGrp = getSportGroup(sport);
+        const ctx = SPORT_CTX[sportGrp] || SPORT_CTX.tennis;
+        if (ctx.setsRowVisible && data.sets && data.sets.length) {
+          // Tennis/hockey/baseball: use linescores for sets
+          const lastSet = data.sets[data.sets.length - 1];
+          setIfEmpty('live-setsA',  String(data.score.home));
+          setIfEmpty('live-setsB',  String(data.score.away));
+          setIfEmpty('live-setNum', String(data.period));
+          setIfEmpty('live-gamesA', String(lastSet.home));
+          setIfEmpty('live-gamesB', String(lastSet.away));
+        } else {
+          // Football/MMA: direct score
+          setIfEmpty('live-gamesA', String(data.score.home));
+          setIfEmpty('live-gamesB', String(data.score.away));
+        }
+        if (data.clock) {
+          const mins = parseInt(data.clock);
+          if (!isNaN(mins)) setIfEmpty('live-minutes', String(mins));
+        }
+      }
+
+      // Show real-time stats if available
+      renderAutoStats(data);
+
+      // Auto-calculate if any signal is now active
+      if (newSignals) {
+        calcAndShowAlert();
+        if (statusEl) {
+          statusEl.innerHTML = '<span style="color:var(--green)">⚡ Signal détecté automatiquement — alerte recalculée</span>';
+        }
+      } else {
+        if (statusEl) {
+          statusEl.textContent = '✓ Scan #' + _autoCount + ' — ' + (data.clock ? data.clock + "'" : 'live') + ' | Score ESPN: ' + data.score.home + '-' + data.score.away;
+        }
+      }
+
+    } catch (err) {
+      console.warn('[AutoDetect]', err.message);
+    }
+  }
+
+  function setIfEmpty(id, val) {
+    var el = document.getElementById(id);
+    if (el && !el.value) el.value = val;
+  }
+
+  function renderAutoStats(data) {
+    const el = document.getElementById('espn-stats-row');
+    if (!el) return;
+    const sA = data.statsA || {}, sB = data.statsB || {};
+    var parts = [];
+    if (sA.aces || sB.aces)           parts.push('Aces: ' + (sA.aces||'—') + ' / ' + (sB.aces||'—'));
+    if (sA.doubleFaults || sB.doubleFaults) parts.push('DFautes: ' + (sA.doubleFaults||'—') + ' / ' + (sB.doubleFaults||'—'));
+    if (sA.possession || sB.possession)   parts.push('Poss.: ' + (sA.possession||'—') + '% / ' + (sB.possession||'—') + '%');
+    if (sA.shots || sB.shots)         parts.push('Tirs: ' + (sA.shots||'—') + ' / ' + (sB.shots||'—'));
+    el.textContent = parts.join('  ·  ');
+  }
+
+  function startAutoDetection(home, away, sport) {
+    _autoMatch   = { home, away, sport };
+    _autoEnabled = true;
+    _autoCount   = 0;
+    stopAutoDetection();
+    detectAndApplySignals();
+    _autoTimer = setInterval(detectAndApplySignals, 30000);
+    var statusEl = document.getElementById('auto-detect-status');
+    if (statusEl) statusEl.textContent = '⊕ Auto-détection ESPN activée — refresh 30s';
+  }
+
+  function stopAutoDetection() {
+    if (_autoTimer) { clearInterval(_autoTimer); _autoTimer = null; }
+    _autoEnabled = false;
+  }
+
+  // ═══════════════════════════════════════════════════════════════════
+  // PLAYER FORM — chargement TheSportsDB
+  // ═══════════════════════════════════════════════════════════════════
+  async function loadPlayerForm(name, side) {
+    if (!name || name.length < 3) return;
+    const el = document.getElementById('player-ctx-' + side);
+    if (!el) return;
+    el.innerHTML = '<span style="color:var(--text-muted);font-size:.75rem">Chargement...</span>';
+
+    try {
+      const r = await fetch('/api/player-form?name=' + encodeURIComponent(name));
+      const d = await r.json();
+      if (!d.found) { el.innerHTML = '<span style="color:var(--text-muted);font-size:.75rem">Pas de données TheSportsDB</span>'; return; }
+
+      const formBadges = (d.form || []).map(function(f) {
+        return '<span class="form-badge fb-' + f.result + '" title="' + (f.opponent||'') + ' (' + (f.score||'') + ')">' + f.result + '</span>';
+      }).join('');
+
+      const streakStr = d.streak > 0
+        ? '<span style="color:var(--green)">🔥 ' + d.streak + 'V</span>'
+        : d.streak < 0
+        ? '<span style="color:var(--red)">❄️ ' + Math.abs(d.streak) + 'D</span>'
+        : '';
+
+      const formPctColor = d.formPct >= 60 ? 'var(--green)' : d.formPct >= 40 ? 'var(--yellow)' : 'var(--red)';
+
+      el.innerHTML =
+        '<div class="player-ctx-name">' + d.name + (d.nationality ? ' <span class="player-ctx-nat">' + d.nationality + '</span>' : '') + '</div>'
+        + '<div class="player-ctx-form-row">'
+        + '<span class="player-ctx-form-pct" style="color:' + formPctColor + '">' + (d.formPct !== null ? d.formPct + '%' : '—') + '</span>'
+        + '<span class="player-ctx-badges">' + formBadges + '</span>'
+        + streakStr
+        + '</div>'
+        + '<div class="player-ctx-record">' + d.wins + 'V / ' + d.losses + 'D (5 derniers)</div>';
+
+    } catch (err) {
+      el.innerHTML = '<span style="color:var(--red);font-size:.75rem">Erreur: ' + err.message + '</span>';
+    }
+  }
+
+  // ═══════════════════════════════════════════════════════════════════
+  // UPDATE CONTEXT depuis les selecteurs HTML
+  // ═══════════════════════════════════════════════════════════════════
+  function updateContext() {
+    ctxA.mental   = (document.getElementById('ctx-a-mental')   || {}).value || 'optimal';
+    ctxA.physical = (document.getElementById('ctx-a-physical') || {}).value || 'optimal';
+    ctxA.surface  = (document.getElementById('ctx-a-surface')  || {}).value || 'neutral';
+    ctxA.fatigue  = (document.getElementById('ctx-a-fatigue')  || {}).value || 'normal';
+    ctxA.cycle    = !!(document.getElementById('ctx-a-cycle')  || {}).checked;
+
+    ctxB.mental   = (document.getElementById('ctx-b-mental')   || {}).value || 'optimal';
+    ctxB.physical = (document.getElementById('ctx-b-physical') || {}).value || 'optimal';
+    ctxB.surface  = (document.getElementById('ctx-b-surface')  || {}).value || 'neutral';
+    ctxB.fatigue  = (document.getElementById('ctx-b-fatigue')  || {}).value || 'normal';
+    ctxB.cycle    = !!(document.getElementById('ctx-b-cycle')  || {}).checked;
+
+    matchCtx.round = (document.getElementById('ctx-match-round') || {}).value || 'early';
+    const h2hRaw   = parseInt((document.getElementById('ctx-h2h-adv') || {}).value) || 0;
+    matchCtx.h2hA  = h2hRaw * 0.01;  // +3 → +0.03 pBase pour A
+    matchCtx.h2hB  = -h2hRaw * 0.01;
+
+    // Recalcul pBase ajusté affiché
+    const adjPct = getAdjustedPBase();
+    const adjEl  = document.getElementById('ctx-adjusted-pbase');
+    if (adjEl) {
+      const raw    = parseFloat(document.getElementById('live-pbaseA').value) || 50;
+      const diff   = Math.round((adjPct - raw) * 10) / 10;
+      const sign   = diff >= 0 ? '+' : '';
+      const color  = diff > 0 ? 'var(--green)' : diff < 0 ? 'var(--red)' : 'var(--text-muted)';
+      adjEl.innerHTML = 'P base ajustée: <strong style="color:' + color + '">'
+        + Math.round(adjPct) + '% (' + sign + diff + '%)</strong>';
+    }
+  }
+
+  // Hook: quand match chargé depuis card-click, démarrer auto-détection
+  function onMatchLoaded(home, away, sport) {
+    _autoMatch = { home, away, sport };
+    // Charger forme joueurs
+    loadPlayerForm(home, 'A');
+    loadPlayerForm(away, 'B');
+    // Mettre à jour titres des panels
+    var titleA = document.getElementById('ctx-a-title');
+    var titleB = document.getElementById('ctx-b-title');
+    if (titleA) titleA.textContent = home;
+    if (titleB) titleB.textContent = away;
+    // Démarrer auto-détection
+    if (sport) startAutoDetection(home, away, sport);
+    // Reset contexte
+    updateContext();
+  }
+
+
+  return { init, updateSportContext: updateLiveSportContext, onMatchLoaded, updateContext, getAdjustedPBase };
 })();

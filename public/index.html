@@ -159,6 +159,171 @@
         </div>
       </div>
 
+
+      <!-- ═══ AUTO-DÉTECTION STATUS ═══ -->
+      <div class="auto-detect-bar">
+        <span id="auto-detect-status" class="auto-detect-text">⊕ Cliquez sur un match pour activer l'auto-détection ESPN</span>
+        <span id="espn-stats-row" class="espn-stats-row"></span>
+        <span id="ctx-adjusted-pbase" class="ctx-adj-pbase"></span>
+      </div>
+
+      <!-- ═══ CONTEXT GRID ═══ -->
+      <div class="context-grid">
+
+        <!-- MATCH CONTEXT -->
+        <div class="card ctx-card">
+          <div class="ctx-card-title">🎯 Contexte Match</div>
+
+          <div class="ctx-field">
+            <label>Round / Phase</label>
+            <select id="ctx-match-round" class="form-control form-control-sm" onchange="if(typeof LiveModule!=='undefined')LiveModule.updateContext()">
+              <option value="early">1er / 2e tour</option>
+              <option value="quarter">Quart de finale</option>
+              <option value="semi">Demi-finale</option>
+              <option value="final">Finale</option>
+            </select>
+          </div>
+
+          <div class="ctx-field">
+            <label>Avantage H2H (pts vers A)</label>
+            <input type="range" id="ctx-h2h-adv" min="-6" max="6" value="0" step="1" class="ctx-range"
+              oninput="document.getElementById('ctx-h2h-val').textContent=this.value;if(typeof LiveModule!=='undefined')LiveModule.updateContext()">
+            <span id="ctx-h2h-val" class="ctx-range-val">0</span>
+          </div>
+
+          <div class="ctx-field">
+            <label>Conditions / Météo</label>
+            <select id="ctx-weather" class="form-control form-control-sm">
+              <option value="normal">Normal</option>
+              <option value="hot">Chaleur intense (+35°C)</option>
+              <option value="wind">Vent fort</option>
+              <option value="rain">Pluie / terrain lourd</option>
+              <option value="cold">Froid (&lt;10°C)</option>
+            </select>
+          </div>
+
+          <div class="ctx-field">
+            <label>Enjeu du match</label>
+            <select id="ctx-stakes" class="form-control form-control-sm">
+              <option value="normal">Match ordinaire</option>
+              <option value="relegation">Maintien / Relégation</option>
+              <option value="title">Course au titre</option>
+              <option value="cup">Coupe / Derby</option>
+              <option value="revenge">Revanche personnelle</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- JOUEUR A CONTEXT -->
+        <div class="card ctx-card">
+          <div class="ctx-card-title" id="ctx-a-title">Joueur / Équipe A</div>
+          <div id="player-ctx-A" class="player-ctx-data">
+            <span style="color:var(--text-muted);font-size:.75rem">Sélectionnez un match</span>
+          </div>
+
+          <div class="ctx-field">
+            <label>État mental</label>
+            <select id="ctx-a-mental" class="form-control form-control-sm ctx-sel-mental" onchange="if(typeof LiveModule!=='undefined')LiveModule.updateContext()">
+              <option value="optimal">✅ Optimal</option>
+              <option value="fatigue">😴 Fatigué / démotivé</option>
+              <option value="disturbed">😟 Perturbé (perso, famille)</option>
+              <option value="crisis">🚨 En crise mentale</option>
+            </select>
+          </div>
+
+          <div class="ctx-field">
+            <label>État physique</label>
+            <select id="ctx-a-physical" class="form-control form-control-sm ctx-sel-phys" onchange="if(typeof LiveModule!=='undefined')LiveModule.updateContext()">
+              <option value="optimal">✅ Optimal</option>
+              <option value="sore">🤕 Courbatures légères</option>
+              <option value="pain">⚠️ Douleur signalée</option>
+              <option value="injury">🚑 Blessure (kine appelé)</option>
+            </select>
+          </div>
+
+          <div class="ctx-field">
+            <label>Confort surface</label>
+            <select id="ctx-a-surface" class="form-control form-control-sm" onchange="if(typeof LiveModule!=='undefined')LiveModule.updateContext()">
+              <option value="preferred">⭐ Surface de prédilection</option>
+              <option value="neutral">➖ Surface neutre</option>
+              <option value="weak">👎 Surface défavorable</option>
+            </select>
+          </div>
+
+          <div class="ctx-field">
+            <label>Fatigue / charge matchs</label>
+            <select id="ctx-a-fatigue" class="form-control form-control-sm" onchange="if(typeof LiveModule!=='undefined')LiveModule.updateContext()">
+              <option value="fresh">🔋 Frais (4+ jours repos)</option>
+              <option value="normal">➖ Normal</option>
+              <option value="tired">😓 Fatigué (2 matchs/3j)</option>
+              <option value="exhausted">💀 Épuisé (3+ matchs/4j)</option>
+            </select>
+          </div>
+
+          <div class="ctx-field ctx-field-cycle">
+            <label class="ctx-cycle-label">
+              <input type="checkbox" id="ctx-a-cycle" onchange="if(typeof LiveModule!=='undefined')LiveModule.updateContext()">
+              <span>🔴 Cycle féminin (impact −4%)</span>
+            </label>
+          </div>
+        </div>
+
+        <!-- JOUEUR B CONTEXT -->
+        <div class="card ctx-card">
+          <div class="ctx-card-title" id="ctx-b-title">Joueur / Équipe B</div>
+          <div id="player-ctx-B" class="player-ctx-data">
+            <span style="color:var(--text-muted);font-size:.75rem">Sélectionnez un match</span>
+          </div>
+
+          <div class="ctx-field">
+            <label>État mental</label>
+            <select id="ctx-b-mental" class="form-control form-control-sm ctx-sel-mental" onchange="if(typeof LiveModule!=='undefined')LiveModule.updateContext()">
+              <option value="optimal">✅ Optimal</option>
+              <option value="fatigue">😴 Fatigué / démotivé</option>
+              <option value="disturbed">😟 Perturbé (perso, famille)</option>
+              <option value="crisis">🚨 En crise mentale</option>
+            </select>
+          </div>
+
+          <div class="ctx-field">
+            <label>État physique</label>
+            <select id="ctx-b-physical" class="form-control form-control-sm ctx-sel-phys" onchange="if(typeof LiveModule!=='undefined')LiveModule.updateContext()">
+              <option value="optimal">✅ Optimal</option>
+              <option value="sore">🤕 Courbatures légères</option>
+              <option value="pain">⚠️ Douleur signalée</option>
+              <option value="injury">🚑 Blessure (kine appelé)</option>
+            </select>
+          </div>
+
+          <div class="ctx-field">
+            <label>Confort surface</label>
+            <select id="ctx-b-surface" class="form-control form-control-sm" onchange="if(typeof LiveModule!=='undefined')LiveModule.updateContext()">
+              <option value="preferred">⭐ Surface de prédilection</option>
+              <option value="neutral">➖ Surface neutre</option>
+              <option value="weak">👎 Surface défavorable</option>
+            </select>
+          </div>
+
+          <div class="ctx-field">
+            <label>Fatigue / charge matchs</label>
+            <select id="ctx-b-fatigue" class="form-control form-control-sm" onchange="if(typeof LiveModule!=='undefined')LiveModule.updateContext()">
+              <option value="fresh">🔋 Frais (4+ jours repos)</option>
+              <option value="normal">➖ Normal</option>
+              <option value="tired">😓 Fatigué (2 matchs/3j)</option>
+              <option value="exhausted">💀 Épuisé (3+ matchs/4j)</option>
+            </select>
+          </div>
+
+          <div class="ctx-field ctx-field-cycle">
+            <label class="ctx-cycle-label">
+              <input type="checkbox" id="ctx-b-cycle" onchange="if(typeof LiveModule!=='undefined')LiveModule.updateContext()">
+              <span>🔴 Cycle féminin (impact −4%)</span>
+            </label>
+          </div>
+        </div>
+
+      </div><!-- end context-grid -->
+
       <div class="live-grid">
         <!-- Score + Form -->
         <div class="card live-status-card">

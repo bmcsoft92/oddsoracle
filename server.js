@@ -854,3 +854,289 @@ app.listen(PORT, () => {
     console.warn('  Get a free key at https://the-odds-api.com/');
   }
 });
+
+// ═══════════════════════════════════════════════════════════════════════
+// ESPN LIVE SIGNAL DETECTION  /api/live-signals
+// ═══════════════════════════════════════════════════════════════════════
+const ESPN_MAP = {
+  tennis_atp: 'tennis/atp', tennis_wta: 'tennis/wta',
+  soccer_epl: 'soccer/eng.1', soccer_france_ligue1: 'soccer/fra.1',
+  soccer_spain_la_liga: 'soccer/esp.1', soccer_germany_bundesliga: 'soccer/ger.1',
+  soccer_italy_serie_a: 'soccer/ita.1', soccer_europe_champs: 'soccer/uefa.champions',
+  soccer_usa_mls: 'soccer/usa.1', soccer_brazil_campeonato: 'soccer/bra.1',
+  soccer_argentina_primera_division: 'soccer/arg.1',
+  soccer_portugal_primeira_liga: 'soccer/por.1',
+  soccer_netherlands_eredivisie: 'soccer/ned.1',
+  basketball_nba: 'basketball/nba', basketball_wnba: 'basketball/wnba',
+  basketball_euroleague: 'basketball/eur.1',
+  baseball_mlb: 'baseball/mlb',
+  icehockey_nhl: 'hockey/nhl',
+  americanfootball_nfl: 'football/nfl',
+  mma_mixed_martial_arts: 'mma/ufc',
+};
+
+function espnName(c) {
+  return (c && c.team && c.team.displayName) ||
+         (c && c.athlete && c.athlete.displayName) || '';
+}
+function espnShort(c) {
+  return (c && c.team && (c.team.shortDisplayName || c.team.abbreviation)) ||
+         (c && c.athlete && c.athlete.shortName) || '';
+}
+
+function parseEspnSignals(comp, sportKey) {
+  const sig = {
+    kineA: false, kineB: false,
+    breakA: false, breakB: false,
+    momentumA: false, momentumB: false,
+    suspension: false, coteMove: false, boiterieA: false,
+    retirement: false, redCardA: false, redCardB: false,
+  };
+  const status    = comp.status    || {};
+  const situation = comp.situation || {};
+  const notes     = comp.notes     || [];
+  const competitors = comp.competitors || [];
+
+  // Match suspended
+  const stName = (status.type || {}).name || '';
+  if (stName === 'STATUS_SUSPENDED' || stName === 'STATUS_DELAYED') sig.suspension = true;
+
+  // Medical / injury / retirement in notes
+  const noteText = notes.map(n => (n.text || n.headline || '')).join(' ').toLowerCase();
+  if (/medical|physio|trainer|kine|injury|injur/.test(noteText)) { sig.kineA = true; }
+  if (/injur|retire|withdraw|walkover|retired/.test(noteText)) { sig.boiterieA = true; sig.retirement = true; }
+
+  // Tennis specifics
+  if (sportKey && sportKey.startsWith('tennis')) {
+    const lp = (situation.lastPlay || '').toLowerCase();
+    const serverId = situation.server ? String(situation.server) : '';
+    if (/break/.test(lp)) {
+      // server 0 = home/A broke serve, server 1 = away/B broke serve
+      if (serverId === '1' || /home/.test(lp)) sig.breakA = true;
+      else sig.breakB = true;
+    }
+    // Retirement from competitor status
+    competitors.forEach(function(c, i) {
+      if ((c.winner === false && c.score === '0') || /ret\.?$|retired/.test((c.score || '').toLowerCase())) {
+        if (i === 0) sig.retirement = true;
+      }
+    });
+  }
+
+  // Football: red card from play-by-play or notes
+  if (sportKey && sportKey.startsWith('soccer')) {
+    if (/red card|expuls/.test(noteText)) { sig.redCardA = true; }
+    // Check stats for corners/shots as momentum proxy
+    const statsA = (competitors[0] || {}).statistics || [];
+    const statsB = (competitors[1] || {}).statistics || [];
+    const cornersA = parseInt((statsA.find(s => s.name === 'corners') || {}).displayValue || '0');
+    const cornersB = parseInt((statsB.find(s => s.name === 'corners') || {}).displayValue || '0');
+    if (cornersA - cornersB >= 3) sig.momentumA = true;
+    if (cornersB - cornersA >= 3) sig.momentumB = true;
+  }
+
+  return sig;
+}
+
+app.get('/api/live-signals', async function(req, res) {
+  const sport = req.query.sport || 'tennis_atp';
+  const home  = req.query.home  || '';
+  const away  = req.query.away  || '';
+
+  const espnPath = ESPN_MAP[sport];
+  if (!espnPath) return res.json({ found: false, reason: 'sport_not_mapped', sport });
+
+  const cacheKey = 'espn_sb_' + sport;
+  let sbData = cache.get(cacheKey);
+
+  if (!sbData) {
+    try {
+      const url  = 'https://site.api.espn.com/apis/site/v2/sports/' + espnPath + '/scoreboard';
+      const ctrl = new AbortController();
+      const timer = setTimeout(function() { ctrl.abort(); }, 8000);
+      const r = await fetch(url, { signal: ctrl.signal });
+      clearTimeout(timer);
+      if (!r.ok) throw new Error('ESPN ' + r.status);
+      sbData = await r.json();
+      cache.set(cacheKey, sbData, 30); // 30s cache for live data
+    } catch (err) {
+      return res.json({ found: false, error: err.message });
+    }
+  }
+
+  const events = sbData.events || [];
+
+  // Return live event list when no specific match requested
+  const liveList = events
+    .filter(function(ev) {
+      const st = ((ev.status || {}).type || {}).name || '';
+      return st === 'STATUS_IN_PROGRESS' || st === 'STATUS_HALFTIME';
+    })
+    .map(function(ev) {
+      const comp  = (ev.competitions || [])[0] || {};
+      const comps = comp.competitors || [];
+      return {
+        id:        ev.id,
+        name:      ev.shortName || ev.name,
+        homeName:  espnName(comps[0]),
+        awayName:  espnName(comps[1]),
+        homeScore: (comps[0] || {}).score || '0',
+        awayScore: (comps[1] || {}).score || '0',
+        clock:     (ev.status || {}).displayClock || '',
+        period:    (ev.status || {}).period || 1,
+      };
+    });
+
+  if (!home) return res.json({ found: false, liveList, sport });
+
+  // Find matching event
+  let matched = null;
+  for (const ev of events) {
+    const comp  = (ev.competitions || [])[0] || {};
+    const comps = comp.competitors || [];
+    const n0 = espnName(comps[0]), n1 = espnName(comps[1]);
+    if (
+      (teamMatch(n0, home) && teamMatch(n1, away)) ||
+      (teamMatch(n0, away) && teamMatch(n1, home))
+    ) { matched = { ev, comp, comps }; break; }
+    // Try short names
+    const s0 = espnShort(comps[0]), s1 = espnShort(comps[1]);
+    if (
+      (teamMatch(s0, home) && teamMatch(s1, away)) ||
+      (teamMatch(s0, away) && teamMatch(s1, home))
+    ) { matched = { ev, comp, comps }; break; }
+  }
+
+  if (!matched) return res.json({ found: false, liveList, sport });
+
+  const { ev, comp, comps } = matched;
+  const signals = parseEspnSignals(comp, sport);
+  const status  = ev.status || {};
+  const period  = status.period || 1;
+  const clock   = status.displayClock || '';
+
+  // Linescores (sets / periods)
+  const lsA = (comps[0] || {}).linescores || [];
+  const lsB = (comps[1] || {}).linescores || [];
+  const sets = lsA.map(function(ls, i) {
+    return { period: i + 1, home: ls.value || 0, away: (lsB[i] || {}).value || 0 };
+  });
+
+  // Player/team stats
+  const statsA = (comps[0] || {}).statistics || [];
+  const statsB = (comps[1] || {}).statistics || [];
+  function getStat(stats, name) {
+    const s = stats.find(function(x) { return x.name === name || x.shortDisplayName === name; });
+    return s ? s.displayValue : null;
+  }
+
+  res.json({
+    found:     true,
+    signals,
+    score:     { home: (comps[0] || {}).score || '0', away: (comps[1] || {}).score || '0' },
+    sets,
+    period,
+    clock,
+    isLive:    ((status.type || {}).name || '').includes('IN_PROGRESS'),
+    homeName:  espnName(comps[0]),
+    awayName:  espnName(comps[1]),
+    statsA: {
+      aces:      getStat(statsA, 'aces'),
+      doubleFaults: getStat(statsA, 'doubleFaults'),
+      winner1stSv: getStat(statsA, 'firstServePointsWon'),
+      shots:     getStat(statsA, 'shots'),
+      possession: getStat(statsA, 'possessionPct'),
+    },
+    statsB: {
+      aces:      getStat(statsB, 'aces'),
+      doubleFaults: getStat(statsB, 'doubleFaults'),
+      winner1stSv: getStat(statsB, 'firstServePointsWon'),
+      shots:     getStat(statsB, 'shots'),
+      possession: getStat(statsB, 'possessionPct'),
+    },
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════
+// PLAYER FORM  /api/player-form
+// ═══════════════════════════════════════════════════════════════════════
+function calcStreak(results) {
+  if (!results.length) return 0;
+  let streak = 0;
+  const last = results[0];
+  for (const r of results) { if (r === last) streak++; else break; }
+  return last === 'W' ? streak : -streak;
+}
+
+app.get('/api/player-form', async function(req, res) {
+  const name = (req.query.name || '').trim();
+  if (!name) return res.status(400).json({ error: 'name required' });
+
+  const cacheKey = 'pform_' + normTeam(name);
+  const cached   = cache.get(cacheKey);
+  if (cached) return res.json(cached);
+
+  try {
+    // Search player on TheSportsDB
+    const ctrl1 = new AbortController();
+    setTimeout(function() { ctrl1.abort(); }, 6000);
+    const r1 = await fetch(
+      'https://www.thesportsdb.com/api/v1/json/3/searchplayers.php?p=' + encodeURIComponent(name),
+      { signal: ctrl1.signal }
+    );
+    const d1 = await r1.json();
+    const players = d1.player || [];
+    if (!players.length) return res.json({ found: false, name });
+
+    const player = players[0];
+
+    // Last events
+    const ctrl2 = new AbortController();
+    setTimeout(function() { ctrl2.abort(); }, 6000);
+    const r2 = await fetch(
+      'https://www.thesportsdb.com/api/v1/json/3/eventslast.php?id=' + player.idPlayer,
+      { signal: ctrl2.signal }
+    );
+    const d2 = await r2.json();
+    const events = (d2.results || []).slice(0, 10);
+
+    const form = events.map(function(ev) {
+      const isHome = teamMatch(ev.strHomeTeam || '', name);
+      const hs = parseInt(ev.intHomeScore) || 0;
+      const as_ = parseInt(ev.intAwayScore) || 0;
+      let result = 'D';
+      if (hs !== as_) result = (isHome ? hs > as_ : as_ > hs) ? 'W' : 'L';
+      return {
+        date:     ev.dateEvent,
+        opponent: isHome ? ev.strAwayTeam : ev.strHomeTeam,
+        score:    hs + '-' + as_,
+        result,
+      };
+    });
+
+    const wins    = form.filter(function(f) { return f.result === 'W'; }).length;
+    const formPct = form.length ? Math.round(wins / form.length * 100) : null;
+    const streak  = calcStreak(form.map(function(f) { return f.result; }));
+
+    const result = {
+      found:       true,
+      name:        player.strPlayer,
+      nationality: player.strNationality,
+      birthDate:   player.dateBorn,
+      position:    player.strPosition,
+      thumb:       player.strThumb || player.strCutout || null,
+      form:        form.slice(0, 5),
+      formPct,
+      wins,
+      losses:      form.length - wins,
+      streak,
+    };
+
+    cache.set(cacheKey, result, 1800);
+    res.json(result);
+
+  } catch (err) {
+    res.json({ found: false, name, error: err.message });
+  }
+});
+

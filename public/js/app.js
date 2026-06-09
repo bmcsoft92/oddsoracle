@@ -1042,6 +1042,8 @@ function attachCardClicks(container) {
       }
       // Appliquer le contexte sport APRES ouverture (elements doivent etre visibles)
       if(sport&&typeof LiveModule!=='undefined'&&LiveModule.updateSportContext) LiveModule.updateSportContext(sport);
+      // Démarrer auto-détection + charger forme joueurs
+      if(typeof LiveModule!=='undefined'&&LiveModule.onMatchLoaded) LiveModule.onMatchLoaded(home,away,sport);
       var form=document.getElementById('live-match-header');
       if(form) form.scrollIntoView({behavior:'smooth',block:'start'});
     });
