@@ -767,33 +767,33 @@ function injectLiveStyles() {
     }
     .alert-box-strong  { border-color: var(--green);  background: rgba(34,197,94,0.05); }
     .alert-box-value   { border-color: var(--cyan);   background: rgba(6,182,212,0.05); }
-    .alert-box-neutral { border-color: var(--border); background: var(--bg-input); }
+    .alert-box-neutral { border-color: var(--border0); background: var(--bg2); }
 
     .alert-header {
       display: flex;
       justify-content: space-between;
       font-size: 0.7rem;
-      color: var(--text-muted);
+      color: var(--text1);
       margin-bottom: 0.35rem;
     }
 
     .alert-sport { font-weight: 700; color: var(--red); font-size: 0.75rem; }
-    .alert-time  { color: var(--text-muted); }
-    .alert-match { font-size: 1rem; font-weight: 700; color: var(--text-primary); }
-    .alert-score { font-size: 0.8rem; color: var(--text-secondary); margin-bottom: 0.5rem; }
-    .alert-sep   { color: var(--text-muted); font-size: 0.7rem; display: block; margin: 0.5rem 0; }
+    .alert-time  { color: var(--text1); }
+    .alert-match { font-size: 1rem; font-weight: 700; color: var(--text0); }
+    .alert-score { font-size: 0.8rem; color: var(--text1); margin-bottom: 0.5rem; }
+    .alert-sep   { color: var(--text1); font-size: 0.7rem; display: block; margin: 0.5rem 0; }
 
     .alert-section { margin: 0.75rem 0; }
     .alert-section-title {
       font-size: 0.68rem;
       text-transform: uppercase;
       letter-spacing: 0.08em;
-      color: var(--text-muted);
+      color: var(--text1);
       margin-bottom: 0.4rem;
     }
 
-    .signal-item { color: var(--text-secondary); padding: 0.15rem 0; }
-    .signal-item.muted { color: var(--text-muted); }
+    .signal-item { color: var(--text1); padding: 0.15rem 0; }
+    .signal-item.muted { color: var(--text1); }
 
     .prob-live-row {
       display: flex;
@@ -802,11 +802,11 @@ function injectLiveStyles() {
       margin: 0.3rem 0;
       font-size: 0.8rem;
     }
-    .prob-live-row > span:first-child { min-width: 90px; color: var(--text-secondary); }
+    .prob-live-row > span:first-child { min-width: 90px; color: var(--text1); }
     .prob-live-bar {
       flex: 1;
       height: 6px;
-      background: var(--border);
+      background: var(--border0);
       border-radius: 3px;
       overflow: hidden;
     }
@@ -815,7 +815,7 @@ function injectLiveStyles() {
 
     .factors-mini {
       font-size: 0.7rem;
-      color: var(--text-muted);
+      color: var(--text1);
       margin-top: 0.25rem;
     }
 
@@ -831,17 +831,17 @@ function injectLiveStyles() {
     .act-label {
       font-weight: 700;
       font-size: 0.82rem;
-      color: var(--text-primary);
+      color: var(--text0);
       margin-bottom: 0.4rem;
     }
     .act-row {
       display: flex;
       justify-content: space-between;
       font-size: 0.8rem;
-      color: var(--text-secondary);
+      color: var(--text1);
       padding: 0.15rem 0;
     }
-    .act-row strong { color: var(--text-primary); }
+    .act-row strong { color: var(--text0); }
     .act-invalid {
       font-size: 0.72rem;
       color: var(--yellow);
@@ -850,10 +850,10 @@ function injectLiveStyles() {
     .act-no-value {
       margin-top: 0.75rem;
       padding: 0.5rem;
-      background: var(--bg-input);
+      background: var(--bg2);
       border-radius: 6px;
       font-size: 0.8rem;
-      color: var(--text-muted);
+      color: var(--text1);
       text-align: center;
     }
   `;
@@ -897,89 +897,141 @@ function updateDatetime() {
 // -----------------------------------------------------------------
 // LIVE FEED MODULE -- auto-charge tous les matchs en cours
 // -----------------------------------------------------------------
+
+// -----------------------------------------------------------------------
+// SHARED MATCH CARD RENDERER  (Betclic-style)
+// -----------------------------------------------------------------------
+function renderMatchCard(match, isLive) {
+  var sels  = match.selections || [];
+  var safeH = (match.homeTeam || '').replace(/["\'<>]/g, '');
+  var safeA = (match.awayTeam || '').replace(/["\'<>]/g, '');
+  var cotA  = sels[0] ? sels[0].bestPrice.toFixed(2) : '';
+  var cotB  = sels[sels.length-1] ? sels[sels.length-1].bestPrice.toFixed(2) : '';
+
+  // Best selection (highest edge)
+  var bestSel = sels.reduce(function(b,s){ return (!b||(s.edge||0)>(b.edge||0))?s:b; }, null);
+
+  // Time badge
+  var dt  = new Date(match.commenceTime);
+  var tod = dt.toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'});
+  var timeBadge;
+  if (isLive) {
+    timeBadge = '<span class="mc-live-badge">&#9679; LIVE &middot; '+tod+'</span>';
+  } else {
+    var h = match.hoursLeft || 0;
+    var tl = h < 1 ? '&lt; 1h' : h < 24 ? 'Dans '+h+'h' : tod;
+    timeBadge = '<span class="mc-time-badge'+(h<2?' mc-urgent':'')+'">'+tl+' &middot; '+tod+'</span>';
+  }
+
+  // Odds columns (1 / X / 2  or  1 / 2)
+  var oddsHtml = sels.map(function(s,i){
+    var n    = sels.length;
+    var lbl  = n===2 ? (i===0?'1':'2') : (i===0?'1': i===1?'X':'2');
+    var best = bestSel && s===bestSel && (s.edge||0)>0;
+    var ec   = (s.edge||0)>0 ? 'mc-ep' : 'mc-en';
+    var et   = s.edge!=null ? ((s.edge>0?'+':'')+s.edge.toFixed(1)+'%') : '';
+    var pw   = Math.min(100,Math.max(0,s.trueProb||0));
+    return '<div class="mc-odd'+(best?' mc-best':'')+'">'
+      +'<div class="mc-ol">'+lbl+'</div>'
+      +'<div class="mc-op">'+(s.bestPrice?s.bestPrice.toFixed(2):'—')+'</div>'
+      +'<div class="mc-ob">'+(s.bestBook||'')+'</div>'
+      +'<div class="mc-bar-wrap"><div class="mc-bar" style="width:'+pw+'%"></div></div>'
+      +'<div class="mc-oe '+ec+'">'+et+'</div>'
+      +'</div>';
+  }).join('');
+
+  // Prediction badge
+  var predHtml = bestSel && bestSel.predLabel
+    ? '<span class="mc-pred feed-pred feed-pred-'+bestSel.predLabel.toLowerCase()+'">'+bestSel.predLabel+'</span>'
+    : '';
+
+  // Kelly
+  var kellyHtml = '';
+  if (bestSel && (bestSel.edge||0)>0 && bestSel.trueProb) {
+    var p  = bestSel.trueProb/100;
+    var b  = (bestSel.bestPrice||2)-1;
+    var k  = Math.max(0,(p*b-(1-p))/b);
+    kellyHtml = '<span class="mc-kelly">Kelly '+( k/4*100).toFixed(1)+'%</span>';
+  }
+
+  // Footer
+  var foot = bestSel ? '<div class="mc-footer">'
+    +'<span class="mc-prob">Prob <strong>'+(bestSel.trueProb||0)+'%</strong></span>'
+    +((bestSel.edge||0)>0?'<span class="mc-ep mc-ev">edge +'+bestSel.edge.toFixed(1)+'%</span>':'')
+    +kellyHtml+'</div>' : '';
+
+  return '<div class="match-card feed-card-clickable"'
+    +' data-home="'+safeH+'" data-away="'+safeA+'"'
+    +' data-sport="'+(match.sportKey||'')+'"'
+    +' data-cotea="'+cotA+'" data-coteb="'+cotB+'">'
+    +'<div class="mc-head">'
+    +'<span class="mc-sport">'+(match.sportIcon||'⚡')+' '+(match.sportLabel||'')+'</span>'
+    +timeBadge+predHtml
+    +'</div>'
+    +'<div class="mc-teams">'
+    +'<span class="mc-team">'+safeH+'</span>'
+    +'<span class="mc-vs">vs</span>'
+    +'<span class="mc-team">'+safeA+'</span>'
+    +'</div>'
+    +'<div class="mc-odds">'+oddsHtml+'</div>'
+    +foot
+    +'</div>';
+}
+
+function attachCardClicks(container) {
+  container.querySelectorAll('.feed-card-clickable').forEach(function(card) {
+    card.addEventListener('click', function() {
+      var home  = card.dataset.home  || '';
+      var away  = card.dataset.away  || '';
+      var sport = card.dataset.sport || '';
+      var cotA  = card.dataset.cotea || '';
+      var cotB  = card.dataset.coteb || '';
+      var setV = function(id,v){ var e=document.getElementById(id); if(e) e.value=v; };
+      var setT = function(id,v){ var e=document.getElementById(id); if(e) e.textContent=v; };
+      setV('live-playerA',home); setT('live-pA-name',home);
+      setV('live-playerB',away); setT('live-pB-name',away);
+      if(cotA) setV('live-coteA',cotA);
+      if(cotB) setV('live-coteB',cotB);
+      if(sport){
+        var sel=document.getElementById('live-sport-select');
+        if(sel){ var o=Array.from(sel.options).find(function(x){ return sport.indexOf(x.value)!==-1||x.value.indexOf(sport.split('_')[0])!==-1; }); if(o) sel.value=o.value; }
+        if(typeof LiveModule!=='undefined'&&LiveModule.updateSportContext) LiveModule.updateSportContext(sport);
+      }
+      // Ouvrir la section avancée si fermée
+      var adv=document.getElementById('live-advanced');
+      if(adv&&adv.style.display==='none'){
+        adv.style.display='block';
+        var tog=adv.previousElementSibling;
+        if(tog&&tog.classList.contains('advanced-toggle')) tog.textContent='\u25be Analyse avan\u00e9e (score live, signaux, fiche)';
+      }
+      var form=document.getElementById('live-match-header');
+      if(form) form.scrollIntoView({behavior:'smooth',block:'start'});
+    });
+  });
+}
+
 const LiveFeedModule = (() => {
 
   let _refreshTimer = null;
 
-  function renderSelections(selections) {
-    if (!selections || !selections.length) return '';
-    return selections.map(function(s) {
-      const label = s.predLabel
-        ? '<span class="feed-pred feed-pred-' + s.predLabel.toLowerCase() + '">' + s.predLabel + '</span>'
-        : '';
-      return '<div class="feed-sel">'
-        + '<span class="feed-sel-name">' + s.name + '</span>'
-        + '<span class="feed-sel-price">' + s.bestPrice.toFixed(2) + '</span>'
-        + '<span class="feed-sel-book">' + (s.bestBook || '') + '</span>'
-        + '<span class="feed-sel-prob">' + s.trueProb + '%</span>'
-        + label
-        + '</div>';
-    }).join('');
-  }
-
-  function renderCard(match) {
-    const time = new Date(match.commenceTime).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
-    const sels = match.selections || [];
-    const cotA = sels[0] ? sels[0].bestPrice.toFixed(2) : '';
-    const cotB = sels[sels.length - 1] ? sels[sels.length - 1].bestPrice.toFixed(2) : '';
-    const safeH = (match.homeTeam || '').replace(/"/g, '');
-    const safeA = (match.awayTeam || '').replace(/"/g, '');
-    return '<div class="feed-card feed-card-live feed-card-clickable" title="Cliquer pour remplir le formulaire" '
-      + 'data-home="' + safeH + '" data-away="' + safeA + '" '
-      + 'data-sport="' + (match.sportKey || '') + '" '
-      + 'data-cotea="' + cotA + '" data-coteb="' + cotB + '">'
-      + '<div class="feed-card-header">'
-      + '<span class="feed-sport-badge">' + (match.sportIcon || 'S') + ' ' + (match.sportLabel || '') + '</span>'
-      + '<span class="feed-live-dot">LIVE</span>'
-      + '<span class="feed-time">' + time + '</span>'
-      + '</div>'
-      + '<div class="feed-match-name">' + match.homeTeam + ' vs ' + match.awayTeam + '</div>'
-      + '<div class="feed-click-hint">&#128270; Cliquer pour analyser</div>'
-      + '<div class="feed-selections">' + renderSelections(match.selections) + '</div>'
-      + '</div>';
-  }
-
   function render(data) {
-    const el = document.getElementById('live-feed-container');
+    var el = document.getElementById('live-feed-container');
     if (!el) return;
     if (!data || !data.matches || !data.matches.length) {
-      el.innerHTML = '<div class="feed-empty">Aucun match en cours sur les sports surveilles.<br>Les cotes live apparaissent ici automatiquement.</div>';
+      el.innerHTML = '<div class="feed-empty">'
+        + '<div style="font-size:1.8rem;margin-bottom:.5rem">&#9679; LIVE</div>'
+        + '<div>Aucun match en cours d&eacute;tect&eacute; sur les sports surveill&eacute;s.</div>'
+        + '<div style="font-size:.72rem;margin-top:.4rem;color:var(--text2)">Les cotes apparaissent automatiquement quand des matchs commencent.</div>'
+        + '<button onclick="LiveFeedModule.load()" class="btn btn-sm btn-secondary" style="margin-top:.75rem">&#8635; Rafra&icirc;chir</button>'
+        + '</div>';
       return;
     }
-    el.innerHTML = '<div class="feed-meta">' + data.count + ' match(s) en cours - Actualise toutes les 2 min</div>'
-      + '<div class="feed-grid">' + data.matches.map(renderCard).join('') + '</div>';
-    // Click-to-fill: clic sur une carte => pré-remplit le formulaire Live Betting
-    el.querySelectorAll('.feed-card-clickable').forEach(function(card) {
-      card.addEventListener('click', function() {
-        const home  = card.dataset.home  || '';
-        const away  = card.dataset.away  || '';
-        const sport = card.dataset.sport || '';
-        const cotA  = card.dataset.cotea || '';
-        const cotB  = card.dataset.coteb || '';
-        const setV = function(id, v) { const e = document.getElementById(id); if (e) e.value = v; };
-        const setT = function(id, v) { const e = document.getElementById(id); if (e) e.textContent = v; };
-        setV('live-playerA', home); setT('live-pA-name', home);
-        setV('live-playerB', away); setT('live-pB-name', away);
-        if (cotA) setV('live-coteA', cotA);
-        if (cotB) setV('live-coteB', cotB);
-        // Adapter le sport
-        if (sport) {
-          const sportSel = document.getElementById('live-sport-select');
-          if (sportSel) {
-            // Trouver l'option correspondante
-            const opts = Array.from(sportSel.options);
-            const match = opts.find(function(o) { return sport.indexOf(o.value) !== -1 || o.value.indexOf(sport.split('_')[0]) !== -1; });
-            if (match) sportSel.value = match.value;
-          }
-          if (typeof LiveModule !== 'undefined' && LiveModule.updateSportContext) {
-            LiveModule.updateSportContext(sport);
-          }
-        }
-        // Scroll vers le formulaire
-        const form = document.getElementById('live-match-header');
-        if (form) form.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      });
-    });
+    el.innerHTML = '<div class="feed-meta-bar">'
+      + '<span>&#9679; '+data.count+' match'+(data.count>1?'s':'')+' en cours</span>'
+      + '<span class="fmb-right">auto-refresh 2min</span>'
+      + '</div>'
+      + '<div class="match-list">' + data.matches.map(function(m){ return renderMatchCard(m, true); }).join('') + '</div>';
+    attachCardClicks(el);
   }
 
   async function load() {
@@ -1024,47 +1076,24 @@ const PrematchFeedModule = (() => {
 
   let _refreshTimer = null;
 
-  function renderSelections(selections) {
-    if (!selections || !selections.length) return '';
-    return selections.map(function(s) {
-      const label = s.predLabel
-        ? '<span class="feed-pred feed-pred-' + s.predLabel.toLowerCase() + '">' + s.predLabel + '</span>'
-        : '';
-      return '<div class="feed-sel">'
-        + '<span class="feed-sel-name">' + s.name + '</span>'
-        + '<span class="feed-sel-price">' + s.bestPrice.toFixed(2) + '</span>'
-        + '<span class="feed-sel-book">' + (s.bestBook || '') + '</span>'
-        + '<span class="feed-sel-prob">' + s.trueProb + '%</span>'
-        + label
-        + '</div>';
-    }).join('');
-  }
-
-  function renderCard(match) {
-    const dt = new Date(match.commenceTime);
-    const time = dt.toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric', month: 'short' })
-      + ' ' + dt.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
-    const hoursLabel = match.hoursLeft < 1 ? "Dans moins d'1h" : 'Dans ' + match.hoursLeft + 'h';
-    return '<div class="feed-card feed-card-upcoming">'
-      + '<div class="feed-card-header">'
-      + '<span class="feed-sport-badge">' + (match.sportIcon || 'S') + ' ' + (match.sportLabel || '') + '</span>'
-      + '<span class="feed-hours-badge">' + hoursLabel + '</span>'
-      + '<span class="feed-time">' + time + '</span>'
-      + '</div>'
-      + '<div class="feed-match-name">' + match.homeTeam + ' vs ' + match.awayTeam + '</div>'
-      + '<div class="feed-selections">' + renderSelections(match.selections) + '</div>'
-      + '</div>';
-  }
-
   function render(data) {
-    const el = document.getElementById('prematch-feed-container');
+    var el = document.getElementById('prematch-feed-container');
     if (!el) return;
     if (!data || !data.matches || !data.matches.length) {
-      el.innerHTML = '<div class="feed-empty">Aucun match programme dans les 24 prochaines heures.</div>';
+      el.innerHTML = '<div class="feed-empty">'
+        + '<div style="font-size:1.8rem;margin-bottom:.5rem">&#9671;</div>'
+        + '<div>Aucun match programm&eacute; dans les 24 prochaines heures.</div>'
+        + '<div style="font-size:.72rem;margin-top:.4rem;color:var(--text2)">Essayez d&#39;actualiser — les cotes apparaissent quand les bookmakers les proposent.</div>'
+        + '<button onclick="PrematchFeedModule.load()" class="btn btn-sm btn-secondary" style="margin-top:.75rem">&#8635; Rafra&icirc;chir</button>'
+        + '</div>';
       return;
     }
-    el.innerHTML = '<div class="feed-meta">' + data.count + ' match(s) a venir - Actualise toutes les 10 min</div>'
-      + '<div class="feed-grid">' + data.matches.map(renderCard).join('') + '</div>';
+    el.innerHTML = '<div class="feed-meta-bar">'
+      + '<span>&#9671; '+data.count+' match'+(data.count>1?'s':'')+' &agrave; venir (24h)</span>'
+      + '<span class="fmb-right">auto-refresh 10min</span>'
+      + '</div>'
+      + '<div class="match-list">' + data.matches.map(function(m){ return renderMatchCard(m, false); }).join('') + '</div>';
+    attachCardClicks(el);
   }
 
   async function load() {
