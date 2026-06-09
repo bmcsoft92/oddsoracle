@@ -51,6 +51,48 @@ const SPORTS = [
 ];
 
 const BOOKMAKERS = ['betclic', 'unibet', 'pinnacle', 'winamax', 'bet365'];
+// ── Icône par groupe de sport ──────────────────────────────────────────────
+function mapGroupIcon(group) {
+  const g = (group || '').toLowerCase();
+  if (g.includes('soccer') || g.includes('football') && !g.includes('american') && !g.includes('aussie')) return '⚽';
+  if (g.includes('tennis'))            return '🎾';
+  if (g.includes('basketball'))        return '🏀';
+  if (g.includes('baseball'))          return '⚾';
+  if (g.includes('icehockey') || g.includes('hockey')) return '🏒';
+  if (g.includes('americanfootball'))  return '🏈';
+  if (g.includes('mma') || g.includes('boxing')) return '🥊';
+  if (g.includes('cricket'))           return '🏏';
+  if (g.includes('rugby'))             return '🏉';
+  if (g.includes('golf'))              return '⛳';
+  return '⚡';
+}
+
+// ── Découverte dynamique des sports actifs (endpoint GRATUIT, 0 quota) ─────
+async function getActiveSports() {
+  const cacheKey = 'active_sports_dyn';
+  const cached   = cache.get(cacheKey);
+  if (cached) return cached;
+  try {
+    const raw    = await oddsApiFetch('/sports', { all: false });
+    const sports = (Array.isArray(raw) ? raw : [])
+      .filter(function(s){ return s.active && !s.has_outrights; })
+      .map(function(s){
+        return {
+          key:   s.key,
+          label: s.title || s.key,
+          icon:  mapGroupIcon(s.group || s.key),
+          group: s.group || s.key,
+        };
+      });
+    console.log('[sports] ' + sports.length + ' sports actifs découverts');
+    cache.set(cacheKey, sports, 1800); // 30 min (endpoint gratuit)
+    return sports;
+  } catch(e) {
+    console.warn('[sports] fallback statique: ' + e.message);
+    return SPORTS; // fallback sur la liste statique
+  }
+}
+
 
 // -- CACHE --
 class Cache {
@@ -293,8 +335,8 @@ async function loadOddsForSport(sport) {
       _raw:         event.bookmakers || [],
     };
   });
-  cache.set(cacheKey, data, 900);
-  cache.set(cacheKey + '_stale', data, 7200);
+  cache.set(cacheKey, data, 3600);
+  cache.set(cacheKey + '_stale', data, 86400);
   return data;
 }
 
@@ -496,11 +538,12 @@ app.get('/api/live/all', async (req, res) => {
       });
     }
 
-    // PARTIE 2 : matchs IMMINENTS (next 3h) depuis The Odds API — tout en parallèle
+    // PARTIE 2 : matchs à venir (24h) — sports découverts dynamiquement
+    const activeSports2 = await getActiveSports();
     const upcomingResults = await Promise.allSettled(
-      SPORTS.map(function(sport){ return loadOddsForSport(sport); })
+      activeSports2.map(function(sport){ return loadOddsForSport(sport); })
     );
-    SPORTS.forEach(function(sport, i) {
+    activeSports2.forEach(function(sport, i) {
       if (upcomingResults[i].status !== 'fulfilled') return;
       for (const event of upcomingResults[i].value) {
         const t = new Date(event.commenceTime).getTime();
@@ -544,28 +587,26 @@ app.get('/api/upcoming', async (req, res) => {
   const cached   = cache.get(cacheKey);
   if (cached) return res.json({ data: cached, cached: true, fetchedAt: cached._fetchedAt, apiUsage });
 
-  const now = Date.now();
+  const now          = Date.now();
+  const activeSports = await getActiveSports(); // sports découverts dynamiquement
   const h24 = now + 24 * 3600 * 1000;
   const upcoming = [];
 
-  for (const sport of SPORTS) {
-    try {
-      const events = await loadOddsForSport(sport);
-      for (const event of events) {
-        const t = new Date(event.commenceTime).getTime();
-        if (t <= now || t > h24) continue;
-        const enriched = enrichEvent(event, sport);
-        if (enriched) upcoming.push({ ...enriched, isLive: false, hoursLeft: Math.round((t - now) / 360000) / 10 });
-      }
-    } catch(e) {
-      console.warn('[upcoming] ' + sport.key + ': ' + e.message);
+  const upRes = await Promise.allSettled(activeSports.map(function(sp){ return loadOddsForSport(sp); }));
+  activeSports.forEach(function(sport, i) {
+    if (upRes[i].status !== 'fulfilled') return;
+    for (const event of upRes[i].value) {
+      const t = new Date(event.commenceTime).getTime();
+      if (t <= now || t > h24) continue;
+      const enriched = enrichEvent(event, sport);
+      if (enriched) upcoming.push({ ...enriched, isLive: false, hoursLeft: Math.round((t - now) / 360000) / 10 });
     }
-  }
+  });
 
   upcoming.sort(function(a, b) { return new Date(a.commenceTime) - new Date(b.commenceTime); });
 
   const result = { matches: upcoming, count: upcoming.length, _fetchedAt: new Date().toISOString() };
-  cache.set(cacheKey, result, 600);
+  cache.set(cacheKey, result, 1800); // 30 min
   res.json({ data: result, cached: false, fetchedAt: result._fetchedAt, apiUsage });
 });
 
@@ -579,13 +620,14 @@ app.get('/api/scanner', async (req, res) => {
     return res.status(503).json({ error: 'ODDS_API_KEY non configuree', apiUsage });
   }
 
+  const activeSportsScan = await getActiveSports();
   const opportunities = [];
   const now = Date.now();
   const h48 = now + 48 * 3600 * 1000;
   let sportsScanned = 0;
   let eventsFound   = 0;
 
-  for (const sport of SPORTS) {
+  for (const sport of activeSportsScan) {
     try {
       const oddsCacheKey = 'odds_' + sport.key + '_all';
       let oddsData = cache.get(oddsCacheKey);
