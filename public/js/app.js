@@ -1065,7 +1065,7 @@ const LiveFeedModule = (() => {
     }
     el.innerHTML = '<div class="feed-meta-bar">'
       + '<span>&#9679; '+data.count+' match'+(data.count>1?'s':'')+' en cours</span>'
-      + '<span class="fmb-right">auto-refresh 2min</span>'
+      + '<span class="fmb-right">auto-refresh 1min</span>'
       + '</div>'
       + '<div class="match-list">' + data.matches.map(function(m){ return renderMatchCard(m, true); }).join('') + '</div>';
     attachCardClicks(el);
@@ -1095,7 +1095,7 @@ const LiveFeedModule = (() => {
 
   function startAutoRefresh() {
     stopAutoRefresh();
-    _refreshTimer = setInterval(load, 120000);
+    _refreshTimer = setInterval(load, 60000);
   }
 
   function stopAutoRefresh() {
