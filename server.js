@@ -187,9 +187,39 @@ function oddsApiFetch(endpoint, params = {}) {
 }
 
 // -- QUOTA GUARD (évite de vider le quota) --
+// Compteur d'appels avant que le premier header x-requests-remaining arrive
+let _apiCallsMadeUnknown = 0;
+const UNKNOWN_QUOTA_LIMIT = 15; // max appels sans connaître le solde
+
 function quotaOk() {
-  if (apiUsage.requestsRemaining === null) return true; // inconnu, autoriser
+  if (apiUsage.requestsRemaining === null) {
+    // Pas encore de header reçu — limiter le nombre d'appels "à l'aveugle"
+    if (_apiCallsMadeUnknown >= UNKNOWN_QUOTA_LIMIT) return false;
+    _apiCallsMadeUnknown++;
+    return true;
+  }
+  // Reset compteur une fois qu'on connaît le solde
+  _apiCallsMadeUnknown = 0;
   return apiUsage.requestsRemaining > 20;
+}
+
+// -- CHARGEMENT SÉRIALISÉ avec vérification quota entre chaque sport --
+// Remplace Promise.allSettled pour éviter 36 appels simultanés au démarrage
+async function loadSportsSafely(sports) {
+  const results = [];
+  for (const sport of sports) {
+    if (!quotaOk()) {
+      console.warn('[quota] Arrêt chargement sports — quota faible');
+      break;
+    }
+    try {
+      const data = await loadOddsForSport(sport);
+      results.push({ status: 'fulfilled', value: data });
+    } catch(e) {
+      results.push({ status: 'rejected', reason: e });
+    }
+  }
+  return results;
 }
 
 // -- CACHE DISQUE (survit aux redémarrages du process) --
@@ -481,11 +511,15 @@ function enrichEvent(event, sport) {
 // -----------------------------------------------------------------------
 async function getLiveScores() {
   try {
-    const resp = await axios.get(
+    const ctrl = new AbortController();
+    setTimeout(function(){ ctrl.abort(); }, 6000);
+    const resp = await fetch(
       'https://www.thesportsdb.com/api/v1/json/3/eventslive.php',
-      { timeout: 6000 }
+      { signal: ctrl.signal }
     );
-    return (resp.data && resp.data.events) ? resp.data.events : [];
+    if (!resp.ok) return [];
+    const data = await resp.json();
+    return (data && data.events) ? data.events : [];
   } catch(e) {
     console.warn('[thesportsdb] ' + e.message);
     return [];
@@ -619,13 +653,11 @@ app.get('/api/live/all', async (req, res) => {
       });
     }
 
-    // PARTIE 2 : matchs à venir (24h) — sports découverts dynamiquement
+    // PARTIE 2 : matchs à venir (24h) — sports découverts dynamiquement (sérialisé)
     const activeSports2 = await getActiveSports();
-    const upcomingResults = await Promise.allSettled(
-      activeSports2.map(function(sport){ return loadOddsForSport(sport); })
-    );
+    const upcomingResults = await loadSportsSafely(activeSports2);
     activeSports2.forEach(function(sport, i) {
-      if (upcomingResults[i].status !== 'fulfilled') return;
+      if (!upcomingResults[i] || upcomingResults[i].status !== 'fulfilled') return;
       for (const event of upcomingResults[i].value) {
         const t = new Date(event.commenceTime).getTime();
         const msAgo = now - t;
@@ -678,9 +710,9 @@ app.get('/api/upcoming', async (req, res) => {
   const h24 = now + 24 * 3600 * 1000;
   const upcoming = [];
 
-  const upRes = await Promise.allSettled(activeSports.map(function(sp){ return loadOddsForSport(sp); }));
+  const upRes = await loadSportsSafely(activeSports);
   activeSports.forEach(function(sport, i) {
-    if (upRes[i].status !== 'fulfilled') return;
+    if (!upRes[i] || upRes[i].status !== 'fulfilled') return;
     for (const event of upRes[i].value) {
       const t = new Date(event.commenceTime).getTime();
       if (t <= now || t > h24) continue;
