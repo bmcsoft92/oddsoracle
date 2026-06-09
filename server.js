@@ -40,6 +40,14 @@ const SPORTS = [
   { key: 'basketball_wnba',              label: 'WNBA',                icon: 'B', group: 'basketball' },
   { key: 'basketball_euroleague',        label: 'Euroleague',          icon: 'B', group: 'basketball' },
   { key: 'basketball_ncaab',             label: 'NCAA Basketball',     icon: 'B', group: 'basketball' },
+  // Baseball
+  { key: 'baseball_mlb',                 label: 'MLB',                 icon: 'X', group: 'baseball' },
+  // Hockey sur glace
+  { key: 'icehockey_nhl',               label: 'NHL',                  icon: 'H', group: 'hockey' },
+  // MMA
+  { key: 'mma_mixed_martial_arts',       label: 'MMA/UFC',             icon: 'M', group: 'mma' },
+  // NFL (hors saison en juin -- disponible en septembre)
+  { key: 'americanfootball_nfl',         label: 'NFL',                 icon: 'A', group: 'american_football' },
 ];
 
 const BOOKMAKERS = ['betclic', 'unibet', 'pinnacle', 'winamax', 'bet365'];
@@ -333,13 +341,19 @@ app.get('/api/scanner', async (req, res) => {
           let bestBookKey  = '';
           let bestBookName = '';
 
+          // Tableau complet de toutes les cotes par bookmaker pour cette selection
+          const allBookmakers = [];
+
           for (const bk of rawBk) {
             const bkH2H = bk.markets && bk.markets.find(function(m) { return m.key === 'h2h'; });
             const bkOut = bkH2H && bkH2H.outcomes && bkH2H.outcomes.find(function(out) { return out.name === o.name; });
-            if (bkOut && bkOut.price > bestPrice) {
-              bestPrice    = bkOut.price;
-              bestBookKey  = bk.key;
-              bestBookName = bk.title || bk.key;
+            if (bkOut && bkOut.price > 1) {
+              allBookmakers.push({ name: bk.title || bk.key, price: bkOut.price });
+              if (bkOut.price > bestPrice) {
+                bestPrice    = bkOut.price;
+                bestBookKey  = bk.key;
+                bestBookName = bk.title || bk.key;
+              }
             }
           }
 
@@ -352,25 +366,32 @@ app.get('/api/scanner', async (req, res) => {
           const hoursLeft  = (t - now) / 3600000;
           const urgency    = isLive ? 'live' : hoursLeft < 2 ? 'soon' : hoursLeft < 6 ? 'today' : 'upcoming';
 
+          // Prediction: recommandation basee sur l'edge et la confiance
+          const predScore  = Math.min(99, Math.round(trueProb * (1 + edge / 100)));
+          const predLabel  = edge >= 10 ? 'FORTE' : edge >= 6 ? 'BONNE' : 'CORRECTE';
+
           opportunities.push({
-            sport:        sport.key,
-            sportLabel:   sport.label,
-            sportIcon:    sport.icon,
-            matchId:      event.id,
-            homeTeam:     event.homeTeam,
-            awayTeam:     event.awayTeam,
-            commenceTime: event.commenceTime,
+            sport:          sport.key,
+            sportLabel:     sport.label,
+            sportIcon:      sport.icon,
+            matchId:        event.id,
+            homeTeam:       event.homeTeam,
+            awayTeam:       event.awayTeam,
+            commenceTime:   event.commenceTime,
             isLive,
             urgency,
-            hoursLeft:    Math.round(hoursLeft * 10) / 10,
-            selection:    o.name,
-            trueProb:     Math.round(trueProb * 1000) / 10,
-            sharpPrice:   o.price,
+            hoursLeft:      Math.round(hoursLeft * 10) / 10,
+            selection:      o.name,
+            trueProb:       Math.round(trueProb * 1000) / 10,
+            sharpPrice:     o.price,
             bestPrice,
-            bestBook:     bestBookName || bestBookKey,
-            edge:         Math.round(edge * 10) / 10,
+            bestBook:       bestBookName || bestBookKey,
+            allBookmakers:  allBookmakers.sort(function(a,b) { return b.price - a.price; }),
+            edge:           Math.round(edge * 10) / 10,
             confidence,
-            ev:           Math.round((trueProb * bestPrice - 1) * 1000) / 10,
+            ev:             Math.round((trueProb * bestPrice - 1) * 1000) / 10,
+            predScore,
+            predLabel,
           });
         }
       }

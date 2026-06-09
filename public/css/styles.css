@@ -1090,6 +1090,98 @@ select.form-control {
 }
 .watch-link-btn:hover { border-color: var(--cyan); color: var(--cyan-light); background: rgba(6,182,212,.08); }
 
+/* -- COMPARATEUR BOOKMAKERS -- */
+.sc-bookmakers {
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: .6rem .85rem;
+}
+.sc-bk-header {
+  font-size: .62rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: .08em;
+  color: var(--text-dim);
+  margin-bottom: .4rem;
+}
+.sc-bk-list { display: flex; flex-direction: column; gap: .2rem; }
+.sc-bk-row {
+  display: flex;
+  align-items: center;
+  gap: .5rem;
+  padding: .25rem .4rem;
+  border-radius: var(--radius-xs);
+  font-size: .75rem;
+}
+.sc-bk-row.sc-bk-best {
+  background: rgba(34,197,94,.1);
+  border: 1px solid rgba(34,197,94,.25);
+}
+.sc-bk-name { flex: 1; color: var(--text-secondary); }
+.sc-bk-best .sc-bk-name { color: var(--green-light); font-weight: 700; }
+.sc-bk-price {
+  font-family: var(--mono);
+  font-weight: 700;
+  color: var(--text-primary);
+  min-width: 36px;
+  text-align: right;
+}
+.sc-bk-best .sc-bk-price { color: var(--green-light); font-size: .85rem; }
+.sc-bk-implied {
+  font-size: .65rem;
+  color: var(--text-dim);
+  min-width: 34px;
+  text-align: right;
+}
+
+/* -- PREDICTION SCANNER IA -- */
+.sc-prediction {
+  background: rgba(99,102,241,.06);
+  border: 1px solid rgba(99,102,241,.2);
+  border-radius: var(--radius-sm);
+  padding: .6rem .85rem;
+}
+.sc-pred-header {
+  font-size: .62rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: .08em;
+  color: var(--accent-light);
+  margin-bottom: .4rem;
+}
+.sc-pred-bar-wrap {
+  height: 5px;
+  background: var(--bg-hover);
+  border-radius: 3px;
+  margin-bottom: .4rem;
+  overflow: hidden;
+}
+.sc-pred-bar {
+  height: 100%;
+  background: var(--grad-accent);
+  border-radius: 3px;
+  transition: width .4s ease;
+}
+.sc-pred-meta {
+  display: flex;
+  align-items: center;
+  gap: .75rem;
+  font-size: .72rem;
+  color: var(--text-muted);
+  flex-wrap: wrap;
+}
+.sc-pred-label {
+  font-weight: 800;
+  font-size: .62rem;
+  text-transform: uppercase;
+  padding: .1rem .4rem;
+  border-radius: 20px;
+}
+.sc-pred-forte { background: rgba(34,197,94,.15); color: var(--green-light); }
+.sc-pred-bonne { background: rgba(6,182,212,.15); color: var(--cyan-light); }
+.sc-pred-correcte { background: rgba(245,158,11,.12); color: var(--yellow-light); }
+
 /* -- SCROLLBAR -- */
 ::-webkit-scrollbar { width: 5px; height: 5px; }
 ::-webkit-scrollbar-track { background: transparent; }
@@ -1122,3 +1214,96 @@ select.form-control {
   .players-grid { grid-template-columns: 1fr; }
   .vs-divider { display: none; }
 }
+
+
+/* -- COMPARATEUR BOOKMAKERS -- */
+.sc-bookmakers {
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: .6rem .85rem;
+}
+.sc-bk-header {
+  font-size: .62rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: .08em;
+  color: var(--text-dim);
+  margin-bottom: .4rem;
+}
+.sc-bk-list { display: flex; flex-direction: column; gap: .2rem; }
+.sc-bk-row {
+  display: flex;
+  align-items: center;
+  gap: .5rem;
+  padding: .25rem .4rem;
+  border-radius: var(--radius-xs);
+  font-size: .75rem;
+}
+.sc-bk-row.sc-bk-best {
+  background: rgba(34,197,94,.1);
+  border: 1px solid rgba(34,197,94,.25);
+}
+.sc-bk-name { flex: 1; color: var(--text-secondary); }
+.sc-bk-best .sc-bk-name { color: var(--green-light); font-weight: 700; }
+.sc-bk-price {
+  font-family: var(--mono);
+  font-weight: 700;
+  color: var(--text-primary);
+  min-width: 36px;
+  text-align: right;
+}
+.sc-bk-best .sc-bk-price { color: var(--green-light); font-size: .85rem; }
+.sc-bk-implied {
+  font-size: .65rem;
+  color: var(--text-dim);
+  min-width: 34px;
+  text-align: right;
+}
+
+/* -- PREDICTION SCANNER IA -- */
+.sc-prediction {
+  background: rgba(99,102,241,.06);
+  border: 1px solid rgba(99,102,241,.2);
+  border-radius: var(--radius-sm);
+  padding: .6rem .85rem;
+}
+.sc-pred-header {
+  font-size: .62rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: .08em;
+  color: var(--accent-light);
+  margin-bottom: .4rem;
+}
+.sc-pred-bar-wrap {
+  height: 5px;
+  background: var(--bg-hover);
+  border-radius: 3px;
+  margin-bottom: .4rem;
+  overflow: hidden;
+}
+.sc-pred-bar {
+  height: 100%;
+  background: var(--grad-accent);
+  border-radius: 3px;
+  transition: width .4s ease;
+}
+.sc-pred-meta {
+  display: flex;
+  align-items: center;
+  gap: .75rem;
+  font-size: .72rem;
+  color: var(--text-muted);
+  flex-wrap: wrap;
+}
+.sc-pred-label {
+  font-weight: 800;
+  font-size: .62rem;
+  text-transform: uppercase;
+  padding: .1rem .4rem;
+  border-radius: 20px;
+}
+.sc-pred-forte { background: rgba(34,197,94,.15); color: var(--green-light); }
+.sc-pred-bonne { background: rgba(6,182,212,.15); color: var(--cyan-light); }
+.sc-pred-correcte { background: rgba(245,158,11,.12); color: var(--yellow-light); }

@@ -65,6 +65,10 @@ const ScannerModule = (() => {
     basketball_wnba:                   'basketball',
     basketball_euroleague:             'basketball',
     basketball_ncaab:                  'basketball',
+    baseball_mlb:                      'baseball',
+    icehockey_nhl:                     'hockey',
+    mma_mixed_martial_arts:            'mma',
+    americanfootball_nfl:              'american_football',
   };
 
   // -----------------------------------------------------------------
@@ -363,6 +367,62 @@ const ScannerModule = (() => {
         </div>
       </div>
 
+      ${(opp.allBookmakers && opp.allBookmakers.length > 1) ? `
+      <div class="sc-bookmakers">
+        <div class="sc-bk-header">Comparateur cotes — ${opp.selection}</div>
+        <div class="sc-bk-list">
+          ${opp.allBookmakers.map(function(bk) {
+            const isBest = bk.price === opp.bestPrice;
+            const impliedProb = Math.round(100 / bk.price * 10) / 10;
+            return '<div class="sc-bk-row' + (isBest ? ' sc-bk-best' : '') + '">'
+              + '<span class="sc-bk-name">' + bk.name + (isBest ? ' [MEILLEUR]' : '') + '</span>'
+              + '<span class="sc-bk-price">' + bk.price.toFixed(2) + '</span>'
+              + '<span class="sc-bk-implied">' + impliedProb + '%</span>'
+              + '</div>';
+          }).join('')}
+        </div>
+      </div>` : ''}
+
+      <div class="sc-prediction">
+        <div class="sc-pred-header">Prediction Scanner IA</div>
+        <div class="sc-pred-bar-wrap">
+          <div class="sc-pred-bar" style="width:${opp.predScore || opp.trueProb}%"></div>
+        </div>
+        <div class="sc-pred-meta">
+          <span class="sc-pred-label sc-pred-${(opp.predLabel || 'CORRECTE').toLowerCase().replace('/','')}">${opp.predLabel || 'CORRECTE'}</span>
+          <span>Probabilite reelle: <strong>${opp.trueProb}%</strong></span>
+          <span>EV: <strong class="text-green">+${opp.ev}%</strong></span>
+        </div>
+      </div>
+
+      ${(opp.allBookmakers && opp.allBookmakers.length > 1) ? `
+      <div class="sc-bookmakers">
+        <div class="sc-bk-header">Comparateur cotes</div>
+        <div class="sc-bk-list">
+          ${opp.allBookmakers.map(function(bk) {
+            const isBest = bk.price === opp.bestPrice;
+            const impliedProb = Math.round(100 / bk.price * 10) / 10;
+            return '<div class="sc-bk-row' + (isBest ? ' sc-bk-best' : '') + '">'
+              + '<span class="sc-bk-name">' + bk.name + (isBest ? ' [BEST]' : '') + '</span>'
+              + '<span class="sc-bk-price">' + bk.price.toFixed(2) + '</span>'
+              + '<span class="sc-bk-implied">' + impliedProb + '%</span>'
+              + '</div>';
+          }).join('')}
+        </div>
+      </div>` : ''}
+
+      <div class="sc-prediction">
+        <div class="sc-pred-header">Prediction Scanner IA</div>
+        <div class="sc-pred-bar-wrap">
+          <div class="sc-pred-bar" style="width:${opp.predScore || opp.trueProb}%"></div>
+        </div>
+        <div class="sc-pred-meta">
+          <span class="sc-pred-label sc-pred-${(opp.predLabel||'CORRECTE').toLowerCase()}">${opp.predLabel||'CORRECTE'}</span>
+          <span>Prob. reelle: <strong>${opp.trueProb}%</strong></span>
+          <span>EV: <strong class="text-green">+${opp.ev}%</strong></span>
+        </div>
+      </div>
+
       ${kelly ? `
       <div class="sc-kelly">
         <div class="sc-kelly-header">
@@ -465,6 +525,50 @@ const ScannerModule = (() => {
       { label: 'YouTube Live Search',  url: 'https://www.youtube.com/results?search_query={query}+live+stream' },
       { label: 'NBA League Pass',      url: 'https://www.nba.com/watch' },
       { label: 'WNBA League Pass',     url: 'https://www.wnba.com/watch' },
+      { label: 'DAZN',                 url: 'https://www.dazn.com' },
+    ],
+    baseball: [
+      { label: 'YouTube Live Search',  url: 'https://www.youtube.com/results?search_query={query}+live+stream' },
+      { label: 'MLB.tv',               url: 'https://www.mlb.com/live-stream-games' },
+      { label: 'ESPN+',                url: 'https://plus.espn.com' },
+    ],
+    hockey: [
+      { label: 'YouTube Live Search',  url: 'https://www.youtube.com/results?search_query={query}+live+stream' },
+      { label: 'NHL.tv',               url: 'https://www.nhl.com/subscribe' },
+      { label: 'ESPN+',                url: 'https://plus.espn.com' },
+      { label: 'DAZN',                 url: 'https://www.dazn.com' },
+    ],
+    mma: [
+      { label: 'YouTube Live Search',  url: 'https://www.youtube.com/results?search_query={query}+live+stream' },
+      { label: 'UFC Fight Pass',        url: 'https://ufcfightpass.com' },
+      { label: 'ESPN+',                url: 'https://plus.espn.com' },
+    ],
+    american_football: [
+      { label: 'YouTube Live Search',  url: 'https://www.youtube.com/results?search_query={query}+live+stream' },
+      { label: 'NFL+',                 url: 'https://www.nfl.com/plus' },
+      { label: 'ESPN+',                url: 'https://plus.espn.com' },
+      { label: 'DAZN',                 url: 'https://www.dazn.com' },
+    ],
+    baseball: [
+      { label: 'YouTube Live Search',  url: 'https://www.youtube.com/results?search_query={query}+live+stream' },
+      { label: 'MLB.tv',               url: 'https://www.mlb.com/live-stream-games' },
+      { label: 'ESPN+',                url: 'https://plus.espn.com' },
+    ],
+    hockey: [
+      { label: 'YouTube Live Search',  url: 'https://www.youtube.com/results?search_query={query}+live+stream' },
+      { label: 'NHL.tv',               url: 'https://www.nhl.com/subscribe' },
+      { label: 'ESPN+',                url: 'https://plus.espn.com' },
+      { label: 'DAZN',                 url: 'https://www.dazn.com' },
+    ],
+    mma: [
+      { label: 'YouTube Live Search',  url: 'https://www.youtube.com/results?search_query={query}+live+stream' },
+      { label: 'UFC Fight Pass',       url: 'https://ufcfightpass.com' },
+      { label: 'ESPN+',                url: 'https://plus.espn.com' },
+    ],
+    american_football: [
+      { label: 'YouTube Live Search',  url: 'https://www.youtube.com/results?search_query={query}+live+stream' },
+      { label: 'NFL+',                 url: 'https://www.nfl.com/plus' },
+      { label: 'ESPN+',                url: 'https://plus.espn.com' },
       { label: 'DAZN',                 url: 'https://www.dazn.com' },
     ],
     default: [
