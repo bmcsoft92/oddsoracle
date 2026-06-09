@@ -1439,6 +1439,135 @@ app.get('/api/match-stats', async function(req, res) {
   }
 });
 
+// -----------------------------------------------------------------------
+// CHECK-RESULT : résultat automatique d'un pari (TheSportsDB + ESPN)
+// -----------------------------------------------------------------------
+app.get('/api/check-result', async (req, res) => {
+  const home      = (req.query.home      || '').trim();
+  const away      = (req.query.away      || '').trim();
+  const date      = (req.query.date      || '').trim(); // YYYY-MM-DD
+  const selection = (req.query.selection || '').trim();
+  const sport     = (req.query.sport     || '').trim();
+
+  if (!home || !away) return res.json({ result: 'pending', reason: 'params manquants' });
+
+  // Helper : normalise un nom d'équipe pour comparaison
+  function norm(s) { return (s||'').toLowerCase().replace(/[^a-z0-9]/g,' ').replace(/\s+/g,' ').trim(); }
+  function teamMatch(a, b) {
+    const na = norm(a), nb = norm(b);
+    if (na === nb) return true;
+    const wa = na.split(' '), wb = nb.split(' ');
+    return wa.some(w => w.length > 3 && nb.includes(w)) || wb.some(w => w.length > 3 && na.includes(w));
+  }
+
+  // ── 1. ESPN scoreboard ──────────────────────────────────────────────
+  const espnPath = ESPN_MAP[sport];
+  if (espnPath) {
+    try {
+      const ctrl = new AbortController();
+      setTimeout(function(){ ctrl.abort(); }, 7000);
+      // Essaie la date fournie + hier + avant-hier (décalage timezone)
+      const dates = [];
+      if (date) {
+        const d = new Date(date);
+        for (let i = -1; i <= 1; i++) {
+          const dd = new Date(d); dd.setDate(dd.getDate() + i);
+          dates.push(dd.toISOString().slice(0,10).replace(/-/g,''));
+        }
+      }
+      const urls = dates.length
+        ? dates.map(d => `https://site.api.espn.com/apis/site/v2/sports/${espnPath}/scoreboard?dates=${d}`)
+        : [`https://site.api.espn.com/apis/site/v2/sports/${espnPath}/scoreboard`];
+
+      for (const url of urls) {
+        const r = await fetch(url, { signal: ctrl.signal });
+        if (!r.ok) continue;
+        const sb = await r.json();
+        const events = sb.events || [];
+        for (const ev of events) {
+          const comp  = (ev.competitions || [])[0] || {};
+          const comps = comp.competitors || [];
+          const n0 = (comps[0]&&comps[0].team&&(comps[0].team.displayName||comps[0].team.shortDisplayName))||'';
+          const n1 = (comps[1]&&comps[1].team&&(comps[1].team.displayName||comps[1].team.shortDisplayName))||'';
+          if (!((teamMatch(n0,home)&&teamMatch(n1,away))||(teamMatch(n0,away)&&teamMatch(n1,home)))) continue;
+
+          const status  = (ev.status||{});
+          const state   = (status.type||{}).state || ''; // pre / in / post
+          if (state !== 'post') return res.json({ result: 'pending', status: state, score: null });
+
+          const s0 = parseFloat(comps[0].score||0);
+          const s1 = parseFloat(comps[1].score||0);
+          const homeIsComp0 = teamMatch(n0, home);
+          const homeScore = homeIsComp0 ? s0 : s1;
+          const awayScore = homeIsComp0 ? s1 : s0;
+
+          let winner = null;
+          if (homeScore > awayScore) winner = home;
+          else if (awayScore > homeScore) winner = away;
+          else winner = 'draw';
+
+          // Détermine win/loss selon la sélection
+          let result = 'loss';
+          const sel = norm(selection);
+          if (sel === 'nul' || sel === 'draw' || sel === 'x') {
+            result = winner === 'draw' ? 'win' : 'loss';
+          } else if (teamMatch(selection, winner)) {
+            result = 'win';
+          }
+
+          return res.json({
+            result, winner,
+            score: homeScore + '-' + awayScore,
+            home, away, source: 'espn'
+          });
+        }
+      }
+    } catch(e) { /* ESPN timeout ou erreur, continuer */ }
+  }
+
+  // ── 2. TheSportsDB fallback ─────────────────────────────────────────
+  try {
+    const query = encodeURIComponent(home + ' ' + away);
+    const ctrl2 = new AbortController();
+    setTimeout(function(){ ctrl2.abort(); }, 6000);
+    const r = await fetch(
+      'https://www.thesportsdb.com/api/v1/json/3/searchevents.php?e=' + query,
+      { signal: ctrl2.signal }
+    );
+    if (r.ok) {
+      const d = await r.json();
+      const events = (d.event || []).filter(function(ev) {
+        if (!teamMatch(ev.strHomeTeam, home) || !teamMatch(ev.strAwayTeam, away)) return false;
+        if (date && ev.dateEvent && !ev.dateEvent.startsWith(date)) return false;
+        return true;
+      });
+      const ev = events[0];
+      if (ev) {
+        const finished = ev.strStatus === 'Match Finished' || ev.strStatus === 'FT' || ev.intHomeScore !== null;
+        if (!finished) return res.json({ result: 'pending', status: ev.strStatus });
+        const hs = parseInt(ev.intHomeScore || 0);
+        const as = parseInt(ev.intAwayScore || 0);
+        let winner = null;
+        if (hs > as) winner = ev.strHomeTeam;
+        else if (as > hs) winner = ev.strAwayTeam;
+        else winner = 'draw';
+
+        const sel = norm(selection);
+        let result = 'loss';
+        if (sel === 'nul' || sel === 'draw' || sel === 'x') {
+          result = winner === 'draw' ? 'win' : 'loss';
+        } else if (teamMatch(selection, winner)) {
+          result = 'win';
+        }
+
+        return res.json({ result, winner, score: hs+'-'+as, home, away, source: 'thesportsdb' });
+      }
+    }
+  } catch(e) { /* timeout */ }
+
+  return res.json({ result: 'pending', reason: 'match non trouvé' });
+});
+
 // -- SPA FALLBACK (doit être EN DERNIER après toutes les routes API) --
 app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));

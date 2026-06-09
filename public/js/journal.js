@@ -196,7 +196,61 @@ const JournalModule = (() => {
     });
 
     renderTable();
+    // Vérifie automatiquement les paris en attente au démarrage
+    setTimeout(autoCheckPendingBets, 2000);
   }
 
-  return { init, renderTable, markResult, removeBet, getAllBets, calcStats };
+  // -----------------------------------------------------------------------
+  // AUTO-CHECK RÉSULTATS : vérifie les paris "pending" via /api/check-result
+  // -----------------------------------------------------------------------
+  let _autoCheckRunning = false;
+
+  async function autoCheckPendingBets() {
+    if (_autoCheckRunning) return;
+    _autoCheckRunning = true;
+
+    const pending = bets.filter(b => b.result === 'pending' && b.match && b.selection);
+    if (!pending.length) { _autoCheckRunning = false; return; }
+
+    console.log('[journal] Auto-check', pending.length, 'paris en attente...');
+
+    for (const bet of pending) {
+      try {
+        // Extraire home/away depuis "Home vs Away"
+        const parts = bet.match.split(/\s+vs\s+/i);
+        if (parts.length < 2) continue;
+        const home = parts[0].trim();
+        const away = parts[1].trim();
+
+        const params = new URLSearchParams({
+          home, away,
+          date: bet.date || '',
+          selection: bet.selection || '',
+          sport: bet.sportKey || bet.sport || ''
+        });
+
+        const r = await fetch('/api/check-result?' + params);
+        if (!r.ok) continue;
+        const data = await r.json();
+
+        if (data.result === 'win' || data.result === 'loss') {
+          updateBetResult(bet.id, data.result);
+          // Impact bankroll
+          const pnl = calcPnl({ ...bet, result: data.result });
+          if (pnl > 0) BankrollManager.recordWin(pnl, bet.type === 'live');
+          else if (pnl < 0) BankrollManager.recordLoss(-pnl, bet.type === 'live');
+          console.log('[journal] ✅ Résultat auto:', bet.match, '→', data.result, data.score || '');
+        }
+
+        // Pause entre requêtes pour ne pas spammer le serveur
+        await new Promise(resolve => setTimeout(resolve, 600));
+      } catch(e) { /* silencieux */ }
+    }
+
+    renderTable();
+    DashboardModule.refresh();
+    _autoCheckRunning = false;
+  }
+
+  return { init, renderTable, markResult, removeBet, getAllBets, calcStats, autoCheckPendingBets };
 })();
