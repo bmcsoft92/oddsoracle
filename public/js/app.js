@@ -1268,14 +1268,22 @@ function openMatchStats(btnOrCard) {
           + (matchId ? '&matchId=' + encodeURIComponent(matchId) : '');
 
   fetch(url)
-    .then(function(r){ return r.json(); })
+    .then(function(r){
+      if (!r.ok) throw new Error('Serveur: ' + r.status + ' — Endpoint non disponible (déploiement en attente ?)');
+      return r.json();
+    })
     .then(function(data){
+      if (data && data.error) throw new Error(data.error);
       window._statsModalData = data;
       window._statsModalMeta = { home: home, away: away, sport: sport, edge: edge, prob: prob };
       renderStatsTab('ia', data, home, away, edge, prob);
     })
     .catch(function(err){
-      if (body) body.innerHTML = '<div class="stats-error">&#x26A0; Erreur: ' + escHtml(err.message) + '</div>';
+      var msg = err.message || 'Erreur inconnue';
+      if (msg.indexOf('<!DOCTYPE') >= 0 || msg.indexOf('JSON') >= 0) {
+        msg = 'Endpoint non disponible — redéployez le serveur';
+      }
+      if (body) body.innerHTML = '<div class="stats-error">&#x26A0; ' + escHtml(msg) + '<br><small style="opacity:.6">Vérifiez que le serveur Render est à jour</small></div>';
     });
 }
 
