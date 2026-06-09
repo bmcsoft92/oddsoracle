@@ -1071,11 +1071,20 @@ const LiveFeedModule = (() => {
     if (!el) return;
     el.innerHTML = '<div class="feed-loading">Chargement des matchs en cours...</div>';
     try {
-      const resp = await fetch('/api/live/all');
+      const ctrl = new AbortController();
+      const tid  = setTimeout(function(){ ctrl.abort(); }, 15000);
+      const resp = await fetch('/api/live/all', { signal: ctrl.signal });
+      clearTimeout(tid);
       const json = await resp.json();
       render(json.data);
     } catch(e) {
-      if (el) el.innerHTML = '<div class="feed-empty">Erreur chargement live: ' + e.message + '</div>';
+      if (el) {
+        const msg = e.name === 'AbortError' ? 'Délai dépassé — cliquez Actualiser' : e.message;
+        el.innerHTML = '<div class="feed-empty">'
+          + '<div>⚠ ' + msg + '</div>'
+          + '<button onclick="LiveFeedModule.load()" class="btn btn-sm btn-secondary" style="margin-top:.75rem">&#8635; Actualiser</button>'
+          + '</div>';
+      }
     }
   }
 
@@ -1133,7 +1142,10 @@ const PrematchFeedModule = (() => {
     if (!el) return;
     el.innerHTML = '<div class="feed-loading">Chargement des matchs a venir...</div>';
     try {
-      const resp = await fetch('/api/upcoming');
+      const ctrl = new AbortController();
+      const tid  = setTimeout(function(){ ctrl.abort(); }, 15000);
+      const resp = await fetch('/api/upcoming', { signal: ctrl.signal });
+      clearTimeout(tid);
       const json = await resp.json();
       render(json.data);
     } catch(e) {

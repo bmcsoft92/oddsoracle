@@ -435,90 +435,101 @@ app.get('/api/live/all', async (req, res) => {
   if (cached) return res.json({ data: cached, cached: true, fetchedAt: cached._fetchedAt, apiUsage });
 
   const now         = Date.now();
+  const cutoffFutur = now + 3 * 3600 * 1000; // matchs imminents < 3h
   const liveMatches = [];
-  const seenKeys    = new Set(); // éviter les doublons
+  const seenKeys    = new Set();
 
-  // ── PARTIE 1 : matchs EN COURS depuis TheSportsDB (source principale) ──
-  const sdbEvents = await getLiveScores();
-  // Pré-charger les odds pour les sports pertinents (1 appel par sport trouvé)
-  const loadedOdds = {};
-  for (const sdbEv of sdbEvents) {
-    const sportName = sdbEv.strSport || '';
-    const meta      = SPORTSDB_META[sportName] || { icon: '⚡', label: sportName };
-    const sportKeys = SPORTSDB_MAP[sportName]  || [];
-    // Essayer de trouver les cotes
-    let enrichedOdds = null;
-    for (const key of sportKeys) {
-      try {
-        if (!loadedOdds[key]) {
-          const sportObj = SPORTS.find(function(s){ return s.key === key; });
-          if (sportObj) loadedOdds[key] = await loadOddsForSport(sportObj);
-        }
-        const oddsEvents = loadedOdds[key] || [];
-        const matched = matchOddsEvent(oddsEvents, sdbEv);
-        if (matched) { enrichedOdds = enrichEvent(matched, SPORTS.find(function(s){ return s.key === key; })); break; }
-      } catch(e) {}
-    }
-    // Construire la carte match (avec ou sans cotes)
-    const matchKey = normTeam(sdbEv.strHomeTeam) + '|' + normTeam(sdbEv.strAwayTeam);
-    if (seenKeys.has(matchKey)) continue;
-    seenKeys.add(matchKey);
-    const liveScore = {
-      homeScore: sdbEv.intHomeScore,
-      awayScore: sdbEv.intAwayScore,
-      progress:  sdbEv.strProgress || sdbEv.strStatus || '',
-      status:    sdbEv.strStatus   || ''
-    };
-    liveMatches.push({
-      homeTeam:    sdbEv.strHomeTeam,
-      awayTeam:    sdbEv.strAwayTeam,
-      sportKey:    (enrichedOdds && enrichedOdds.sportKey) || sportKeys[0] || 'unknown',
-      sportLabel:  meta.label,
-      sportIcon:   meta.icon,
-      commenceTime: (sdbEv.dateEvent||'') + 'T' + (sdbEv.strTime||'00:00:00'),
-      isLive:      true,
-      isImminent:  false,
-      liveScore,
-      selections:  enrichedOdds ? (enrichedOdds.selections || []) : [],
-      league:      sdbEv.strLeague || ''
+  // ── Timeout global 12s pour éviter le blocage du client ──
+  const deadline = new Promise(function(_, rej) { setTimeout(function(){ rej(new Error('timeout')); }, 12000); });
+
+  async function buildLiveFeed() {
+    // PARTIE 1 : TheSportsDB (matchs EN COURS, gratuit, sans quota)
+    const sdbEvents = await getLiveScores(); // timeout 6s interne
+    // Sports uniques trouvés dans TheSportsDB → charger odds en parallèle
+    const sdbSports = [...new Set(
+      sdbEvents.flatMap(function(e){ return SPORTSDB_MAP[e.strSport||'']||[]; })
+    )];
+    const oddsResults = await Promise.allSettled(
+      sdbSports.map(function(key){
+        const sp = SPORTS.find(function(s){ return s.key===key; });
+        return sp ? loadOddsForSport(sp) : Promise.resolve([]);
+      })
+    );
+    const loadedOdds = {};
+    sdbSports.forEach(function(key, i){
+      loadedOdds[key] = oddsResults[i].status==='fulfilled' ? oddsResults[i].value : [];
     });
-  }
 
-  // ── PARTIE 2 : matchs IMMINENTS depuis The Odds API (prochaines 2h) ──
-  const cutoffFutur = now + 2 * 3600 * 1000;
-  for (const sport of SPORTS) {
-    try {
-      const events = await loadOddsForSport(sport);
-      for (const event of events) {
+    for (const sdbEv of sdbEvents) {
+      const sportName = sdbEv.strSport || '';
+      if (!sdbEv.strHomeTeam || !sdbEv.strAwayTeam) continue;
+      const meta     = SPORTSDB_META[sportName] || { icon: '⚡', label: sportName };
+      const sportKs  = SPORTSDB_MAP[sportName]  || [];
+      const mk = normTeam(sdbEv.strHomeTeam)+'|'+normTeam(sdbEv.strAwayTeam);
+      if (seenKeys.has(mk)) continue;
+      seenKeys.add(mk);
+      let enrichedOdds = null;
+      for (const key of sportKs) {
+        const matched = matchOddsEvent(loadedOdds[key]||[], sdbEv);
+        if (matched) {
+          enrichedOdds = enrichEvent(matched, SPORTS.find(function(s){ return s.key===key; }));
+          break;
+        }
+      }
+      liveMatches.push({
+        homeTeam:    sdbEv.strHomeTeam,
+        awayTeam:    sdbEv.strAwayTeam,
+        sportKey:    (enrichedOdds&&enrichedOdds.sportKey)||sportKs[0]||'unknown',
+        sportLabel:  meta.label,
+        sportIcon:   meta.icon,
+        commenceTime:(sdbEv.dateEvent||now)+'T'+(sdbEv.strTime||'00:00:00'),
+        isLive:      true,
+        isImminent:  false,
+        liveScore: {
+          homeScore: sdbEv.intHomeScore,
+          awayScore: sdbEv.intAwayScore,
+          progress:  sdbEv.strProgress||sdbEv.strStatus||'',
+          status:    sdbEv.strStatus||''
+        },
+        selections: enrichedOdds ? (enrichedOdds.selections||[]) : [],
+        league:     sdbEv.strLeague||''
+      });
+    }
+
+    // PARTIE 2 : matchs IMMINENTS (next 3h) depuis The Odds API — tout en parallèle
+    const upcomingResults = await Promise.allSettled(
+      SPORTS.map(function(sport){ return loadOddsForSport(sport); })
+    );
+    SPORTS.forEach(function(sport, i) {
+      if (upcomingResults[i].status !== 'fulfilled') return;
+      for (const event of upcomingResults[i].value) {
         const t = new Date(event.commenceTime).getTime();
-        if (t <= now || t > cutoffFutur) continue; // seulement les futurs < 2h
+        if (t <= now || t > cutoffFutur) continue;
         const enriched = enrichEvent(event, sport);
         if (!enriched) continue;
-        const matchKey = normTeam(enriched.homeTeam) + '|' + normTeam(enriched.awayTeam);
-        if (seenKeys.has(matchKey)) continue; // pas de doublon avec TheSportsDB
-        seenKeys.add(matchKey);
-        const h = (t - now) / 3600000;
+        const mk2 = normTeam(enriched.homeTeam)+'|'+normTeam(enriched.awayTeam);
+        if (seenKeys.has(mk2)) continue;
+        seenKeys.add(mk2);
         liveMatches.push({
           ...enriched,
           isLive:    false,
           isImminent: true,
-          hoursLeft: Math.round(h * 10) / 10
+          hoursLeft: Math.round((t-now)/360000)/10
         });
       }
-    } catch(e) {
-      console.warn('[upcoming-imminent] ' + sport.key + ': ' + e.message);
-    }
+    });
   }
 
-  // Trier : en cours d'abord (par edge), puis imminents par heure
+  try {
+    await Promise.race([buildLiveFeed(), deadline]);
+  } catch(e) {
+    console.warn('[live/all] ' + e.message);
+  }
+
   liveMatches.sort(function(a, b) {
     if (a.isLive && !b.isLive) return -1;
     if (!a.isLive && b.isLive) return  1;
-    if (a.isLive) {
-      const eA = Math.max(0, ...(a.selections||[]).map(function(s){ return s.edge||0; }));
-      const eB = Math.max(0, ...(b.selections||[]).map(function(s){ return s.edge||0; }));
-      return eB - eA;
-    }
+    if (a.isLive) return 0;
     return new Date(a.commenceTime) - new Date(b.commenceTime);
   });
 
