@@ -93,6 +93,7 @@
       const open=s.style.display!=='none'&&s.style.display!=='';
       s.style.display=open?'none':'block';
       this.textContent=(open?'▸':'▾')+' Analyse avancée (score live, signaux, fiche)';
+      if(!open){const sel=document.getElementById('live-sport-select');if(sel&&typeof LiveModule!=='undefined'&&LiveModule.updateSportContext)LiveModule.updateSportContext(sel.value);}
     ">▸ Analyse avancée (score live, signaux, fiche)</div>
 
     <div id="live-advanced" style="display:none" class="advanced-section">
@@ -554,17 +555,29 @@
     <div class="page-header">
       <h1>⚡ Scanner IA <span class="header-meta">— Valeur positive · Kelly auto</span></h1>
       <div style="display:flex;gap:.5rem;align-items:center;flex-wrap:wrap">
-        <select id="scan-sport-filter" class="form-control" style="width:auto">
+        <select id="scan-filter-sport" class="form-control" style="width:auto">
           <option value="all">Tous les sports</option>
           <option value="tennis">🎾 Tennis</option>
-          <option value="soccer">⚽ Football</option>
+          <option value="football">⚽ Football</option>
           <option value="basketball">🏀 Basketball</option>
           <option value="baseball">⚾ Baseball</option>
-          <option value="icehockey">🏒 Hockey</option>
+          <option value="hockey">🏒 Hockey</option>
           <option value="mma">🥊 MMA</option>
-          <option value="americanfootball">🏈 NFL</option>
+          <option value="american_football">🏈 NFL</option>
         </select>
-        <button class="btn btn-primary" id="btn-scan">⚡ Scanner</button>
+        <select id="scan-filter-edge" class="form-control" style="width:auto">
+          <option value="0">Edge ≥ 0%</option>
+          <option value="3">Edge ≥ 3%</option>
+          <option value="5">Edge ≥ 5%</option>
+          <option value="8">Edge ≥ 8%</option>
+          <option value="10">Edge ≥ 10%</option>
+        </select>
+        <label class="signal-check" style="font-size:.72rem">
+          <input type="checkbox" id="scan-filter-live" />
+          <span>Live seulement</span>
+        </label>
+        <button class="btn btn-primary" id="btn-scan">⚡ Scanner maintenant</button>
+        <button class="btn btn-sm btn-secondary sc-notif-btn" id="btn-notif-toggle">Notifications OFF</button>
         <label class="signal-check" style="font-size:.72rem">
           <input type="checkbox" id="scan-auto-log" checked />
           <span>Auto-log journal</span>
@@ -574,26 +587,9 @@
 
     <div class="card">
       <div id="scanner-status">Prêt — Cliquez sur Scanner pour analyser tous les marchés</div>
-      <div style="overflow-x:auto">
-        <table class="scanner-results" id="scanner-table">
-          <thead>
-            <tr>
-              <th>Sport</th>
-              <th>Match</th>
-              <th>Dans</th>
-              <th>Sélection</th>
-              <th>Bookmaker</th>
-              <th>Cote</th>
-              <th>Prob. réelle</th>
-              <th>Edge</th>
-              <th>Kelly</th>
-              <th>Signal</th>
-            </tr>
-          </thead>
-          <tbody id="scanner-tbody">
-            <tr><td colspan="10" class="empty-state" style="text-align:center;padding:2rem;color:var(--text2)">Lancez un scan pour voir les opportunités</td></tr>
-          </tbody>
-        </table>
+      <div id="scanner-meta" style="font-size:.75rem;color:var(--text-muted);margin-top:.25rem"></div>
+      <div id="scanner-results" style="margin-top:1rem">
+        <div class="feed-empty">Lancez un scan pour voir les opportunités</div>
       </div>
     </div>
   </section>
@@ -910,9 +906,3 @@
 <script src="js/api.js"></script>
 <script src="js/live.js?v=42"></script>
 <script src="js/prematch.js?v=42"></script>
-<script src="js/scanner.js?v=42"></script>
-<script src="js/bankroll.js?v=42"></script>
-<script src="js/journal.js?v=42"></script>
-<script src="js/app.js?v=42"></script>
-</body>
-</html>

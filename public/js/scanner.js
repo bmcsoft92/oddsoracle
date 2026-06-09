@@ -481,7 +481,7 @@ const ScannerModule = (() => {
     const onlyLive = liveEl ? liveEl.checked : false;
 
     const filtered = _lastScanData.opportunities.filter(o => {
-      if (sport !== 'all' && o.sport !== sport) return false;
+      if (sport !== 'all' && SPORT_MAP[o.sport] !== sport) return false;
       if (o.edge < minEdge) return false;
       if (onlyLive && !o.isLive) return false;
       return true;
@@ -541,28 +541,6 @@ const ScannerModule = (() => {
     mma: [
       { label: 'YouTube Live Search',  url: 'https://www.youtube.com/results?search_query={query}+live+stream' },
       { label: 'UFC Fight Pass',        url: 'https://ufcfightpass.com' },
-      { label: 'ESPN+',                url: 'https://plus.espn.com' },
-    ],
-    american_football: [
-      { label: 'YouTube Live Search',  url: 'https://www.youtube.com/results?search_query={query}+live+stream' },
-      { label: 'NFL+',                 url: 'https://www.nfl.com/plus' },
-      { label: 'ESPN+',                url: 'https://plus.espn.com' },
-      { label: 'DAZN',                 url: 'https://www.dazn.com' },
-    ],
-    baseball: [
-      { label: 'YouTube Live Search',  url: 'https://www.youtube.com/results?search_query={query}+live+stream' },
-      { label: 'MLB.tv',               url: 'https://www.mlb.com/live-stream-games' },
-      { label: 'ESPN+',                url: 'https://plus.espn.com' },
-    ],
-    hockey: [
-      { label: 'YouTube Live Search',  url: 'https://www.youtube.com/results?search_query={query}+live+stream' },
-      { label: 'NHL.tv',               url: 'https://www.nhl.com/subscribe' },
-      { label: 'ESPN+',                url: 'https://plus.espn.com' },
-      { label: 'DAZN',                 url: 'https://www.dazn.com' },
-    ],
-    mma: [
-      { label: 'YouTube Live Search',  url: 'https://www.youtube.com/results?search_query={query}+live+stream' },
-      { label: 'UFC Fight Pass',       url: 'https://ufcfightpass.com' },
       { label: 'ESPN+',                url: 'https://plus.espn.com' },
     ],
     american_football: [

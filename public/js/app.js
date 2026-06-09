@@ -1032,7 +1032,6 @@ function attachCardClicks(container) {
       if(sport){
         var sel=document.getElementById('live-sport-select');
         if(sel){ var o=Array.from(sel.options).find(function(x){ return sport.indexOf(x.value)!==-1||x.value.indexOf(sport.split('_')[0])!==-1; }); if(o) sel.value=o.value; }
-        if(typeof LiveModule!=='undefined'&&LiveModule.updateSportContext) LiveModule.updateSportContext(sport);
       }
       // Ouvrir la section avancée si fermée
       var adv=document.getElementById('live-advanced');
@@ -1041,6 +1040,8 @@ function attachCardClicks(container) {
         var tog=adv.previousElementSibling;
         if(tog&&tog.classList.contains('advanced-toggle')) tog.textContent='\u25be Analyse avanc\u00e9e (score live, signaux, fiche)';
       }
+      // Appliquer le contexte sport APRES ouverture (elements doivent etre visibles)
+      if(sport&&typeof LiveModule!=='undefined'&&LiveModule.updateSportContext) LiveModule.updateSportContext(sport);
       var form=document.getElementById('live-match-header');
       if(form) form.scrollIntoView({behavior:'smooth',block:'start'});
     });
