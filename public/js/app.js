@@ -1006,7 +1006,7 @@ function renderMatchCard(match, isLive) {
     +' data-is-live="'+(isLiveCard?'1':'0')+'"'
     +scoreData+'>'
     +'<div class="mc-head">'
-    +'<span class="mc-sport">'+(match.sportIcon||'âš¡')+' '+(match.sportLabel||'')+'</span>'
+    +'<span class="mc-sport">'+(match.sportIcon||'⚡')+' '+(match.sportLabel||'')+'</span>'
     +timeBadge+predHtml
     +'</div>'
     +'<div class="mc-teams">'
@@ -1115,7 +1115,7 @@ const LiveFeedModule = (() => {
       if (el) {
         const msg = e.name === 'AbortError' ? 'Délai dépassé — cliquez Actualiser' : e.message;
         el.innerHTML = '<div class="feed-empty">'
-          + '<div>âš  ' + msg + '</div>'
+          + '<div>⚠ ' + msg + '</div>'
           + '<button onclick="LiveFeedModule.load()" class="btn btn-sm btn-secondary" style="margin-top:.75rem">&#8635; Actualiser</button>'
           + '</div>';
       }
@@ -1287,7 +1287,34 @@ function openMatchStats(btnOrCard) {
     });
 }
 
+var _cotesRefreshTimer = null;
+
+function _startCotesRefresh() {
+  _stopCotesRefresh();
+  _cotesRefreshTimer = setInterval(function() {
+    var meta = window._statsModalMeta || {};
+    if (!meta.home) return;
+    var url = '/api/match-stats?home=' + encodeURIComponent(meta.home)
+            + '&away=' + encodeURIComponent(meta.away)
+            + '&sport=' + encodeURIComponent(meta.sport || '');
+    fetch(url).then(function(r){ return r.ok ? r.json() : null; }).then(function(data) {
+      if (!data) return;
+      window._statsModalData = data;
+      var body = document.getElementById('stats-modal-body');
+      var activeTab = document.querySelector('.stats-tab.active');
+      if (body && activeTab && activeTab.dataset.tab === 'cotes') {
+        body.innerHTML = renderTabCotes(data, meta.home, meta.away);
+      }
+    }).catch(function(){});
+  }, 30000); // refresh toutes les 30s
+}
+
+function _stopCotesRefresh() {
+  if (_cotesRefreshTimer) { clearInterval(_cotesRefreshTimer); _cotesRefreshTimer = null; }
+}
+
 function closeStatsModal() {
+  _stopCotesRefresh();
   var overlay = document.getElementById('stats-modal-overlay');
   if (overlay) overlay.style.display = 'none';
 }
@@ -1301,6 +1328,9 @@ function switchStatsTab(tabName) {
   var data = window._statsModalData;
   var meta = window._statsModalMeta || {};
   if (data) renderStatsTab(tabName, data, meta.home||'', meta.away||'', meta.edge||0, meta.prob||0);
+  // Auto-refresh cotes quand l'onglet est actif
+  if (tabName === 'cotes') { _startCotesRefresh(); }
+  else { _stopCotesRefresh(); }
 }
 
 function renderStatsTab(tab, data, home, away, edge, prob) {
@@ -1600,7 +1630,7 @@ function renderTabCotes(data, home, away) {
   var om = data.oddsMovement || {};
 
   var html = '<div class="stats-cotes">';
-  html += '<div class="stats-section-title">📊 Variation des cotes</div>';
+  html += '<div class="stats-section-title">📊 Variation des cotes <span class="cotes-live-badge">🔄 live</span></div>';
 
   if (!om.homeTeam && !om.awayTeam) {
     html += '<div class="stats-empty">Historique des cotes non disponible — les variations s\'enregistrent au fil des scans</div>';
@@ -1639,7 +1669,7 @@ function renderTabLive(data, home, away) {
   var esp = data.espnStats || {};
 
   var html = '<div class="stats-live">';
-  html += '<div class="stats-section-title">âš¡ Stats ESPN en direct</div>';
+  html += '<div class="stats-section-title">⚡ Stats ESPN en direct</div>';
 
   if (!esp || !esp.found) {
     html += '<div class="stats-empty">Pas de stats ESPN disponibles — match non démarré ou hors couverture ESPN</div>';
@@ -1728,13 +1758,13 @@ function renderTabLive(data, home, away) {
       return pa - pb;
     });
     sorted.forEach(function(inc) {
-      var icon = 'âš½';
+      var icon = '⚽';
       var cls = 'inc-goal';
       if (inc.redCard) { icon = '🟥'; cls = 'inc-red'; }
       else if (inc.yellowCard) { icon = '🟨'; cls = 'inc-yellow'; }
       else if (/sub|remplac/i.test(inc.type)) { icon = '🔄'; cls = 'inc-sub'; }
       else if (!inc.scoring) { icon = '📌'; cls = 'inc-event'; }
-      if (inc.penalty) icon = 'âš½ P';
+      if (inc.penalty) icon = '⚽ P';
       var athlete = (inc.athletes && inc.athletes[0]) ? escHtml(inc.athletes[0]) : '';
       var sideClass = inc.side === 'home' ? 'inc-side-home' : 'inc-side-away';
       html += '<div class="incident-item ' + cls + ' ' + sideClass + '">'
@@ -1855,14 +1885,12 @@ var _analysisQueue = [];
 var _analysisRunning = false;
 
 function queueCardAnalysis(cardEl) {
-  var home  = cardEl.dataset.home;
-  var away  = cardEl.dataset.away;
+  var home = cardEl.dataset.home;
+  var away = cardEl.dataset.away;
   var sport = cardEl.dataset.sport;
   var isLive = cardEl.dataset.isLive === '1';
   if (!home || !away) return;
-
   var key = home + '|' + away + '|' + sport;
-
   var edge = parseFloat(cardEl.dataset.edge) || 0;
   var prob = parseFloat(cardEl.dataset.prob) || 0;
   var bestOdd = cardEl.querySelector('.mc-odd.mc-best');
@@ -1876,12 +1904,9 @@ function queueCardAnalysis(cardEl) {
       else teamName = 'Nul';
     }
   }
-
   var analysisDiv = cardEl.querySelector('.card-analysis');
   if (!analysisDiv) return;
-
   analysisDiv.innerHTML = buildInlinePred(edge, prob, teamName, isLive);
-
   if (isLive && !_analysisCache[key]) {
     _analysisQueue.push({ key: key, home: home, away: away, sport: sport, cardEl: cardEl, analysisDiv: analysisDiv, edge: edge, prob: prob, teamName: teamName });
     if (!_analysisRunning) drainAnalysisQueue();

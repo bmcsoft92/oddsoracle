@@ -875,6 +875,8 @@ option,optgroup{background:var(--bg1)}
 .qs-label { font-size: .72rem; color: var(--text-muted, #8892b0); margin: 4px 0; }
 .qs-val-h, .qs-val-a { font-weight: 600; font-size: .85rem; color: var(--text, #e8eaf0); }
 .stats-section-title { font-size: .85rem; font-weight: 700; color: var(--accent, #4fc3f7); margin: 14px 0 8px; text-transform: uppercase; letter-spacing: .05em; }
+.cotes-live-badge { font-size: .7rem; font-weight: 600; color: #4caf50; background: rgba(76,175,80,.15); border: 1px solid rgba(76,175,80,.3); border-radius: 4px; padding: 1px 6px; margin-left: 8px; text-transform: none; letter-spacing: 0; vertical-align: middle; animation: pulse-green 2s infinite; }
+@keyframes pulse-green { 0%,100%{opacity:1} 50%{opacity:.5} }
 .stats-odds-row { display: flex; gap: 8px; flex-wrap: wrap; }
 .odds-mini {
   flex: 1; min-width: 80px; background: var(--surface, #141824); border-radius: 8px;
