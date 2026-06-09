@@ -267,6 +267,17 @@
         <button class="btn btn-secondary" id="btn-new-analysis">Réinitialiser</button>
       </div>
 
+      <!-- Feed auto 24h -->
+      <div class="card feed-section-card">
+        <div class="card-header">
+          <h2>&#128200; Matchs a venir (24h) -- Auto</h2>
+          <button class="btn btn-sm btn-secondary" onclick="PrematchFeedModule.load()">&#128257; Actualiser</button>
+        </div>
+        <div id="prematch-feed-container">
+          <div class="feed-loading">Chargement...</div>
+        </div>
+      </div>
+
       <div class="two-col">
         <!-- Left: Form -->
         <div class="card form-card" id="prematch-form-card">
@@ -527,11 +538,22 @@
             <span id="quota-display"></span>
           </div>
           <span class="live-indicator" id="live-dot">LIVE</span>
-          <button class="btn btn-sm btn-secondary" id="btn-live-setup">Préparer fiche</button>
+          <button class="btn btn-sm btn-secondary" id="btn-live-setup">Preparer fiche</button>
         </div>
       </div>
 
-      <!-- Sélecteur de match live -->
+      <!-- Feed auto matchs en cours -->
+      <div class="card feed-section-card">
+        <div class="card-header">
+          <h2>&#128308; Matchs en cours -- Toutes les cotes en direct</h2>
+          <button class="btn btn-sm btn-secondary" onclick="LiveFeedModule.load()">&#128257; Actualiser</button>
+        </div>
+        <div id="live-feed-container">
+          <div class="feed-loading">Chargement des matchs en cours...</div>
+        </div>
+      </div>
+
+      <!-- Selecteur de match live -->
       <div class="card match-selector-card">
         <div class="card-header">
           <h2>📡 Sélectionner un match en direct</h2>

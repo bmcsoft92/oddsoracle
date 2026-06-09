@@ -890,19 +890,180 @@ function updateDatetime() {
 }
 
 // -----------------------------------------------------------------
+// LIVE FEED MODULE -- auto-charge tous les matchs en cours
+// -----------------------------------------------------------------
+const LiveFeedModule = (() => {
+
+  let _refreshTimer = null;
+
+  function renderSelections(selections) {
+    if (!selections || !selections.length) return '';
+    return selections.map(function(s) {
+      const label = s.predLabel
+        ? '<span class="feed-pred feed-pred-' + s.predLabel.toLowerCase() + '">' + s.predLabel + '</span>'
+        : '';
+      return '<div class="feed-sel">'
+        + '<span class="feed-sel-name">' + s.name + '</span>'
+        + '<span class="feed-sel-price">' + s.bestPrice.toFixed(2) + '</span>'
+        + '<span class="feed-sel-book">' + (s.bestBook || '') + '</span>'
+        + '<span class="feed-sel-prob">' + s.trueProb + '%</span>'
+        + label
+        + '</div>';
+    }).join('');
+  }
+
+  function renderCard(match) {
+    const time = new Date(match.commenceTime).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+    return '<div class="feed-card feed-card-live">'
+      + '<div class="feed-card-header">'
+      + '<span class="feed-sport-badge">' + (match.sportIcon || 'S') + ' ' + (match.sportLabel || '') + '</span>'
+      + '<span class="feed-live-dot">LIVE</span>'
+      + '<span class="feed-time">' + time + '</span>'
+      + '</div>'
+      + '<div class="feed-match-name">' + match.homeTeam + ' vs ' + match.awayTeam + '</div>'
+      + '<div class="feed-selections">' + renderSelections(match.selections) + '</div>'
+      + '</div>';
+  }
+
+  function render(data) {
+    const el = document.getElementById('live-feed-container');
+    if (!el) return;
+    if (!data || !data.matches || !data.matches.length) {
+      el.innerHTML = '<div class="feed-empty">Aucun match en cours sur les sports surveilles.<br>Les cotes live apparaissent ici automatiquement.</div>';
+      return;
+    }
+    el.innerHTML = '<div class="feed-meta">' + data.count + ' match(s) en cours - Actualise toutes les 2 min</div>'
+      + '<div class="feed-grid">' + data.matches.map(renderCard).join('') + '</div>';
+  }
+
+  async function load() {
+    const el = document.getElementById('live-feed-container');
+    if (!el) return;
+    el.innerHTML = '<div class="feed-loading">Chargement des matchs en cours...</div>';
+    try {
+      const resp = await fetch('/api/live/all');
+      const json = await resp.json();
+      render(json.data);
+    } catch(e) {
+      if (el) el.innerHTML = '<div class="feed-empty">Erreur chargement live: ' + e.message + '</div>';
+    }
+  }
+
+  function startAutoRefresh() {
+    stopAutoRefresh();
+    _refreshTimer = setInterval(load, 120000);
+  }
+
+  function stopAutoRefresh() {
+    if (_refreshTimer) { clearInterval(_refreshTimer); _refreshTimer = null; }
+  }
+
+  function init() {
+    const tab = document.getElementById('tab-live');
+    if (tab) {
+      tab.addEventListener('click', function() {
+        load();
+        startAutoRefresh();
+      });
+    }
+  }
+
+  return { init, load, startAutoRefresh, stopAutoRefresh };
+})();
+
+// -----------------------------------------------------------------
+// PREMATCH FEED MODULE -- auto-charge tous les matchs prochaines 24h
+// -----------------------------------------------------------------
+const PrematchFeedModule = (() => {
+
+  let _refreshTimer = null;
+
+  function renderSelections(selections) {
+    if (!selections || !selections.length) return '';
+    return selections.map(function(s) {
+      const label = s.predLabel
+        ? '<span class="feed-pred feed-pred-' + s.predLabel.toLowerCase() + '">' + s.predLabel + '</span>'
+        : '';
+      return '<div class="feed-sel">'
+        + '<span class="feed-sel-name">' + s.name + '</span>'
+        + '<span class="feed-sel-price">' + s.bestPrice.toFixed(2) + '</span>'
+        + '<span class="feed-sel-book">' + (s.bestBook || '') + '</span>'
+        + '<span class="feed-sel-prob">' + s.trueProb + '%</span>'
+        + label
+        + '</div>';
+    }).join('');
+  }
+
+  function renderCard(match) {
+    const dt = new Date(match.commenceTime);
+    const time = dt.toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric', month: 'short' })
+      + ' ' + dt.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+    const hoursLabel = match.hoursLeft < 1 ? "Dans moins d'1h" : 'Dans ' + match.hoursLeft + 'h';
+    return '<div class="feed-card feed-card-upcoming">'
+      + '<div class="feed-card-header">'
+      + '<span class="feed-sport-badge">' + (match.sportIcon || 'S') + ' ' + (match.sportLabel || '') + '</span>'
+      + '<span class="feed-hours-badge">' + hoursLabel + '</span>'
+      + '<span class="feed-time">' + time + '</span>'
+      + '</div>'
+      + '<div class="feed-match-name">' + match.homeTeam + ' vs ' + match.awayTeam + '</div>'
+      + '<div class="feed-selections">' + renderSelections(match.selections) + '</div>'
+      + '</div>';
+  }
+
+  function render(data) {
+    const el = document.getElementById('prematch-feed-container');
+    if (!el) return;
+    if (!data || !data.matches || !data.matches.length) {
+      el.innerHTML = '<div class="feed-empty">Aucun match programme dans les 24 prochaines heures.</div>';
+      return;
+    }
+    el.innerHTML = '<div class="feed-meta">' + data.count + ' match(s) a venir - Actualise toutes les 10 min</div>'
+      + '<div class="feed-grid">' + data.matches.map(renderCard).join('') + '</div>';
+  }
+
+  async function load() {
+    const el = document.getElementById('prematch-feed-container');
+    if (!el) return;
+    el.innerHTML = '<div class="feed-loading">Chargement des matchs a venir...</div>';
+    try {
+      const resp = await fetch('/api/upcoming');
+      const json = await resp.json();
+      render(json.data);
+    } catch(e) {
+      if (el) el.innerHTML = '<div class="feed-empty">Erreur: ' + e.message + '</div>';
+    }
+  }
+
+  function startAutoRefresh() {
+    stopAutoRefresh();
+    _refreshTimer = setInterval(load, 600000);
+  }
+
+  function stopAutoRefresh() {
+    if (_refreshTimer) { clearInterval(_refreshTimer); _refreshTimer = null; }
+  }
+
+  function init() {
+    const tab = document.getElementById('tab-prematch');
+    if (tab) {
+      tab.addEventListener('click', function() {
+        load();
+        startAutoRefresh();
+      });
+    }
+  }
+
+  return { init, load, startAutoRefresh, stopAutoRefresh };
+})();
+
+// -----------------------------------------------------------------
 // INIT
 // -----------------------------------------------------------------
 document.addEventListener('DOMContentLoaded', () => {
-  // Charger les donnees persistantes
   BankrollManager.load();
-
-  // Injecter styles dynamiques
   injectLiveStyles();
-
-  // Navigation
   initNavigation();
 
-  // Modules
   PrematchModule.init();
   LiveModule.init();
   BankrollUI.init();
@@ -911,11 +1072,15 @@ document.addEventListener('DOMContentLoaded', () => {
   LiveMatchSelector.init();
   PrematchSelector.init();
   ScannerModule.init();
+  LiveFeedModule.init();
+  PrematchFeedModule.init();
 
-  // Dashboard initial
+  LiveFeedModule.load();
+  PrematchFeedModule.load();
+
   DashboardModule.refresh();
   updateDatetime();
   setInterval(updateDatetime, 60000);
 
-  console.log('OddsOracle v3.0 initialized -- Scanner IA active');
+  console.log('OddsOracle v3.0 initialized -- Scanner IA + Auto Feed active');
 });

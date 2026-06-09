@@ -1307,3 +1307,185 @@ select.form-control {
 .sc-pred-forte { background: rgba(34,197,94,.15); color: var(--green-light); }
 .sc-pred-bonne { background: rgba(6,182,212,.15); color: var(--cyan-light); }
 .sc-pred-correcte { background: rgba(245,158,11,.12); color: var(--yellow-light); }
+
+
+/* ============================================================
+   FEED AUTO -- Live & Prematch feed modules
+   ============================================================ */
+
+.feed-section-card {
+  margin-bottom: 1.5rem;
+}
+
+.feed-loading {
+  padding: 1.5rem;
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 0.85rem;
+}
+
+.feed-empty {
+  padding: 2rem;
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 0.85rem;
+  line-height: 1.6;
+}
+
+.feed-meta {
+  padding: 0.5rem 1rem;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 1rem;
+}
+
+.feed-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 1rem;
+  padding: 0 0.5rem 0.5rem;
+}
+
+.feed-card {
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 1rem;
+  transition: border-color 0.2s;
+}
+
+.feed-card:hover {
+  border-color: var(--accent);
+}
+
+.feed-card-live {
+  border-left: 3px solid var(--red, #e74c3c);
+}
+
+.feed-card-upcoming {
+  border-left: 3px solid var(--accent);
+}
+
+.feed-card-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.6rem;
+  flex-wrap: wrap;
+}
+
+.feed-sport-badge {
+  font-size: 0.7rem;
+  font-weight: 700;
+  padding: 0.2rem 0.5rem;
+  background: var(--bg-card);
+  border-radius: 4px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.feed-live-dot {
+  font-size: 0.65rem;
+  font-weight: 800;
+  color: var(--red, #e74c3c);
+  background: rgba(231, 76, 60, 0.12);
+  padding: 0.15rem 0.45rem;
+  border-radius: 3px;
+  letter-spacing: 0.08em;
+  animation: pulse 2s infinite;
+}
+
+.feed-hours-badge {
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: var(--accent);
+  background: rgba(var(--accent-rgb, 82, 183, 136), 0.1);
+  padding: 0.15rem 0.45rem;
+  border-radius: 3px;
+}
+
+.feed-time {
+  margin-left: auto;
+  font-size: 0.72rem;
+  color: var(--text-muted);
+}
+
+.feed-match-name {
+  font-size: 0.88rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin-bottom: 0.75rem;
+}
+
+.feed-selections {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.feed-sel {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.35rem 0.5rem;
+  background: var(--bg-card);
+  border-radius: 6px;
+  font-size: 0.78rem;
+  flex-wrap: wrap;
+}
+
+.feed-sel-name {
+  flex: 1;
+  font-weight: 600;
+  color: var(--text-primary);
+  min-width: 80px;
+}
+
+.feed-sel-price {
+  font-weight: 800;
+  color: var(--green);
+  font-size: 0.85rem;
+  min-width: 36px;
+  text-align: right;
+}
+
+.feed-sel-book {
+  font-size: 0.68rem;
+  color: var(--text-muted);
+  background: var(--bg-input);
+  padding: 0.1rem 0.35rem;
+  border-radius: 3px;
+}
+
+.feed-sel-prob {
+  font-size: 0.68rem;
+  color: var(--text-muted);
+  min-width: 32px;
+  text-align: right;
+}
+
+.feed-pred {
+  font-size: 0.6rem;
+  font-weight: 800;
+  padding: 0.1rem 0.3rem;
+  border-radius: 3px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.feed-pred-forte {
+  background: rgba(46, 213, 115, 0.18);
+  color: #2ed573;
+}
+
+.feed-pred-bonne {
+  background: rgba(0, 210, 255, 0.15);
+  color: #00d2ff;
+}
+
+.feed-pred-correcte {
+  background: rgba(255, 200, 0, 0.15);
+  color: #ffc800;
+}

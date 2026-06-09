@@ -270,6 +270,153 @@ app.get('/api/quota', (req, res) => {
   res.json(apiUsage);
 });
 
+// -- HELPER PARTAGE: charge les cotes d'un sport (reutilise le cache scanner) --
+async function loadOddsForSport(sport) {
+  const cacheKey = 'odds_' + sport.key + '_all';
+  let data = cache.get(cacheKey);
+  if (data) return data;
+  const raw = await oddsApiFetch('/sports/' + sport.key + '/odds', {
+    regions: 'eu', markets: 'h2h', oddsFormat: 'decimal',
+    bookmakers: BOOKMAKERS.join(','),
+  });
+  data = (Array.isArray(raw) ? raw : [raw]).map(function(event) {
+    return {
+      id:           event.id,
+      sport:        event.sport_key,
+      sportLabel:   sport.label,
+      sportIcon:    sport.icon,
+      homeTeam:     event.home_team,
+      awayTeam:     event.away_team,
+      commenceTime: event.commence_time,
+      bookmakers:   formatBookmakers(event.bookmakers || []),
+      bestOdds:     extractBestOdds(event.bookmakers || []),
+      _raw:         event.bookmakers || [],
+    };
+  });
+  cache.set(cacheKey, data, 900);
+  cache.set(cacheKey + '_stale', data, 7200);
+  return data;
+}
+
+// Enrichit un evenement avec cotes completes par selection
+function enrichEvent(event, sport) {
+  const rawBk = event._raw || [];
+  const pinnacle = rawBk.find(function(b) { return b.key === 'pinnacle'; });
+  const sharpBk  = pinnacle || rawBk[0];
+  const sharpH2H = sharpBk && sharpBk.markets && sharpBk.markets.find(function(m) { return m.key === 'h2h'; });
+  if (!sharpH2H || !sharpH2H.outcomes || !sharpH2H.outcomes.length) return null;
+
+  const outcomes  = sharpH2H.outcomes;
+  const overround = outcomes.reduce(function(s, o) { return s + 1 / o.price; }, 0);
+
+  const selections = outcomes.map(function(o) {
+    const trueProb = (1 / o.price) / overround;
+    const allBooks = [];
+    let bestPrice = 1.0, bestBook = '';
+    rawBk.forEach(function(bk) {
+      const h2h = bk.markets && bk.markets.find(function(m) { return m.key === 'h2h'; });
+      const out = h2h && h2h.outcomes && h2h.outcomes.find(function(x) { return x.name === o.name; });
+      if (out && out.price > 1) {
+        allBooks.push({ name: bk.title || bk.key, price: out.price });
+        if (out.price > bestPrice) { bestPrice = out.price; bestBook = bk.title || bk.key; }
+      }
+    });
+    allBooks.sort(function(a, b) { return b.price - a.price; });
+    const edge     = (trueProb * bestPrice - 1) * 100;
+    const predLabel = edge >= 10 ? 'FORTE' : edge >= 6 ? 'BONNE' : edge >= 2 ? 'CORRECTE' : null;
+    return {
+      name:          o.name,
+      sharpPrice:    o.price,
+      bestPrice,
+      bestBook,
+      allBookmakers: allBooks,
+      trueProb:      Math.round(trueProb * 1000) / 10,
+      edge:          Math.round(edge * 10) / 10,
+      predScore:     Math.min(99, Math.round(trueProb * (1 + Math.max(0, edge) / 100))),
+      predLabel,
+    };
+  });
+
+  return {
+    id:           event.id,
+    sport:        sport.key,
+    sportLabel:   sport.label,
+    sportIcon:    sport.icon,
+    homeTeam:     event.homeTeam,
+    awayTeam:     event.awayTeam,
+    commenceTime: event.commenceTime,
+    selections,
+    bookmakerCount: rawBk.length,
+    hasSharp:       !!pinnacle,
+  };
+}
+
+// -- LIVE ALL: tous les matchs en cours sur tous les sports --
+app.get('/api/live/all', async (req, res) => {
+  const cacheKey = 'live_all';
+  const cached   = cache.get(cacheKey);
+  if (cached) return res.json({ data: cached, cached: true, fetchedAt: cached._fetchedAt, apiUsage });
+
+  const now    = Date.now();
+  const cutoff = now - 4 * 3600 * 1000;
+  const liveMatches = [];
+
+  for (const sport of SPORTS) {
+    try {
+      const events = await loadOddsForSport(sport);
+      for (const event of events) {
+        const t = new Date(event.commenceTime).getTime();
+        if (t < cutoff || t > now) continue;
+        const enriched = enrichEvent(event, sport);
+        if (enriched) liveMatches.push({ ...enriched, isLive: true });
+      }
+    } catch(e) {
+      console.warn('[live/all] ' + sport.key + ': ' + e.message);
+    }
+  }
+
+  liveMatches.sort(function(a, b) {
+    const maxEdgeA = Math.max(...(a.selections || []).map(function(s) { return s.edge; }));
+    const maxEdgeB = Math.max(...(b.selections || []).map(function(s) { return s.edge; }));
+    return maxEdgeB - maxEdgeA;
+  });
+
+  const result = { matches: liveMatches, count: liveMatches.length, _fetchedAt: new Date().toISOString() };
+  cache.set(cacheKey, result, 120);
+  res.json({ data: result, cached: false, fetchedAt: result._fetchedAt, apiUsage });
+});
+
+// -- UPCOMING: tous les matchs des prochaines 24h sur tous les sports --
+app.get('/api/upcoming', async (req, res) => {
+  const cacheKey = 'upcoming_all';
+  const cached   = cache.get(cacheKey);
+  if (cached) return res.json({ data: cached, cached: true, fetchedAt: cached._fetchedAt, apiUsage });
+
+  const now = Date.now();
+  const h24 = now + 24 * 3600 * 1000;
+  const upcoming = [];
+
+  for (const sport of SPORTS) {
+    try {
+      const events = await loadOddsForSport(sport);
+      for (const event of events) {
+        const t = new Date(event.commenceTime).getTime();
+        if (t <= now || t > h24) continue;
+        const enriched = enrichEvent(event, sport);
+        if (enriched) upcoming.push({ ...enriched, isLive: false, hoursLeft: Math.round((t - now) / 360000) / 10 });
+      }
+    } catch(e) {
+      console.warn('[upcoming] ' + sport.key + ': ' + e.message);
+    }
+  }
+
+  upcoming.sort(function(a, b) { return new Date(a.commenceTime) - new Date(b.commenceTime); });
+
+  const result = { matches: upcoming, count: upcoming.length, _fetchedAt: new Date().toISOString() };
+  cache.set(cacheKey, result, 600);
+  res.json({ data: result, cached: false, fetchedAt: result._fetchedAt, apiUsage });
+});
+
 // -- SCANNER IA --
 app.get('/api/scanner', async (req, res) => {
   const cacheKey = 'scanner_results';
@@ -341,7 +488,6 @@ app.get('/api/scanner', async (req, res) => {
           let bestBookKey  = '';
           let bestBookName = '';
 
-          // Tableau complet de toutes les cotes par bookmaker pour cette selection
           const allBookmakers = [];
 
           for (const bk of rawBk) {
@@ -366,7 +512,6 @@ app.get('/api/scanner', async (req, res) => {
           const hoursLeft  = (t - now) / 3600000;
           const urgency    = isLive ? 'live' : hoursLeft < 2 ? 'soon' : hoursLeft < 6 ? 'today' : 'upcoming';
 
-          // Prediction: recommandation basee sur l'edge et la confiance
           const predScore  = Math.min(99, Math.round(trueProb * (1 + edge / 100)));
           const predLabel  = edge >= 10 ? 'FORTE' : edge >= 6 ? 'BONNE' : 'CORRECTE';
 
