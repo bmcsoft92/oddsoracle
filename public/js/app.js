@@ -984,7 +984,7 @@ function renderMatchCard(match, isLive) {
   var foot = bestSel ? '<div class="mc-footer">'
     +'<span class="mc-prob">Prob <strong>'+(bestSel.trueProb||0)+'%</strong></span>'
     +((bestSel.edge||0)>0?'<span class="mc-ep mc-ev">edge +'+bestSel.edge.toFixed(1)+'%</span>':'')
-    +kellyHtml+watchHtml+'</div>' : watchHtml ? '<div class="mc-footer">'+watchHtml+'</div>' : '';
+    +kellyHtml+watchHtml+'<button class="mc-stats-btn" onclick="event.stopPropagation();openMatchStats(this)">&#x1F4CA; Stats</button></div>' : watchHtml ? '<div class="mc-footer">'+watchHtml+'<button class="mc-stats-btn" onclick="event.stopPropagation();openMatchStats(this)">&#x1F4CA; Stats</button></div>' : '<div class="mc-footer"><button class="mc-stats-btn" onclick="event.stopPropagation();openMatchStats(this)">&#x1F4CA; Stats</button></div>';
 
   // data-score pour auto-fill form
   var scoreData = match.liveScore
@@ -995,6 +995,7 @@ function renderMatchCard(match, isLive) {
     +' data-home="'+safeH+'" data-away="'+safeA+'"'
     +' data-sport="'+(match.sportKey||'')+'"'
     +' data-cotea="'+cotA+'" data-coteb="'+cotB+'"'
+    +' data-match-id="'+(match.id||'')+'"'
     +scoreData+'>'
     +'<div class="mc-head">'
     +'<span class="mc-sport">'+(match.sportIcon||'⚡')+' '+(match.sportLabel||'')+'</span>'
@@ -1205,3 +1206,364 @@ document.addEventListener('DOMContentLoaded', () => {
   LiveFeedModule.load();
   PrematchFeedModule.load();
 });
+
+/* ===== STATS MODAL - Flashscore style ===== */
+
+function openMatchStats(btnEl) {
+  var card = btnEl.closest('.match-card');
+  if (!card) return;
+  var home    = card.dataset.home    || '';
+  var away    = card.dataset.away    || '';
+  var sport   = card.dataset.sport   || '';
+  var matchId = card.dataset.matchId || card.dataset['match-id'] || '';
+
+  var modal = document.getElementById('stats-modal');
+  var overlay = document.getElementById('stats-modal-overlay');
+  if (!modal || !overlay) return;
+
+  // Set title
+  var titleEl = document.getElementById('stats-modal-title');
+  if (titleEl) titleEl.textContent = home + ' vs ' + away;
+
+  // Show modal
+  overlay.style.display = 'flex';
+  modal.style.display = 'block';
+
+  // Show loading
+  var body = document.getElementById('stats-modal-body');
+  if (body) body.innerHTML = '<div class="stats-loading">&#x23F3; Chargement des statistiques...</div>';
+
+  // Reset tabs
+  var tabs = modal.querySelectorAll('.stats-tab');
+  tabs.forEach(function(t){ t.classList.remove('active'); });
+  var firstTab = modal.querySelector('.stats-tab[data-tab="apercu"]');
+  if (firstTab) firstTab.classList.add('active');
+
+  // Fetch stats
+  var url = '/api/match-stats?home=' + encodeURIComponent(home)
+          + '&away=' + encodeURIComponent(away)
+          + '&sport=' + encodeURIComponent(sport)
+          + (matchId ? '&matchId=' + encodeURIComponent(matchId) : '');
+
+  fetch(url)
+    .then(function(r){ return r.json(); })
+    .then(function(data){
+      window._statsModalData = data;
+      window._statsModalMeta = { home: home, away: away, sport: sport };
+      renderStatsTab('apercu', data, home, away);
+    })
+    .catch(function(err){
+      if (body) body.innerHTML = '<div class="stats-error">&#x26A0; Erreur: ' + err.message + '</div>';
+    });
+}
+
+function closeStatsModal() {
+  var overlay = document.getElementById('stats-modal-overlay');
+  if (overlay) overlay.style.display = 'none';
+}
+
+function switchStatsTab(tabName) {
+  var modal = document.getElementById('stats-modal');
+  if (!modal) return;
+  modal.querySelectorAll('.stats-tab').forEach(function(t){
+    t.classList.toggle('active', t.dataset.tab === tabName);
+  });
+  var data = window._statsModalData;
+  var meta = window._statsModalMeta || {};
+  if (data) renderStatsTab(tabName, data, meta.home || '', meta.away || '');
+}
+
+function renderStatsTab(tab, data, home, away) {
+  var body = document.getElementById('stats-modal-body');
+  if (!body) return;
+  if (tab === 'apercu')     body.innerHTML = renderTabApercu(data, home, away);
+  else if (tab === 'h2h')   body.innerHTML = renderTabH2H(data, home, away);
+  else if (tab === 'forme') body.innerHTML = renderTabForme(data, home, away);
+  else if (tab === 'cotes') body.innerHTML = renderTabCotes(data, home, away);
+  else if (tab === 'live')  body.innerHTML = renderTabLive(data, home, away);
+}
+
+function renderTabApercu(data, home, away) {
+  var fh = data.formHome || {};
+  var fa = data.formAway || {};
+  var h2h = data.h2h || {};
+  var om = data.oddsMovement || {};
+  
+  var html = '<div class="stats-apercu">';
+
+  // Teams header
+  html += '<div class="stats-teams-row">'
+        + '<div class="stats-team-name">' + escHtml(home) + '</div>'
+        + '<div class="stats-vs">VS</div>'
+        + '<div class="stats-team-name">' + escHtml(away) + '</div>'
+        + '</div>';
+
+  // Quick stats row
+  html += '<div class="stats-quick-row">';
+  html += makeQuickStat('Forme', renderFormBadges(fh.form || ''), renderFormBadges(fa.form || ''));
+  html += makeQuickStat('Classement / Score', fh.formPct ? fh.formPct + '%' : '—', fa.formPct ? fa.formPct + '%' : '—');
+  html += makeQuickStat('H2H Vict.', h2h.homeWins != null ? h2h.homeWins : '—', h2h.awayWins != null ? h2h.awayWins : '—');
+  html += '</div>';
+
+  // Odds movement quick
+  if (om && om.homeTeam) {
+    html += '<div class="stats-section-title">&#x1F4C8; Mouvement des cotes</div>';
+    html += '<div class="stats-odds-row">';
+    html += renderOddsMini(home, om.homeTeam);
+    html += renderOddsMini(away, om.awayTeam);
+    if (om.drawTeam) html += renderOddsMini('Nul', om.drawTeam);
+    html += '</div>';
+  }
+
+  html += '</div>';
+  return html;
+}
+
+function renderTabH2H(data, home, away) {
+  var h2h = data.h2h || {};
+  var meetings = h2h.meetings || [];
+  
+  var html = '<div class="stats-h2h">';
+  html += '<div class="stats-section-title">&#x1F91C; Confrontations directes</div>';
+
+  if (!meetings.length) {
+    html += '<div class="stats-empty">Aucune confrontation trouvée</div>';
+  } else {
+    // Summary bar
+    var total = (h2h.homeWins||0) + (h2h.awayWins||0) + (h2h.draws||0);
+    if (total > 0) {
+      var pctH = Math.round((h2h.homeWins||0)/total*100);
+      var pctD = Math.round((h2h.draws||0)/total*100);
+      var pctA = 100 - pctH - pctD;
+      html += '<div class="h2h-bar-wrap">'
+            + '<div class="h2h-bar">'
+            + '<div class="h2h-bar-h" style="width:'+pctH+'%">'+h2h.homeWins+'</div>'
+            + '<div class="h2h-bar-d" style="width:'+pctD+'%">'+h2h.draws+'</div>'
+            + '<div class="h2h-bar-a" style="width:'+pctA+'%">'+h2h.awayWins+'</div>'
+            + '</div>'
+            + '<div class="h2h-bar-labels">'
+            + '<span>' + escHtml(home) + '</span>'
+            + '<span>Nul</span>'
+            + '<span>' + escHtml(away) + '</span>'
+            + '</div>'
+            + '</div>';
+    }
+
+    // Meetings table
+    html += '<table class="stats-table"><thead><tr><th>Date</th><th>Domicile</th><th>Score</th><th>Extérieur</th></tr></thead><tbody>';
+    meetings.slice(0,8).forEach(function(m){
+      html += '<tr>'
+            + '<td>' + (m.date||'').slice(0,10) + '</td>'
+            + '<td>' + escHtml(m.home||'') + '</td>'
+            + '<td class="stats-score">' + (m.score||'') + '</td>'
+            + '<td>' + escHtml(m.away||'') + '</td>'
+            + '</tr>';
+    });
+    html += '</tbody></table>';
+  }
+  html += '</div>';
+  return html;
+}
+
+function renderTabForme(data, home, away) {
+  var fh = data.formHome || {};
+  var fa = data.formAway || {};
+  
+  var html = '<div class="stats-forme">';
+  html += '<div class="stats-two-col">';
+
+  // Home form
+  html += '<div class="stats-col">';
+  html += '<div class="stats-col-title">' + escHtml(home) + '</div>';
+  if (fh.form) {
+    html += '<div class="stats-form-badges">' + renderFormBadges(fh.form) + '</div>';
+  }
+  if (fh.formPct != null) {
+    html += '<div class="stats-form-pct">&#x1F3AF; ' + fh.formPct + '% victoires</div>';
+  }
+  if (fh.streak) {
+    var icon = fh.streak > 0 ? '&#x1F525;' : '&#x274C;';
+    html += '<div class="stats-streak">' + icon + ' Série: '
+          + (fh.streak > 0 ? fh.streak + ' victoires' : Math.abs(fh.streak) + ' défaites') + '</div>';
+  }
+  if (fh.recent && fh.recent.length) {
+    html += '<table class="stats-table"><thead><tr><th>Date</th><th>Match</th><th>Score</th><th>Résultat</th></tr></thead><tbody>';
+    fh.recent.slice(0,5).forEach(function(ev){
+      var rClass = ev.result==='W'?'fb-W':ev.result==='L'?'fb-L':'fb-D';
+      html += '<tr><td>'+(ev.date||'').slice(0,10)+'</td>'
+            + '<td>'+escHtml(ev.home||'')+' vs '+escHtml(ev.away||'')+'</td>'
+            + '<td class="stats-score">'+escHtml(ev.score||'')+'</td>'
+            + '<td><span class="form-badge '+rClass+'">'+ev.result+'</span></td></tr>';
+    });
+    html += '</tbody></table>';
+  }
+  html += '</div>';
+
+  // Away form
+  html += '<div class="stats-col">';
+  html += '<div class="stats-col-title">' + escHtml(away) + '</div>';
+  if (fa.form) {
+    html += '<div class="stats-form-badges">' + renderFormBadges(fa.form) + '</div>';
+  }
+  if (fa.formPct != null) {
+    html += '<div class="stats-form-pct">&#x1F3AF; ' + fa.formPct + '% victoires</div>';
+  }
+  if (fa.streak) {
+    var icon2 = fa.streak > 0 ? '&#x1F525;' : '&#x274C;';
+    html += '<div class="stats-streak">' + icon2 + ' Série: '
+          + (fa.streak > 0 ? fa.streak + ' victoires' : Math.abs(fa.streak) + ' défaites') + '</div>';
+  }
+  if (fa.recent && fa.recent.length) {
+    html += '<table class="stats-table"><thead><tr><th>Date</th><th>Match</th><th>Score</th><th>Résultat</th></tr></thead><tbody>';
+    fa.recent.slice(0,5).forEach(function(ev){
+      var rClass2 = ev.result==='W'?'fb-W':ev.result==='L'?'fb-L':'fb-D';
+      html += '<tr><td>'+(ev.date||'').slice(0,10)+'</td>'
+            + '<td>'+escHtml(ev.home||'')+' vs '+escHtml(ev.away||'')+'</td>'
+            + '<td class="stats-score">'+escHtml(ev.score||'')+'</td>'
+            + '<td><span class="form-badge '+rClass2+'">'+ev.result+'</span></td></tr>';
+    });
+    html += '</tbody></table>';
+  }
+  html += '</div>';
+
+  html += '</div></div>';
+  return html;
+}
+
+function renderTabCotes(data, home, away) {
+  var om = data.oddsMovement || {};
+  
+  var html = '<div class="stats-cotes">';
+  html += '<div class="stats-section-title">&#x1F4CA; Variation des cotes</div>';
+
+  if (!om || !om.homeTeam) {
+    html += '<div class="stats-empty">Pas d\'historique de cotes disponible</div>';
+    html += '</div>';
+    return html;
+  }
+
+  function renderOddsBlock(label, mov) {
+    if (!mov) return '';
+    var dir = mov.direction || 'stable';
+    var arrow = dir === 'down' ? '&#x2193;' : dir === 'up' ? '&#x2191;' : '&#x2192;';
+    var cls = dir === 'down' ? 'odds-down' : dir === 'up' ? 'odds-up' : 'odds-stable';
+    var steam = mov.steam ? '<span class="steam-badge">&#x1F525; Steam</span>' : '';
+    var sparkline = '';
+    if (mov.sparkline && mov.sparkline.length > 1) {
+      sparkline = renderSparkline(mov.sparkline);
+    }
+    return '<div class="odds-block">'
+         + '<div class="odds-block-label">' + escHtml(label) + '</div>'
+         + '<div class="odds-block-vals">'
+         + '<span class="odds-open">Ouv: <strong>' + (mov.opening ? mov.opening.toFixed(2) : '—') + '</strong></span>'
+         + '<span class="odds-arrow ' + cls + '">' + arrow + '</span>'
+         + '<span class="odds-curr">Act: <strong>' + (mov.current ? mov.current.toFixed(2) : '—') + '</strong></span>'
+         + (mov.pctChange != null ? '<span class="odds-pct ' + cls + '">' + (mov.pctChange > 0 ? '+' : '') + mov.pctChange.toFixed(1) + '%</span>' : '')
+         + steam
+         + '</div>'
+         + sparkline
+         + '</div>';
+  }
+
+  html += renderOddsBlock(home, om.homeTeam);
+  if (om.drawTeam) html += renderOddsBlock('Nul', om.drawTeam);
+  html += renderOddsBlock(away, om.awayTeam);
+
+  html += '</div>';
+  return html;
+}
+
+function renderTabLive(data, home, away) {
+  var espn = data.espnStats || {};
+  
+  var html = '<div class="stats-live">';
+  html += '<div class="stats-section-title">&#x26A1; Stats en direct (ESPN)</div>';
+
+  if (!espn || !espn.homeStats) {
+    html += '<div class="stats-empty">Pas de stats ESPN disponibles (match non démarré ou hors couverture)</div>';
+    html += '</div>';
+    return html;
+  }
+
+  var hStats = espn.homeStats || {};
+  var aStats = espn.awayStats || {};
+  var statKeys = Object.keys(hStats);
+
+  if (!statKeys.length) {
+    html += '<div class="stats-empty">Aucune statistique disponible</div>';
+    html += '</div>';
+    return html;
+  }
+
+  html += '<table class="stats-table stats-live-table">';
+  html += '<thead><tr><th>' + escHtml(home) + '</th><th>Stat</th><th>' + escHtml(away) + '</th></tr></thead><tbody>';
+
+  statKeys.forEach(function(key){
+    var hv = hStats[key];
+    var av = aStats[key] || 0;
+    var hNum = parseFloat(hv) || 0;
+    var aNum = parseFloat(av) || 0;
+    var total = hNum + aNum;
+    var hPct = total > 0 ? Math.round(hNum/total*100) : 50;
+    var aPct = 100 - hPct;
+    var isWinH = hNum > aNum;
+    var isWinA = aNum > hNum;
+    html += '<tr>'
+          + '<td class="stat-val '+(isWinH?'stat-winner':'')+'">'+hv+'<div class="stat-bar-h" style="width:'+hPct+'%"></div></td>'
+          + '<td class="stat-label">'+escHtml(key)+'</td>'
+          + '<td class="stat-val '+(isWinA?'stat-winner':'')+'">'+av+'<div class="stat-bar-a" style="width:'+aPct+'%"></div></td>'
+          + '</tr>';
+  });
+
+  html += '</tbody></table>';
+  html += '</div>';
+  return html;
+}
+
+function renderFormBadges(form) {
+  if (!form) return '';
+  return form.split('').map(function(c){
+    var cls = c==='W'?'fb-W':c==='L'?'fb-L':'fb-D';
+    return '<span class="form-badge '+cls+'">'+c+'</span>';
+  }).join('');
+}
+
+function renderOddsMini(label, mov) {
+  if (!mov) return '';
+  var dir = mov.direction || 'stable';
+  var arrow = dir==='down'?'&#x2193;':dir==='up'?'&#x2191;':'&#x2192;';
+  var cls = dir==='down'?'odds-down':dir==='up'?'odds-up':'odds-stable';
+  return '<div class="odds-mini">'
+       + '<div class="odds-mini-label">'+escHtml(label)+'</div>'
+       + '<div class="odds-mini-val '+cls+'">'+arrow+' '+(mov.current?mov.current.toFixed(2):'—')+'</div>'
+       + (mov.pctChange!=null?'<div class="odds-mini-pct '+cls+'">'+(mov.pctChange>0?'+':'')+mov.pctChange.toFixed(1)+'%</div>':'')
+       + '</div>';
+}
+
+function renderSparkline(vals) {
+  if (!vals || vals.length < 2) return '';
+  var w = 200, h = 40;
+  var min = Math.min.apply(null, vals);
+  var max = Math.max.apply(null, vals);
+  var range = max - min || 1;
+  var pts = vals.map(function(v, i){
+    var x = Math.round(i / (vals.length-1) * w);
+    var y = Math.round(h - (v - min) / range * h);
+    return x+','+y;
+  }).join(' ');
+  return '<svg class="sparkline" viewBox="0 0 '+w+' '+h+'" xmlns="http://www.w3.org/2000/svg">'
+       + '<polyline points="'+pts+'" fill="none" stroke="var(--accent)" stroke-width="2"/>'
+       + '</svg>';
+}
+
+function makeQuickStat(label, valH, valA) {
+  return '<div class="quick-stat">'
+       + '<div class="qs-val-h">'+valH+'</div>'
+       + '<div class="qs-label">'+label+'</div>'
+       + '<div class="qs-val-a">'+valA+'</div>'
+       + '</div>';
+}
+
+function escHtml(s) {
+  return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}

@@ -112,6 +112,45 @@ class Cache {
 
 const cache = new Cache();
 
+// ── Historique cotes en mémoire (tracking mouvement / steam) ─────────────
+const oddsHistory = {};  // { matchId: { open, snapshots, openTime } }
+
+function recordOddsSnapshot(matchId, homeTeam, awayTeam, rawBookmakers) {
+  if (!matchId || !rawBookmakers || !rawBookmakers.length) return;
+  const snapshot = { ts: Date.now(), bk: rawBookmakers };
+  if (!oddsHistory[matchId]) {
+    oddsHistory[matchId] = { home: homeTeam, away: awayTeam, open: snapshot, snapshots: [snapshot], openTime: Date.now() };
+  } else {
+    oddsHistory[matchId].snapshots.push(snapshot);
+    if (oddsHistory[matchId].snapshots.length > 48) oddsHistory[matchId].snapshots.shift();
+  }
+  const cutoff = Date.now() - 86400000;
+  Object.keys(oddsHistory).forEach(function(k) { if (oddsHistory[k].openTime < cutoff) delete oddsHistory[k]; });
+}
+
+function getOddsMovement(matchId, teamName) {
+  const hist = oddsHistory[matchId];
+  if (!hist || hist.snapshots.length < 2) return null;
+  function bestPrice(bkArr, tName) {
+    let best = null;
+    bkArr.forEach(function(bk) {
+      const mk = bk.markets && bk.markets.find(function(m){ return m.key === 'h2h'; });
+      if (!mk) return;
+      const out = mk.outcomes && mk.outcomes.find(function(o){ return teamMatch(o.name, tName); });
+      if (out && out.price && (!best || out.price > best)) best = out.price;
+    });
+    return best;
+  }
+  const opening = bestPrice(hist.open.bk, teamName);
+  const current = bestPrice(hist.snapshots[hist.snapshots.length - 1].bk, teamName);
+  if (!opening || !current) return null;
+  const pctChange = Math.round((current - opening) / opening * 1000) / 10;
+  const direction = pctChange > 0.5 ? 'up' : pctChange < -0.5 ? 'down' : 'stable';
+  const steam     = Math.abs(pctChange) >= 5;
+  const sparkline = hist.snapshots.slice(-8).map(function(s){ return bestPrice(s.bk, teamName); }).filter(Boolean);
+  return { opening, current, pctChange, direction, steam, sparkline };
+}
+
 let apiUsage = {
   requestsUsed: 0,
   requestsRemaining: null,
@@ -322,6 +361,7 @@ async function loadOddsForSport(sport) {
     bookmakers: BOOKMAKERS.join(','),
   });
   data = (Array.isArray(raw) ? raw : [raw]).map(function(event) {
+    recordOddsSnapshot(event.id, event.home_team, event.away_team, event.bookmakers || []);
     return {
       id:           event.id,
       sport:        event.sport_key,
@@ -1140,3 +1180,170 @@ app.get('/api/player-form', async function(req, res) {
   }
 });
 
+
+// ═══════════════════════════════════════════════════════════════════════
+// MATCH STATS — H2H + Forme + Mouvement cotes + Stats ESPN
+// Inspiré Flashscore / bookmakers
+// ═══════════════════════════════════════════════════════════════════════
+
+// Récupère les derniers résultats d'une équipe/joueur (TheSportsDB)
+async function fetchTeamRecentForm(name) {
+  if (!name) return null;
+  const cacheKey = 'form_' + normTeam(name);
+  const cached = cache.get(cacheKey);
+  if (cached) return cached;
+  try {
+    const ctrl = new AbortController();
+    setTimeout(function(){ ctrl.abort(); }, 5000);
+    const r = await fetch('https://www.thesportsdb.com/api/v1/json/3/searchplayers.php?p=' + encodeURIComponent(name), { signal: ctrl.signal });
+    const d = await r.json();
+    const players = d.player || [];
+    if (!players.length) {
+      // Try team search
+      const ctrl2 = new AbortController();
+      setTimeout(function(){ ctrl2.abort(); }, 5000);
+      const r2 = await fetch('https://www.thesportsdb.com/api/v1/json/3/searchteams.php?t=' + encodeURIComponent(name), { signal: ctrl2.signal });
+      const d2 = await r2.json();
+      const teams = d2.teams || [];
+      if (!teams.length) return null;
+      const team = teams[0];
+      const ctrl3 = new AbortController();
+      setTimeout(function(){ ctrl3.abort(); }, 5000);
+      const r3 = await fetch('https://www.thesportsdb.com/api/v1/json/3/eventslast.php?id=' + team.idTeam, { signal: ctrl3.signal });
+      const d3 = await r3.json();
+      const events = (d3.results || []).slice(0, 7);
+      const form = events.map(function(ev) {
+        const isHome = teamMatch(ev.strHomeTeam || '', name);
+        const hs = parseInt(ev.intHomeScore) || 0, as = parseInt(ev.intAwayScore) || 0;
+        let result = 'D';
+        if (hs !== as) result = (isHome ? hs > as : as > hs) ? 'W' : 'L';
+        return { date: ev.dateEvent, home: ev.strHomeTeam, away: ev.strAwayTeam, homeScore: hs, awayScore: as, result, venue: ev.strVenue || '' };
+      });
+      const wins = form.filter(function(f){ return f.result === 'W'; }).length;
+      const result = { name: team.strTeam, badge: team.strTeamBadge || null, form, formPct: form.length ? Math.round(wins/form.length*100) : null, streak: calcStreak(form.map(function(f){ return f.result; })), goalsScored: form.reduce(function(acc,f){ const isH = teamMatch(f.home,name); return acc + (isH ? f.homeScore : f.awayScore); },0), goalsConceded: form.reduce(function(acc,f){ const isH = teamMatch(f.home,name); return acc + (isH ? f.awayScore : f.homeScore); },0) };
+      cache.set(cacheKey, result, 1800);
+      return result;
+    }
+    // Player form
+    const player = players[0];
+    const ctrl4 = new AbortController();
+    setTimeout(function(){ ctrl4.abort(); }, 5000);
+    const r4 = await fetch('https://www.thesportsdb.com/api/v1/json/3/eventslast.php?id=' + player.idPlayer, { signal: ctrl4.signal });
+    const d4 = await r4.json();
+    const events = (d4.results || []).slice(0, 7);
+    const form = events.map(function(ev) {
+      const isHome = teamMatch(ev.strHomeTeam || '', name);
+      const hs = parseInt(ev.intHomeScore) || 0, as = parseInt(ev.intAwayScore) || 0;
+      let result = 'D';
+      if (hs !== as) result = (isHome ? hs > as : as > hs) ? 'W' : 'L';
+      return { date: ev.dateEvent, home: ev.strHomeTeam, away: ev.strAwayTeam, homeScore: hs, awayScore: as, result };
+    });
+    const wins = form.filter(function(f){ return f.result === 'W'; }).length;
+    const result = { name: player.strPlayer, nationality: player.strNationality, thumb: player.strThumb || null, form, formPct: form.length ? Math.round(wins/form.length*100) : null, streak: calcStreak(form.map(function(f){ return f.result; })) };
+    cache.set(cacheKey, result, 1800);
+    return result;
+  } catch(err) { return null; }
+}
+
+// Récupère le H2H entre deux équipes (TheSportsDB searchevents)
+async function fetchH2H(homeTeam, awayTeam) {
+  const cacheKey = 'h2h_' + normTeam(homeTeam) + '_' + normTeam(awayTeam);
+  const cached = cache.get(cacheKey);
+  if (cached) return cached;
+  try {
+    const query = homeTeam + ' vs ' + awayTeam;
+    const ctrl = new AbortController();
+    setTimeout(function(){ ctrl.abort(); }, 5000);
+    const r = await fetch('https://www.thesportsdb.com/api/v1/json/3/searchevents.php?e=' + encodeURIComponent(query), { signal: ctrl.signal });
+    const d = await r.json();
+    const events = (d.event || []).slice(0, 10).map(function(ev) {
+      return {
+        date: ev.dateEvent,
+        home: ev.strHomeTeam, away: ev.strAwayTeam,
+        homeScore: parseInt(ev.intHomeScore) || 0,
+        awayScore: parseInt(ev.intAwayScore) || 0,
+        venue: ev.strVenue || '',
+        season: ev.strSeason || '',
+      };
+    });
+    const homeWins  = events.filter(function(e){ return teamMatch(e.home, homeTeam) ? e.homeScore > e.awayScore : e.awayScore > e.homeScore; }).length;
+    const awayWins  = events.filter(function(e){ return teamMatch(e.away, homeTeam) ? e.homeScore > e.awayScore : e.awayScore > e.homeScore; }).length;
+    const draws     = events.filter(function(e){ return e.homeScore === e.awayScore; }).length;
+    const result = { meetings: events, homeWins, awayWins, draws, total: events.length };
+    cache.set(cacheKey, result, 3600);
+    return result;
+  } catch(err) { return null; }
+}
+
+app.get('/api/match-stats', async function(req, res) {
+  const home    = req.query.home    || '';
+  const away    = req.query.away    || '';
+  const sport   = req.query.sport   || '';
+  const matchId = req.query.matchId || '';
+
+  const cacheKey = 'mstats_' + normTeam(home) + '_' + normTeam(away);
+  const cached = cache.get(cacheKey);
+  if (cached) return res.json(Object.assign({}, cached, {
+    oddsMovement: {
+      home: matchId ? getOddsMovement(matchId, home) : null,
+      away: matchId ? getOddsMovement(matchId, away) : null,
+    }
+  }));
+
+  // Run all in parallel
+  const [formHomeRes, formAwayRes, h2hRes, espnRes] = await Promise.allSettled([
+    fetchTeamRecentForm(home),
+    fetchTeamRecentForm(away),
+    fetchH2H(home, away),
+    (async function() {
+      if (!sport) return null;
+      const espnPath = ESPN_MAP[sport];
+      if (!espnPath) return null;
+      try {
+        const url = 'https://site.api.espn.com/apis/site/v2/sports/' + espnPath + '/scoreboard';
+        const ctrl = new AbortController();
+        setTimeout(function(){ ctrl.abort(); }, 6000);
+        const r = await fetch(url, { signal: ctrl.signal });
+        if (!r.ok) return null;
+        const sbData = await r.json();
+        const events = sbData.events || [];
+        for (const ev of events) {
+          const comp  = (ev.competitions || [])[0] || {};
+          const comps = comp.competitors || [];
+          const n0 = espnName(comps[0]), n1 = espnName(comps[1]);
+          if (!((teamMatch(n0,home) && teamMatch(n1,away)) || (teamMatch(n0,away) && teamMatch(n1,home)))) continue;
+          const statsA = (comps[0] || {}).statistics || [];
+          const statsB = (comps[1] || {}).statistics || [];
+          function gs(stats, name) { const s = stats.find(function(x){ return x.name === name || x.abbreviation === name; }); return s ? s.displayValue : null; }
+          return {
+            found: true,
+            score: { home: (comps[0]||{}).score||'0', away: (comps[1]||{}).score||'0' },
+            period: (ev.status||{}).period || 1,
+            clock:  (ev.status||{}).displayClock || '',
+            statsA: { possession: gs(statsA,'possessionPct'), shots: gs(statsA,'shots'), shotsOnTarget: gs(statsA,'shotsOnTarget'), corners: gs(statsA,'cornerKicks'), yellowCards: gs(statsA,'yellowCards'), aces: gs(statsA,'aces'), doubleFaults: gs(statsA,'doubleFaults'), firstServePct: gs(statsA,'firstServeIn') },
+            statsB: { possession: gs(statsB,'possessionPct'), shots: gs(statsB,'shots'), shotsOnTarget: gs(statsB,'shotsOnTarget'), corners: gs(statsB,'cornerKicks'), yellowCards: gs(statsB,'yellowCards'), aces: gs(statsB,'aces'), doubleFaults: gs(statsB,'doubleFaults'), firstServePct: gs(statsB,'firstServeIn') },
+          };
+        }
+        return { found: false };
+      } catch(e) { return null; }
+    })()
+  ]);
+
+  const result = {
+    home, away, sport,
+    formHome: formHomeRes.value  || null,
+    formAway: formAwayRes.value  || null,
+    h2h:      h2hRes.value       || null,
+    espn:     espnRes.value      || null,
+    oddsMovement: {
+      home: matchId ? getOddsMovement(matchId, home) : null,
+      away: matchId ? getOddsMovement(matchId, away) : null,
+    },
+  };
+
+  // Cache 10 min (sans oddsMovement car dynamique)
+  const toCache = Object.assign({}, result, { oddsMovement: null });
+  cache.set(cacheKey, toCache, 600);
+
+  res.json(result);
+});
