@@ -1054,8 +1054,8 @@ function attachCardClicks(container) {
       if(sport&&typeof LiveModule!=='undefined'&&LiveModule.updateSportContext) LiveModule.updateSportContext(sport);
       // Démarrer auto-détection + charger forme joueurs
       if(typeof LiveModule!=='undefined'&&LiveModule.onMatchLoaded) LiveModule.onMatchLoaded(home,away,sport);
-      var form=document.getElementById('live-match-header');
-      if(form) form.scrollIntoView({behavior:'smooth',block:'start'});
+      // Ouvrir le modal stats grand jeu
+      openMatchStats(card);
     });
   });
 }
@@ -1233,39 +1233,35 @@ document.addEventListener('DOMContentLoaded', () => {
   PrematchFeedModule.load();
 });
 
-/* ===== STATS MODAL - Flashscore style ===== */
+/* ===== STATS MODAL - Grand Jeu ===== */
 
-function openMatchStats(btnEl) {
-  var card = btnEl.closest('.match-card');
+function openMatchStats(btnOrCard) {
+  var card = btnOrCard.closest ? btnOrCard.closest('.match-card') : btnOrCard;
   if (!card) return;
   var home    = card.dataset.home    || '';
   var away    = card.dataset.away    || '';
   var sport   = card.dataset.sport   || '';
   var matchId = card.dataset.matchId || card.dataset['match-id'] || '';
+  var edge    = parseFloat(card.dataset.edge) || 0;
+  var prob    = parseFloat(card.dataset.prob)  || 0;
 
-  var modal = document.getElementById('stats-modal');
   var overlay = document.getElementById('stats-modal-overlay');
+  var modal   = document.getElementById('stats-modal');
   if (!modal || !overlay) return;
 
-  // Set title
   var titleEl = document.getElementById('stats-modal-title');
-  if (titleEl) titleEl.textContent = home + ' vs ' + away;
+  if (titleEl) titleEl.textContent = home + ' — ' + away;
 
-  // Show modal
   overlay.style.display = 'flex';
-  modal.style.display = 'block';
 
-  // Show loading
+  // Reset to IA tab
+  modal.querySelectorAll('.stats-tab').forEach(function(t){ t.classList.remove('active'); });
+  var iaTab = modal.querySelector('.stats-tab[data-tab="ia"]');
+  if (iaTab) iaTab.classList.add('active');
+
   var body = document.getElementById('stats-modal-body');
-  if (body) body.innerHTML = '<div class="stats-loading">&#x23F3; Chargement des statistiques...</div>';
+  if (body) body.innerHTML = '<div class="stats-loading"><div class="stats-spinner"></div>Analyse en cours…</div>';
 
-  // Reset tabs
-  var tabs = modal.querySelectorAll('.stats-tab');
-  tabs.forEach(function(t){ t.classList.remove('active'); });
-  var firstTab = modal.querySelector('.stats-tab[data-tab="apercu"]');
-  if (firstTab) firstTab.classList.add('active');
-
-  // Fetch stats
   var url = '/api/match-stats?home=' + encodeURIComponent(home)
           + '&away=' + encodeURIComponent(away)
           + '&sport=' + encodeURIComponent(sport)
@@ -1275,11 +1271,11 @@ function openMatchStats(btnEl) {
     .then(function(r){ return r.json(); })
     .then(function(data){
       window._statsModalData = data;
-      window._statsModalMeta = { home: home, away: away, sport: sport };
-      renderStatsTab('apercu', data, home, away);
+      window._statsModalMeta = { home: home, away: away, sport: sport, edge: edge, prob: prob };
+      renderStatsTab('ia', data, home, away, edge, prob);
     })
     .catch(function(err){
-      if (body) body.innerHTML = '<div class="stats-error">&#x26A0; Erreur: ' + err.message + '</div>';
+      if (body) body.innerHTML = '<div class="stats-error">&#x26A0; Erreur: ' + escHtml(err.message) + '</div>';
     });
 }
 
@@ -1296,93 +1292,223 @@ function switchStatsTab(tabName) {
   });
   var data = window._statsModalData;
   var meta = window._statsModalMeta || {};
-  if (data) renderStatsTab(tabName, data, meta.home || '', meta.away || '');
+  if (data) renderStatsTab(tabName, data, meta.home||'', meta.away||'', meta.edge||0, meta.prob||0);
 }
 
-function renderStatsTab(tab, data, home, away) {
+function renderStatsTab(tab, data, home, away, edge, prob) {
   var body = document.getElementById('stats-modal-body');
   if (!body) return;
-  if (tab === 'apercu')     body.innerHTML = renderTabApercu(data, home, away);
+  if (tab === 'ia')     body.innerHTML = renderTabIA(data, home, away, edge, prob);
+  else if (tab === 'apercu') body.innerHTML = renderTabApercu(data, home, away);
   else if (tab === 'h2h')   body.innerHTML = renderTabH2H(data, home, away);
   else if (tab === 'forme') body.innerHTML = renderTabForme(data, home, away);
   else if (tab === 'cotes') body.innerHTML = renderTabCotes(data, home, away);
   else if (tab === 'live')  body.innerHTML = renderTabLive(data, home, away);
 }
 
+/* ---- IA ANALYSE TAB ---- */
+function renderTabIA(data, home, away, edge, prob) {
+  var fh = data.formHome || {};
+  var fa = data.formAway || {};
+  var h2h = data.h2h || {};
+  var om  = data.oddsMovement || {};
+  var mvH = om.homeTeam || {}; var mvA = om.awayTeam || {};
+
+  // Determine recommended side
+  var rec = null, recCls = '', recIcon = '';
+  if (edge >= 2) {
+    rec = 'Cuiabá'; // placeholder, actually computed from bestSel
+    recCls = edge >= 5 ? 'ia-rec-hot' : 'ia-rec-good';
+    recIcon = edge >= 5 ? '🔥' : '✅';
+  }
+
+  // Find best side from bestSel stored in meta
+  var meta = window._statsModalMeta || {};
+  var bestTeam = '';
+  // Get from card data
+  var cards = document.querySelectorAll('.feed-card-clickable');
+  for (var i=0; i<cards.length; i++) {
+    var c = cards[i];
+    if (c.dataset.home === home && c.dataset.away === away) {
+      var bestOdd = c.querySelector('.mc-odd.mc-best .mc-ol');
+      if (bestOdd) {
+        var side = bestOdd.textContent.trim();
+        bestTeam = side==='1' ? home : side==='2' ? away : 'Nul';
+      }
+      break;
+    }
+  }
+
+  // Build confidence score (0-100)
+  var confidence = Math.min(95, Math.max(10,
+    (prob > 0 ? Math.min(40, prob * 0.5) : 20)
+    + (Math.abs(edge) > 0 ? Math.min(25, Math.abs(edge) * 3) : 0)
+    + (fh.form && fh.form.length ? 10 : 0)
+    + (h2h.total > 0 ? 10 : 0)
+    + (mvH.direction ? 5 : 0)
+    + (Math.abs((mvH.pctChange||0)) > 3 ? 10 : 0)
+  ));
+
+  var edgeCls = edge >= 3 ? 'edge-hot' : edge >= 1 ? 'edge-ok' : edge >= 0 ? 'edge-neutral' : 'edge-neg';
+  var edgeSign = edge >= 0 ? '+' : '';
+
+  // Key factors
+  var factors = [];
+  if (fh.formPct != null && fa.formPct != null) {
+    var formDiff = (fh.formPct||0) - (fa.formPct||0);
+    if (Math.abs(formDiff) > 15) factors.push({ icon: '📊', text: (formDiff>0?home:away) + ' en meilleure forme (' + Math.abs(formDiff) + '% écart)', positive: formDiff>0 === (home===bestTeam) });
+  }
+  if (h2h.total >= 3) {
+    var domTeam = h2h.homeWins > h2h.awayWins ? home : away;
+    factors.push({ icon: '🤝', text: 'H2H: ' + domTeam + ' domine (' + Math.max(h2h.homeWins,h2h.awayWins) + '/' + h2h.total + ')', positive: domTeam===bestTeam });
+  }
+  if (mvH.direction === 'down') factors.push({ icon: '📉', text: home + ' cote baisse ' + (mvH.pctChange?mvH.pctChange.toFixed(1)+'%':''), positive: false });
+  if (mvA.direction === 'down') factors.push({ icon: '📉', text: away + ' cote baisse ' + (mvA.pctChange?mvA.pctChange.toFixed(1)+'%':''), positive: false });
+  if (mvH.steam) factors.push({ icon: '🚨', text: 'Steam détecté sur ' + home, positive: true });
+  if (mvA.steam) factors.push({ icon: '🚨', text: 'Steam détecté sur ' + away, positive: true });
+  if (fh.streak > 2) factors.push({ icon: '🔥', text: home + ' en série de ' + fh.streak + ' victoires', positive: home===bestTeam });
+  if (fa.streak > 2) factors.push({ icon: '🔥', text: away + ' en série de ' + fa.streak + ' victoires', positive: away===bestTeam });
+  if (fh.streak < -2) factors.push({ icon: '❄️', text: home + ' en série de ' + Math.abs(fh.streak) + ' défaites', positive: home!==bestTeam });
+  if (fa.streak < -2) factors.push({ icon: '❄️', text: away + ' en série de ' + Math.abs(fa.streak) + ' défaites', positive: away!==bestTeam });
+
+  var html = '<div class="ia-panel">';
+
+  // Recommandation principale
+  var recLabel = edge >= 5 ? 'FORT BET' : edge >= 2 ? 'BET' : edge >= 0.5 ? 'SURVEILLER' : 'PASSER';
+  var recColor = edge >= 5 ? '#ff5252' : edge >= 2 ? '#66bb6a' : edge >= 0.5 ? '#4fc3f7' : '#888';
+  html += '<div class="ia-rec-box" style="border-color:' + recColor + '20;background:' + recColor + '0d">'
+        + '<div class="ia-rec-label" style="color:' + recColor + '">' + recLabel + '</div>'
+        + (bestTeam ? '<div class="ia-rec-team">' + escHtml(bestTeam) + '</div>' : '')
+        + '<div class="ia-rec-meta">'
+        + (prob > 0 ? '<span class="ia-meta-badge">Prob ' + Math.round(prob) + '%</span>' : '')
+        + (edge !== 0 ? '<span class="ia-meta-badge" style="color:' + recColor + '">' + edgeSign + edge.toFixed(1) + '% edge</span>' : '')
+        + '</div>'
+        + '</div>';
+
+  // Confidence gauge
+  html += '<div class="ia-confidence">'
+        + '<div class="ia-conf-label">Niveau de confiance IA</div>'
+        + '<div class="ia-conf-bar-wrap">'
+        + '<div class="ia-conf-bar" style="width:' + confidence + '%;background:' + recColor + '"></div>'
+        + '</div>'
+        + '<div class="ia-conf-pct">' + Math.round(confidence) + '%</div>'
+        + '</div>';
+
+  // Factors
+  if (factors.length) {
+    html += '<div class="ia-factors-title">Facteurs clés</div>'
+          + '<div class="ia-factors">';
+    factors.forEach(function(f) {
+      var cls = f.positive ? 'ia-factor-pos' : 'ia-factor-neg';
+      html += '<div class="ia-factor ' + cls + '"><span>' + f.icon + '</span><span>' + escHtml(f.text) + '</span></div>';
+    });
+    html += '</div>';
+  }
+
+  // Quick stats row
+  html += '<div class="ia-quick-grid">';
+  html += iaQuickCard('Prob. Victoire', prob > 0 ? Math.round(prob) + '%' : '—', 'via The Odds API');
+  html += iaQuickCard('Edge bookmakers', edgeSign + edge.toFixed(1) + '%', edge >= 1 ? 'Valeur positive' : 'Pas de value');
+  html += iaQuickCard('H2H', h2h.total > 0 ? h2h.homeWins + 'V / ' + h2h.draws + 'N / ' + h2h.awayWins + 'D' : '—', home + ' vs ' + away);
+  html += iaQuickCard('Forme ' + escHtml(home.split(' ')[0]), fh.formPct != null ? fh.formPct + '%' : '—', fh.streak ? (fh.streak>0?'🔥':'❄️') + ' Série ' + fh.streak : 'N/A');
+  html += iaQuickCard('Forme ' + escHtml(away.split(' ')[0]), fa.formPct != null ? fa.formPct + '%' : '—', fa.streak ? (fa.streak>0?'🔥':'❄️') + ' Série ' + fa.streak : 'N/A');
+  if (mvH.current) html += iaQuickCard('Mouv. cote ' + escHtml(home.split(' ')[0]), (mvH.pctChange!=null?(mvH.pctChange>0?'+':'')+mvH.pctChange.toFixed(1)+'%':'—'), mvH.steam?'🚨 Steam':'');
+  html += '</div>';
+
+  html += '</div>';
+  return html;
+}
+
+function iaQuickCard(label, val, sub) {
+  return '<div class="ia-qcard"><div class="ia-qcard-val">' + val + '</div>'
+       + '<div class="ia-qcard-label">' + label + '</div>'
+       + (sub ? '<div class="ia-qcard-sub">' + escHtml(sub) + '</div>' : '')
+       + '</div>';
+}
+
+/* ---- APERÇU TAB ---- */
 function renderTabApercu(data, home, away) {
   var fh = data.formHome || {};
   var fa = data.formAway || {};
   var h2h = data.h2h || {};
-  var om = data.oddsMovement || {};
-  
-  var html = '<div class="stats-apercu">';
+  var om  = data.oddsMovement || {};
+  var esp = data.espnStats || {};
 
-  // Teams header
+  var html = '<div class="stats-apercu">';
   html += '<div class="stats-teams-row">'
         + '<div class="stats-team-name">' + escHtml(home) + '</div>'
         + '<div class="stats-vs">VS</div>'
         + '<div class="stats-team-name">' + escHtml(away) + '</div>'
         + '</div>';
 
-  // Quick stats row
-  html += '<div class="stats-quick-row">';
-  html += makeQuickStat('Forme', renderFormBadges(fh.form || ''), renderFormBadges(fa.form || ''));
-  html += makeQuickStat('Classement / Score', fh.formPct ? fh.formPct + '%' : '—', fa.formPct ? fa.formPct + '%' : '—');
-  html += makeQuickStat('H2H Vict.', h2h.homeWins != null ? h2h.homeWins : '—', h2h.awayWins != null ? h2h.awayWins : '—');
-  html += '</div>';
-
-  // Odds movement quick
-  if (om && om.homeTeam) {
-    html += '<div class="stats-section-title">&#x1F4C8; Mouvement des cotes</div>';
-    html += '<div class="stats-odds-row">';
-    html += renderOddsMini(home, om.homeTeam);
-    html += renderOddsMini(away, om.awayTeam);
-    if (om.drawTeam) html += renderOddsMini('Nul', om.drawTeam);
-    html += '</div>';
+  if (esp && esp.found && esp.score) {
+    html += '<div class="apercu-score">'
+          + '<span class="asc-h">' + esp.score.home + '</span>'
+          + '<span class="asc-sep">:</span>'
+          + '<span class="asc-a">' + esp.score.away + '</span>'
+          + (esp.clock ? '<span class="asc-clock">⏱ ' + esp.clock + '</span>' : '')
+          + '</div>';
   }
 
+  html += '<div class="stats-quick-row">';
+  html += makeQuickStat('Forme (5M)', renderFormBadgesArr(fh.form, 5), renderFormBadgesArr(fa.form, 5));
+  html += makeQuickStat('% Victoires', fh.formPct != null ? fh.formPct + '%' : '—', fa.formPct != null ? fa.formPct + '%' : '—');
+  html += makeQuickStat('H2H Vict.', h2h.homeWins != null ? String(h2h.homeWins) : '—', h2h.awayWins != null ? String(h2h.awayWins) : '—');
+  if (fh.goalsScored != null) html += makeQuickStat('Buts marqués', String(fh.goalsScored||0), String(fa.goalsScored||0));
+  if (fh.goalsConceded != null) html += makeQuickStat('Buts encaissés', String(fh.goalsConceded||0), String(fa.goalsConceded||0));
+  html += '</div>';
+
+  if (om.homeTeam || om.awayTeam) {
+    html += '<div class="stats-section-title">📈 Mouvement des cotes</div>'
+          + '<div class="stats-odds-row">'
+          + renderOddsMini(home, om.homeTeam)
+          + (om.drawTeam ? renderOddsMini('Nul', om.drawTeam) : '')
+          + renderOddsMini(away, om.awayTeam)
+          + '</div>';
+  }
   html += '</div>';
   return html;
 }
 
+/* ---- H2H TAB ---- */
 function renderTabH2H(data, home, away) {
   var h2h = data.h2h || {};
   var meetings = h2h.meetings || [];
-  
+
   var html = '<div class="stats-h2h">';
-  html += '<div class="stats-section-title">&#x1F91C; Confrontations directes</div>';
+  html += '<div class="stats-section-title">🤝 Confrontations directes</div>';
 
   if (!meetings.length) {
-    html += '<div class="stats-empty">Aucune confrontation trouvée</div>';
+    html += '<div class="stats-empty">Aucune confrontation trouvée dans la base de données</div>';
   } else {
-    // Summary bar
     var total = (h2h.homeWins||0) + (h2h.awayWins||0) + (h2h.draws||0);
     if (total > 0) {
       var pctH = Math.round((h2h.homeWins||0)/total*100);
       var pctD = Math.round((h2h.draws||0)/total*100);
       var pctA = 100 - pctH - pctD;
-      html += '<div class="h2h-bar-wrap">'
+      html += '<div class="h2h-summary">'
+            + '<div class="h2h-sum-team">' + escHtml(home) + '<strong>' + h2h.homeWins + '</strong></div>'
+            + '<div class="h2h-sum-draw">Nul<strong>' + h2h.draws + '</strong></div>'
+            + '<div class="h2h-sum-team">' + escHtml(away) + '<strong>' + h2h.awayWins + '</strong></div>'
+            + '</div>'
             + '<div class="h2h-bar">'
-            + '<div class="h2h-bar-h" style="width:'+pctH+'%">'+h2h.homeWins+'</div>'
-            + '<div class="h2h-bar-d" style="width:'+pctD+'%">'+h2h.draws+'</div>'
-            + '<div class="h2h-bar-a" style="width:'+pctA+'%">'+h2h.awayWins+'</div>'
-            + '</div>'
-            + '<div class="h2h-bar-labels">'
-            + '<span>' + escHtml(home) + '</span>'
-            + '<span>Nul</span>'
-            + '<span>' + escHtml(away) + '</span>'
-            + '</div>'
+            + '<div class="h2h-bar-h" style="width:'+pctH+'%">'+(pctH>8?pctH+'%':'')+'</div>'
+            + '<div class="h2h-bar-d" style="width:'+pctD+'%">'+(pctD>8?pctD+'%':'')+'</div>'
+            + '<div class="h2h-bar-a" style="width:'+pctA+'%">'+(pctA>8?pctA+'%':'')+'</div>'
             + '</div>';
     }
-
-    // Meetings table
-    html += '<table class="stats-table"><thead><tr><th>Date</th><th>Domicile</th><th>Score</th><th>Extérieur</th></tr></thead><tbody>';
-    meetings.slice(0,8).forEach(function(m){
+    html += '<table class="stats-table" style="margin-top:12px">'
+          + '<thead><tr><th>Date</th><th>Saison</th><th>Domicile</th><th class="stats-score">Score</th><th>Extérieur</th></tr></thead><tbody>';
+    meetings.forEach(function(m) {
+      var hs = m.homeScore, as = m.awayScore;
+      var scoreStr = hs + ' : ' + as;
+      var winner = hs > as ? m.home : as > hs ? m.away : null;
       html += '<tr>'
             + '<td>' + (m.date||'').slice(0,10) + '</td>'
-            + '<td>' + escHtml(m.home||'') + '</td>'
-            + '<td class="stats-score">' + (m.score||'') + '</td>'
-            + '<td>' + escHtml(m.away||'') + '</td>'
+            + '<td style="color:var(--text-muted);font-size:.75rem">' + (m.season||'') + '</td>'
+            + '<td class="' + (winner===m.home?'stat-winner':'') + '">' + escHtml(m.home||'') + '</td>'
+            + '<td class="stats-score">' + scoreStr + '</td>'
+            + '<td class="' + (winner===m.away?'stat-winner':'') + '">' + escHtml(m.away||'') + '</td>'
             + '</tr>';
     });
     html += '</tbody></table>';
@@ -1391,202 +1517,208 @@ function renderTabH2H(data, home, away) {
   return html;
 }
 
+/* ---- FORME TAB ---- */
 function renderTabForme(data, home, away) {
   var fh = data.formHome || {};
   var fa = data.formAway || {};
-  
-  var html = '<div class="stats-forme">';
-  html += '<div class="stats-two-col">';
 
-  // Home form
-  html += '<div class="stats-col">';
-  html += '<div class="stats-col-title">' + escHtml(home) + '</div>';
-  if (fh.form) {
-    html += '<div class="stats-form-badges">' + renderFormBadges(fh.form) + '</div>';
-  }
-  if (fh.formPct != null) {
-    html += '<div class="stats-form-pct">&#x1F3AF; ' + fh.formPct + '% victoires</div>';
-  }
-  if (fh.streak) {
-    var icon = fh.streak > 0 ? '&#x1F525;' : '&#x274C;';
-    html += '<div class="stats-streak">' + icon + ' Série: '
-          + (fh.streak > 0 ? fh.streak + ' victoires' : Math.abs(fh.streak) + ' défaites') + '</div>';
-  }
-  if (fh.recent && fh.recent.length) {
-    html += '<table class="stats-table"><thead><tr><th>Date</th><th>Match</th><th>Score</th><th>Résultat</th></tr></thead><tbody>';
-    fh.recent.slice(0,5).forEach(function(ev){
-      var rClass = ev.result==='W'?'fb-W':ev.result==='L'?'fb-L':'fb-D';
-      html += '<tr><td>'+(ev.date||'').slice(0,10)+'</td>'
-            + '<td>'+escHtml(ev.home||'')+' vs '+escHtml(ev.away||'')+'</td>'
-            + '<td class="stats-score">'+escHtml(ev.score||'')+'</td>'
-            + '<td><span class="form-badge '+rClass+'">'+ev.result+'</span></td></tr>';
-    });
-    html += '</tbody></table>';
-  }
-  html += '</div>';
-
-  // Away form
-  html += '<div class="stats-col">';
-  html += '<div class="stats-col-title">' + escHtml(away) + '</div>';
-  if (fa.form) {
-    html += '<div class="stats-form-badges">' + renderFormBadges(fa.form) + '</div>';
-  }
-  if (fa.formPct != null) {
-    html += '<div class="stats-form-pct">&#x1F3AF; ' + fa.formPct + '% victoires</div>';
-  }
-  if (fa.streak) {
-    var icon2 = fa.streak > 0 ? '&#x1F525;' : '&#x274C;';
-    html += '<div class="stats-streak">' + icon2 + ' Série: '
-          + (fa.streak > 0 ? fa.streak + ' victoires' : Math.abs(fa.streak) + ' défaites') + '</div>';
-  }
-  if (fa.recent && fa.recent.length) {
-    html += '<table class="stats-table"><thead><tr><th>Date</th><th>Match</th><th>Score</th><th>Résultat</th></tr></thead><tbody>';
-    fa.recent.slice(0,5).forEach(function(ev){
-      var rClass2 = ev.result==='W'?'fb-W':ev.result==='L'?'fb-L':'fb-D';
-      html += '<tr><td>'+(ev.date||'').slice(0,10)+'</td>'
-            + '<td>'+escHtml(ev.home||'')+' vs '+escHtml(ev.away||'')+'</td>'
-            + '<td class="stats-score">'+escHtml(ev.score||'')+'</td>'
-            + '<td><span class="form-badge '+rClass2+'">'+ev.result+'</span></td></tr>';
-    });
-    html += '</tbody></table>';
-  }
-  html += '</div>';
-
-  html += '</div></div>';
-  return html;
-}
-
-function renderTabCotes(data, home, away) {
-  var om = data.oddsMovement || {};
-  
-  var html = '<div class="stats-cotes">';
-  html += '<div class="stats-section-title">&#x1F4CA; Variation des cotes</div>';
-
-  if (!om || !om.homeTeam) {
-    html += '<div class="stats-empty">Pas d\'historique de cotes disponible</div>';
+  function teamBlock(f, name) {
+    var html = '<div class="stats-col">';
+    html += '<div class="stats-col-title">' + escHtml(name) + '</div>';
+    if (f.badge) html += '<img src="' + escHtml(f.badge) + '" class="team-badge" onerror="this.style.display=&quot;none&quot;">';
+    if (f.form && f.form.length) {
+      html += '<div class="stats-form-badges">' + renderFormBadgesArr(f.form) + '</div>';
+    }
+    if (f.formPct != null) html += '<div class="stats-form-pct">🎯 ' + f.formPct + '% victoires</div>';
+    if (f.streak) {
+      var streakIcon = f.streak > 0 ? '🔥' : '❄️';
+      html += '<div class="stats-streak">' + streakIcon + ' '
+            + (f.streak > 0 ? f.streak + ' victoires consécutives' : Math.abs(f.streak) + ' défaites consécutives')
+            + '</div>';
+    }
+    if (f.goalsScored != null) {
+      html += '<div class="stats-goals-row">'
+            + '<span>⚽ ' + (f.goalsScored||0) + ' buts marqués</span>'
+            + '<span>🥅 ' + (f.goalsConceded||0) + ' buts encaissés</span>'
+            + '</div>';
+    }
+    if (f.form && f.form.length) {
+      html += '<table class="stats-table" style="margin-top:8px">'
+            + '<thead><tr><th>Date</th><th>Match</th><th class="stats-score">Score</th><th></th></tr></thead><tbody>';
+      var recentMatches = Array.isArray(f.form) ? f.form : [];
+      recentMatches.slice(0,6).forEach(function(ev) {
+        var rCls = ev.result==='W'?'fb-W':ev.result==='L'?'fb-L':'fb-D';
+        var scoreStr = ev.homeScore + ':' + ev.awayScore;
+        html += '<tr>'
+              + '<td>' + (ev.date||'').slice(0,10) + '</td>'
+              + '<td style="font-size:.75rem">' + escHtml(ev.home||'') + ' v ' + escHtml(ev.away||'') + '</td>'
+              + '<td class="stats-score">' + scoreStr + '</td>'
+              + '<td><span class="form-badge ' + rCls + '">' + ev.result + '</span></td>'
+              + '</tr>';
+      });
+      html += '</tbody></table>';
+    }
     html += '</div>';
     return html;
   }
 
-  function renderOddsBlock(label, mov) {
+  return '<div class="stats-forme"><div class="stats-two-col">'
+       + teamBlock(fh, home)
+       + teamBlock(fa, away)
+       + '</div></div>';
+}
+
+/* ---- COTES TAB ---- */
+function renderTabCotes(data, home, away) {
+  var om = data.oddsMovement || {};
+
+  var html = '<div class="stats-cotes">';
+  html += '<div class="stats-section-title">📊 Variation des cotes</div>';
+
+  if (!om.homeTeam && !om.awayTeam) {
+    html += '<div class="stats-empty">Historique des cotes non disponible — les variations s\'enregistrent au fil des scans</div>';
+    return html + '</div>';
+  }
+
+  function oddsBlock(label, mov) {
     if (!mov) return '';
     var dir = mov.direction || 'stable';
-    var arrow = dir === 'down' ? '&#x2193;' : dir === 'up' ? '&#x2191;' : '&#x2192;';
-    var cls = dir === 'down' ? 'odds-down' : dir === 'up' ? 'odds-up' : 'odds-stable';
-    var steam = mov.steam ? '<span class="steam-badge">&#x1F525; Steam</span>' : '';
-    var sparkline = '';
-    if (mov.sparkline && mov.sparkline.length > 1) {
-      sparkline = renderSparkline(mov.sparkline);
-    }
+    var arrow = dir==='down'?'▼':dir==='up'?'▲':'→';
+    var cls = dir==='down'?'odds-down':dir==='up'?'odds-up':'odds-stable';
+    var steamBadge = mov.steam ? '<span class="steam-badge">🚨 STEAM</span>' : '';
+    var sparkHtml = (mov.sparkline && mov.sparkline.length > 1) ? renderSparkline(mov.sparkline) : '';
     return '<div class="odds-block">'
          + '<div class="odds-block-label">' + escHtml(label) + '</div>'
-         + '<div class="odds-block-vals">'
-         + '<span class="odds-open">Ouv: <strong>' + (mov.opening ? mov.opening.toFixed(2) : '—') + '</strong></span>'
-         + '<span class="odds-arrow ' + cls + '">' + arrow + '</span>'
-         + '<span class="odds-curr">Act: <strong>' + (mov.current ? mov.current.toFixed(2) : '—') + '</strong></span>'
-         + (mov.pctChange != null ? '<span class="odds-pct ' + cls + '">' + (mov.pctChange > 0 ? '+' : '') + mov.pctChange.toFixed(1) + '%</span>' : '')
-         + steam
+         + '<div class="odds-vals-row">'
+         + '<div class="odds-val-item"><div class="ovl">Ouverture</div><div class="ovv">' + (mov.opening?mov.opening.toFixed(2):'—') + '</div></div>'
+         + '<div class="odds-arrow-big ' + cls + '">' + arrow + '</div>'
+         + '<div class="odds-val-item"><div class="ovl">Actuel</div><div class="ovv">' + (mov.current?mov.current.toFixed(2):'—') + '</div></div>'
+         + '<div class="odds-val-item"><div class="ovl">Variation</div><div class="ovv ' + cls + '">' + (mov.pctChange!=null?(mov.pctChange>0?'+':'')+mov.pctChange.toFixed(1)+'%':'—') + '</div></div>'
+         + steamBadge
          + '</div>'
-         + sparkline
+         + sparkHtml
          + '</div>';
   }
 
-  html += renderOddsBlock(home, om.homeTeam);
-  if (om.drawTeam) html += renderOddsBlock('Nul', om.drawTeam);
-  html += renderOddsBlock(away, om.awayTeam);
-
+  html += oddsBlock(home, om.homeTeam);
+  if (om.drawTeam) html += oddsBlock('Nul', om.drawTeam);
+  html += oddsBlock(away, om.awayTeam);
   html += '</div>';
   return html;
 }
 
+/* ---- LIVE ESPN TAB ---- */
 function renderTabLive(data, home, away) {
-  var espn = data.espnStats || {};
-  
-  var html = '<div class="stats-live">';
-  html += '<div class="stats-section-title">&#x26A1; Stats en direct (ESPN)</div>';
+  var esp = data.espnStats || {};
 
-  if (!espn || !espn.homeStats) {
-    html += '<div class="stats-empty">Pas de stats ESPN disponibles (match non démarré ou hors couverture)</div>';
-    html += '</div>';
-    return html;
+  var html = '<div class="stats-live">';
+  html += '<div class="stats-section-title">⚡ Stats ESPN en direct</div>';
+
+  if (!esp || !esp.found) {
+    html += '<div class="stats-empty">Pas de stats ESPN disponibles — match non démarré ou hors couverture ESPN</div>';
+    return html + '</div>';
   }
 
-  var hStats = espn.homeStats || {};
-  var aStats = espn.awayStats || {};
-  var statKeys = Object.keys(hStats);
+  if (esp.score) {
+    html += '<div class="apercu-score" style="margin-bottom:16px">'
+          + '<span class="asc-h">' + esp.score.home + '</span>'
+          + '<span class="asc-sep">:</span>'
+          + '<span class="asc-a">' + esp.score.away + '</span>'
+          + (esp.clock ? '<span class="asc-clock">⏱ ' + esp.clock + '</span>' : '')
+          + '</div>';
+  }
 
-  if (!statKeys.length) {
-    html += '<div class="stats-empty">Aucune statistique disponible</div>';
-    html += '</div>';
-    return html;
+  var hStats = esp.statsA || {};
+  var aStats = esp.statsB || {};
+
+  // Build stat rows from known keys
+  var statDefs = [
+    { key: 'possession', label: 'Possession (%)' },
+    { key: 'shots', label: 'Tirs' },
+    { key: 'shotsOnTarget', label: 'Tirs cadrés' },
+    { key: 'corners', label: 'Corners' },
+    { key: 'yellowCards', label: 'Cartons jaunes' },
+    { key: 'aces', label: 'Aces' },
+    { key: 'doubleFaults', label: 'Doubles fautes' },
+    { key: 'firstServePct', label: '1er service (%)' },
+  ];
+
+  var rows = statDefs.filter(function(s){ return hStats[s.key] != null || aStats[s.key] != null; });
+
+  if (!rows.length) {
+    html += '<div class="stats-empty">Statistiques pas encore disponibles pour ce match</div>';
+    return html + '</div>';
   }
 
   html += '<table class="stats-table stats-live-table">';
-  html += '<thead><tr><th>' + escHtml(home) + '</th><th>Stat</th><th>' + escHtml(away) + '</th></tr></thead><tbody>';
-
-  statKeys.forEach(function(key){
-    var hv = hStats[key];
-    var av = aStats[key] || 0;
+  html += '<thead><tr><th>' + escHtml(home) + '</th><th>Statistique</th><th>' + escHtml(away) + '</th></tr></thead><tbody>';
+  rows.forEach(function(s) {
+    var hv = hStats[s.key] || '0';
+    var av = aStats[s.key] || '0';
     var hNum = parseFloat(hv) || 0;
     var aNum = parseFloat(av) || 0;
     var total = hNum + aNum;
     var hPct = total > 0 ? Math.round(hNum/total*100) : 50;
     var aPct = 100 - hPct;
-    var isWinH = hNum > aNum;
-    var isWinA = aNum > hNum;
     html += '<tr>'
-          + '<td class="stat-val '+(isWinH?'stat-winner':'')+'">'+hv+'<div class="stat-bar-h" style="width:'+hPct+'%"></div></td>'
-          + '<td class="stat-label">'+escHtml(key)+'</td>'
-          + '<td class="stat-val '+(isWinA?'stat-winner':'')+'">'+av+'<div class="stat-bar-a" style="width:'+aPct+'%"></div></td>'
+          + '<td class="stat-cell"><span class="stat-num' + (hNum>aNum?' stat-winner':'') + '">' + hv + '</span>'
+          + '<div class="stat-bar-track"><div class="stat-bar-fill stat-bar-h" style="width:' + hPct + '%"></div></div></td>'
+          + '<td class="stat-label">' + s.label + '</td>'
+          + '<td class="stat-cell"><div class="stat-bar-track stat-bar-track-r"><div class="stat-bar-fill stat-bar-a" style="width:' + aPct + '%"></div></div>'
+          + '<span class="stat-num' + (aNum>hNum?' stat-winner':'') + '">' + av + '</span></td>'
           + '</tr>';
   });
-
   html += '</tbody></table>';
   html += '</div>';
   return html;
 }
 
-function renderFormBadges(form) {
-  if (!form) return '';
-  return form.split('').map(function(c){
-    var cls = c==='W'?'fb-W':c==='L'?'fb-L':'fb-D';
-    return '<span class="form-badge '+cls+'">'+c+'</span>';
+/* ---- HELPERS ---- */
+function renderFormBadgesArr(form, limit) {
+  if (!form || !form.length) return '<span style="color:var(--text-muted);font-size:.75rem">N/A</span>';
+  var arr = Array.isArray(form) ? form : form.split ? form.split('') : [];
+  if (limit) arr = arr.slice(0, limit);
+  return arr.map(function(item) {
+    var r = typeof item === 'object' ? item.result : item;
+    var cls = r==='W'?'fb-W':r==='L'?'fb-L':'fb-D';
+    return '<span class="form-badge ' + cls + '">' + r + '</span>';
   }).join('');
 }
 
 function renderOddsMini(label, mov) {
   if (!mov) return '';
-  var dir = mov.direction || 'stable';
-  var arrow = dir==='down'?'&#x2193;':dir==='up'?'&#x2191;':'&#x2192;';
+  var dir = mov.direction||'stable';
+  var arrow = dir==='down'?'▼':dir==='up'?'▲':'→';
   var cls = dir==='down'?'odds-down':dir==='up'?'odds-up':'odds-stable';
   return '<div class="odds-mini">'
-       + '<div class="odds-mini-label">'+escHtml(label)+'</div>'
-       + '<div class="odds-mini-val '+cls+'">'+arrow+' '+(mov.current?mov.current.toFixed(2):'—')+'</div>'
-       + (mov.pctChange!=null?'<div class="odds-mini-pct '+cls+'">'+(mov.pctChange>0?'+':'')+mov.pctChange.toFixed(1)+'%</div>':'')
+       + '<div class="odds-mini-label">' + escHtml(label) + '</div>'
+       + '<div class="odds-mini-val ' + cls + '">' + arrow + ' ' + (mov.current?mov.current.toFixed(2):'—') + '</div>'
+       + (mov.pctChange!=null ? '<div class="odds-mini-pct ' + cls + '">' + (mov.pctChange>0?'+':'') + mov.pctChange.toFixed(1) + '%</div>' : '')
        + '</div>';
 }
 
 function renderSparkline(vals) {
   if (!vals || vals.length < 2) return '';
-  var w = 200, h = 40;
+  var w = 220, h = 44;
   var min = Math.min.apply(null, vals);
   var max = Math.max.apply(null, vals);
   var range = max - min || 1;
-  var pts = vals.map(function(v, i){
-    var x = Math.round(i / (vals.length-1) * w);
-    var y = Math.round(h - (v - min) / range * h);
+  var pts = vals.map(function(v,i){
+    var x = Math.round(i/(vals.length-1)*w);
+    var y = Math.round(h - (v-min)/range*h);
     return x+','+y;
   }).join(' ');
-  return '<svg class="sparkline" viewBox="0 0 '+w+' '+h+'" xmlns="http://www.w3.org/2000/svg">'
-       + '<polyline points="'+pts+'" fill="none" stroke="var(--accent)" stroke-width="2"/>'
+  return '<svg class="sparkline" viewBox="0 0 '+w+' '+h+'" xmlns="http://www.w3.org/2000/svg" style="margin-top:8px">'
+       + '<polyline points="'+pts+'" fill="none" stroke="var(--accent,#4fc3f7)" stroke-width="2" stroke-linejoin="round"/>'
+       + '<circle cx="'+pts.split(' ').pop().split(',')[0]+'" cy="'+pts.split(' ').pop().split(',')[1]+'" r="3" fill="var(--accent,#4fc3f7)"/>'
        + '</svg>';
 }
 
 function makeQuickStat(label, valH, valA) {
   return '<div class="quick-stat">'
-       + '<div class="qs-val-h">'+valH+'</div>'
-       + '<div class="qs-label">'+label+'</div>'
-       + '<div class="qs-val-a">'+valA+'</div>'
+       + '<div class="qs-val-h">' + valH + '</div>'
+       + '<div class="qs-label">' + label + '</div>'
+       + '<div class="qs-val-a">' + valA + '</div>'
        + '</div>';
 }
 
