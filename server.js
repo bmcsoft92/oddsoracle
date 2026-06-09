@@ -942,11 +942,6 @@ if (process.env.NODE_ENV === 'production' && process.env.RENDER_EXTERNAL_URL) {
   }, 14 * 60 * 1000);
 }
 
-// -- SPA FALLBACK --
-app.get('*', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'index.html'));
-});
-
 // -- START --
 app.listen(PORT, () => {
   console.log('');
@@ -1442,4 +1437,9 @@ app.get('/api/match-stats', async function(req, res) {
     console.error('[match-stats]', err.message);
     res.status(500).json({ error: err.message, home, away });
   }
+});
+
+// -- SPA FALLBACK (doit être EN DERNIER après toutes les routes API) --
+app.get('*', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
