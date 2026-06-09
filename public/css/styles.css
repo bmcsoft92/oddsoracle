@@ -345,6 +345,77 @@ option,optgroup{background:var(--bg1)}
 .scanner-auto-info{padding:.5rem .75rem;font-size:.7rem;color:var(--text2);border-top:1px solid var(--border0)}
 .scanner-book-list{display:flex;gap:.25rem;flex-wrap:wrap}
 
+/* ===== SCANNER CARDS v2 ===== */
+.scanner-grid{display:flex;flex-direction:column;gap:.65rem;padding:.75rem}
+.sc2-card{background:var(--bg1);border:1px solid var(--border0);border-radius:10px;overflow:hidden;transition:border-color .15s,box-shadow .15s}
+.sc2-card:hover{border-color:var(--blue);box-shadow:0 0 0 1px var(--blue) inset}
+.sc2-card--live{border-left:3px solid var(--green)}
+.sc2-card--forte{border-left:3px solid #f59e0b}
+/* Head */
+.sc2-head{display:flex;align-items:center;gap:.5rem;padding:.5rem .8rem;background:var(--bg2);border-bottom:1px solid var(--border0)}
+.sc2-rank{font-family:var(--mono);font-weight:900;font-size:.82rem;color:var(--blue);min-width:2.2rem}
+.sc2-sport{font-size:.68rem;color:var(--text2);flex:1;text-transform:uppercase;letter-spacing:.05em}
+.sc2-badges{display:flex;gap:.3rem;flex-shrink:0}
+.sc2-urgency,.sc2-ev-badge{padding:.1rem .42rem;border-radius:3px;font-size:.62rem;font-weight:700;font-family:var(--mono);text-transform:uppercase;letter-spacing:.04em}
+.urgency-live{background:rgba(16,185,129,.15);color:var(--green)}
+.urgency-soon{background:rgba(239,68,68,.12);color:#ef4444}
+.urgency-today{background:rgba(245,158,11,.12);color:#f59e0b}
+.urgency-upcoming{background:var(--bg2);color:var(--text2);border:1px solid var(--border0)}
+.ev-forte{background:rgba(245,158,11,.15);color:#f59e0b}
+.ev-bonne{background:rgba(16,185,129,.12);color:var(--green)}
+.ev-ok{background:rgba(59,130,246,.1);color:var(--blue)}
+/* Match */
+.sc2-match{padding:.6rem .8rem;border-bottom:1px solid var(--border0)}
+.sc2-teams{display:flex;align-items:center;gap:.4rem;margin-bottom:.3rem}
+.sc2-team{font-weight:700;font-size:.9rem;color:var(--text0);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sc2-home{text-align:right}.sc2-away{text-align:left}
+.sc2-vs{font-size:.6rem;font-weight:700;color:var(--text2);padding:0 .2rem;white-space:nowrap;flex-shrink:0}
+.sc2-sel-row{display:flex;align-items:center;gap:.5rem}
+.sc2-sel-label{font-size:.58rem;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--text2);white-space:nowrap;flex-shrink:0}
+.sc2-sel-name{font-size:.85rem;font-weight:700;color:var(--cyan);flex:1}
+.sc2-time{font-size:.65rem;color:var(--text2);font-family:var(--mono);white-space:nowrap;flex-shrink:0}
+.sc2-live-dot{display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--green);margin-right:3px;animation:pulse 1.2s infinite}
+/* Metrics */
+.sc2-metrics{display:grid;grid-template-columns:repeat(3,1fr);border-bottom:1px solid var(--border0)}
+.sc2-metric{padding:.6rem .5rem;text-align:center;border-right:1px solid var(--border0)}
+.sc2-metric:last-child{border-right:none}
+.sc2-m-val{display:block;font-family:var(--mono);font-size:1.2rem;font-weight:800;color:var(--text0);line-height:1.1}
+.sc2-m-lbl{display:block;font-size:.52rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--text2);margin:.12rem 0 .08rem}
+.sc2-m-sub{display:block;font-size:.6rem;color:var(--text2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sc2-edge-val.ev-forte{color:#f59e0b}
+.sc2-edge-val.ev-bonne{color:var(--green)}
+.sc2-edge-val.ev-ok{color:var(--blue)}
+/* Bookmaker comparison */
+.sc2-bk-section{padding:.45rem .8rem;border-bottom:1px solid var(--border0)}
+.sc2-bk-title{font-size:.6rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text2);margin-bottom:.35rem}
+.sc2-bk-row{display:flex;align-items:center;gap:.4rem;padding:.18rem 0}
+.sc2-bk-name{font-size:.7rem;width:68px;flex-shrink:0;color:var(--text1)}
+.sc2-bk-bar-wrap{flex:1;height:3px;background:var(--border0);border-radius:2px;overflow:hidden}
+.sc2-bk-bar{height:100%;background:var(--blue);border-radius:2px}
+.sc2-bk-odds{font-family:var(--mono);font-size:.72rem;font-weight:700;color:var(--text0);width:30px;text-align:right;flex-shrink:0}
+.sc2-bk-impl{font-size:.62rem;color:var(--text2);width:30px;text-align:right;font-family:var(--mono);flex-shrink:0}
+.sc2-bk-row.sc2-bk-best .sc2-bk-name,.sc2-bk-row.sc2-bk-best .sc2-bk-odds{color:var(--green);font-weight:700}
+.sc2-bk-row.sc2-bk-best .sc2-bk-bar{background:var(--green)}
+/* Kelly */
+.sc2-kelly{display:flex;align-items:center;justify-content:space-between;padding:.5rem .8rem;border-bottom:1px solid var(--border0);background:rgba(59,130,246,.04)}
+.sc2-kelly-left{display:flex;align-items:baseline;gap:.5rem}
+.sc2-kelly-stake{font-family:var(--mono);font-size:1.1rem;font-weight:800;color:var(--blue)}
+.sc2-kelly-stake small{font-size:.65rem;opacity:.7}
+.sc2-kelly-mode{font-size:.62rem;color:var(--text2)}
+.sc2-kelly-right{display:flex;align-items:center;gap:.3rem;font-size:.78rem;font-family:var(--mono)}
+.sc2-kelly-win{color:var(--green);font-weight:700}
+.sc2-kelly-sep{color:var(--text2)}
+.sc2-kelly-loss{color:var(--red)}
+/* Footer */
+.sc2-footer{display:flex;align-items:center;justify-content:space-between;padding:.45rem .8rem}
+.sc2-footer-right{display:flex;gap:.3rem}
+.sc2-btn{padding:.25rem .6rem;border-radius:5px;font-size:.7rem;font-weight:600;cursor:pointer;border:none;transition:opacity .15s,background .15s;white-space:nowrap}
+.sc2-btn:hover{opacity:.8}
+.sc2-btn-journal{background:rgba(59,130,246,.15);color:var(--blue)}
+.sc2-btn-logged{background:rgba(16,185,129,.12);color:var(--green)}
+.sc2-btn-ghost{background:var(--bg2);color:var(--text2);border:1px solid var(--border0)}
+.sc2-btn-watch{background:rgba(245,158,11,.15);color:#f59e0b}
+
 /* ===== LIVE SECTION ===== */
 .live-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(310px,1fr));gap:.7rem}
 .live-match-header{

@@ -327,6 +327,111 @@ const ScannerModule = (() => {
   }
 
   function renderCard(opp, rank) {
+    const kelly   = autoKelly(opp.trueProb, opp.bestPrice, _bankroll, opp.isLive);
+    const conf    = CONF_META[opp.confidence] || CONF_META.low;
+    const urgency = URGENCY_META[opp.urgency]  || URGENCY_META.upcoming;
+    const edgeCls = opp.edge >= 10 ? 'ev-forte' : opp.edge >= 5 ? 'ev-bonne' : 'ev-ok';
+    const predLbl = opp.edge >= 10 ? 'FORTE'    : opp.edge >= 5 ? 'BONNE'    : 'CORRECTE';
+
+    const selLabel = opp.selection === opp.homeTeam
+      ? '🏠 ' + opp.homeTeam
+      : opp.selection === opp.awayTeam
+        ? '✈️ ' + opp.awayTeam
+        : '🤝 Nul';
+
+    const homeEsc  = opp.homeTeam.replace(/'/g, "\\'");
+    const awayEsc  = opp.awayTeam.replace(/'/g, "\\'");
+    const isLogged = _loggedIds.has(oppId(opp));
+
+    // Comparateur de cotes (compact, 1 seule fois)
+    const bkHtml = (opp.allBookmakers && opp.allBookmakers.length > 1)
+      ? opp.allBookmakers.map(function(bk) {
+          const isBest = bk.price === opp.bestPrice;
+          const pct    = Math.round(100 / bk.price * 10) / 10;
+          const barW   = Math.min(100, Math.round((bk.price - 1) / 4 * 100));
+          return '<div class="sc2-bk-row' + (isBest ? ' sc2-bk-best' : '') + '">'
+            + '<span class="sc2-bk-name">' + bk.name + (isBest ? ' ★' : '') + '</span>'
+            + '<div class="sc2-bk-bar-wrap"><div class="sc2-bk-bar" style="width:' + barW + '%"></div></div>'
+            + '<span class="sc2-bk-odds">' + bk.price.toFixed(2) + '</span>'
+            + '<span class="sc2-bk-impl">' + pct + '%</span>'
+            + '</div>';
+        }).join('')
+      : '';
+
+    return `
+    <div class="sc2-card${opp.isLive ? ' sc2-card--live' : ''}${opp.edge >= 10 ? ' sc2-card--forte' : ''}">
+
+      <div class="sc2-head">
+        <span class="sc2-rank">#${rank + 1}</span>
+        <span class="sc2-sport">${opp.sportLabel || opp.sport}</span>
+        <div class="sc2-badges">
+          <span class="sc2-urgency ${urgency.cls}">${urgency.label}</span>
+          <span class="sc2-ev-badge ${edgeCls}">${predLbl}</span>
+        </div>
+      </div>
+
+      <div class="sc2-match">
+        <div class="sc2-teams">
+          <span class="sc2-team sc2-home">${opp.homeTeam}</span>
+          <span class="sc2-vs">VS</span>
+          <span class="sc2-team sc2-away">${opp.awayTeam}</span>
+        </div>
+        <div class="sc2-sel-row">
+          <span class="sc2-sel-label">PARIER SUR</span>
+          <span class="sc2-sel-name">${selLabel}</span>
+          <span class="sc2-time">${opp.isLive ? '<span class="sc2-live-dot"></span>EN COURS' : formatTime(opp.commenceTime)}</span>
+        </div>
+      </div>
+
+      <div class="sc2-metrics">
+        <div class="sc2-metric">
+          <span class="sc2-m-val">${opp.bestPrice.toFixed(2)}</span>
+          <span class="sc2-m-lbl">COTE</span>
+          <span class="sc2-m-sub">${opp.bestBook || '?'}</span>
+        </div>
+        <div class="sc2-metric">
+          <span class="sc2-m-val">${opp.trueProb}%</span>
+          <span class="sc2-m-lbl">PROB. VRAIE</span>
+          <span class="sc2-m-sub">${conf.label} · ${conf.desc}</span>
+        </div>
+        <div class="sc2-metric">
+          <span class="sc2-m-val sc2-edge-val ${edgeCls}">+${opp.edge}%</span>
+          <span class="sc2-m-lbl">EDGE</span>
+          <span class="sc2-m-sub">Valeur attendue</span>
+        </div>
+      </div>
+
+      ${bkHtml ? `<div class="sc2-bk-section"><div class="sc2-bk-title">Comparateur de cotes</div>${bkHtml}</div>` : ''}
+
+      ${kelly ? `
+      <div class="sc2-kelly">
+        <div class="sc2-kelly-left">
+          <span class="sc2-kelly-stake">${kelly.stake} <small>EUR</small></span>
+          <span class="sc2-kelly-mode">Kelly 1/${opp.isLive ? '6' : '4'} · ${kelly.fraction}%</span>
+        </div>
+        <div class="sc2-kelly-right">
+          <span class="sc2-kelly-win">+${kelly.pnlWin} EUR</span>
+          <span class="sc2-kelly-sep">/</span>
+          <span class="sc2-kelly-loss">${kelly.pnlLoss} EUR</span>
+        </div>
+      </div>` : ''}
+
+      <div class="sc2-footer">
+        <button class="sc2-btn sc2-btn-journal${isLogged ? ' sc2-btn-logged' : ''}"
+                onclick="ScannerModule.addToJournal(${rank})">
+          ${isLogged ? '✓ Loggé' : '+ Journal'}
+        </button>
+        <div class="sc2-footer-right">
+          <button class="sc2-btn sc2-btn-ghost" onclick="ScannerModule.focusSport('${opp.sport}')">Ce sport</button>
+          <button class="sc2-btn sc2-btn-watch" onclick="ScannerModule.watchMatch('${homeEsc}','${awayEsc}','${opp.sport}')">&#9654; Watch</button>
+        </div>
+      </div>
+
+    </div>`;
+  }
+
+  // -- Ancienne fonction garder pour compat (non utilisee)
+  function _renderCardOld(opp, rank) {
     const kelly    = autoKelly(opp.trueProb, opp.bestPrice, _bankroll, opp.isLive);
     const conf     = CONF_META[opp.confidence] || CONF_META.low;
     const urgency  = URGENCY_META[opp.urgency] || URGENCY_META.upcoming;
