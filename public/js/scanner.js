@@ -302,7 +302,26 @@ const ScannerModule = (() => {
       return;
     }
 
-    const opps = data.opportunities;
+    // -- Déduplication : 1 seule sélection par match, filtre données aberrantes --
+    const matchBest = {};
+    for (const opp of data.opportunities) {
+      const teams = [opp.homeTeam, opp.awayTeam].sort().join('|');
+      const matchKey = opp.sport + '|' + teams;
+      if (!matchBest[matchKey]) matchBest[matchKey] = { opps: [], impliedSum: 0 };
+      matchBest[matchKey].opps.push(opp);
+      matchBest[matchKey].impliedSum += opp.bestPrice ? (1 / opp.bestPrice) : 0;
+    }
+    const dedupedOpps = [];
+    for (const mk of Object.values(matchBest)) {
+      // Si somme des proba implicites < 85% → cotes erronées, ignorer
+      if (mk.opps.length > 1 && mk.impliedSum < 0.85) continue;
+      // Garder uniquement le meilleur edge par match
+      mk.opps.sort((a, b) => (b.edge || 0) - (a.edge || 0));
+      dedupedOpps.push(mk.opps[0]);
+    }
+    dedupedOpps.sort((a, b) => (b.edge || 0) - (a.edge || 0));
+
+    const opps = dedupedOpps;
     const html = opps.map((opp, i) => renderCard(opp, i)).join('');
     container.innerHTML = `<div class="scanner-grid">${html}</div>`;
   }
