@@ -587,17 +587,22 @@ app.get('/api/live/all', async (req, res) => {
       if (upcomingResults[i].status !== 'fulfilled') return;
       for (const event of upcomingResults[i].value) {
         const t = new Date(event.commenceTime).getTime();
-        if (t <= now || t > cutoffFutur) continue;
+        const msAgo = now - t;
+        // Skip if too far in future, or started more than 3h ago (probably finished)
+        if (t > cutoffFutur) continue;
+        if (msAgo > 3 * 3600000) continue;
         const enriched = enrichEvent(event, sport);
         if (!enriched) continue;
         const mk2 = normTeam(enriched.homeTeam)+'|'+normTeam(enriched.awayTeam);
         if (seenKeys.has(mk2)) continue;
         seenKeys.add(mk2);
+        const started  = t <= now;
+        const hoursLeft = started ? 0 : Math.round((t-now)/360000)/10;
         liveMatches.push({
           ...enriched,
-          isLive:    false,
-          isImminent: true,
-          hoursLeft: Math.round((t-now)/360000)/10
+          isLive:    started,
+          isImminent: !started,
+          hoursLeft
         });
       }
     });
@@ -1281,14 +1286,16 @@ app.get('/api/match-stats', async function(req, res) {
   const sport   = req.query.sport   || '';
   const matchId = req.query.matchId || '';
 
+  try {
   const cacheKey = 'mstats_' + normTeam(home) + '_' + normTeam(away);
   const cached = cache.get(cacheKey);
-  if (cached) return res.json(Object.assign({}, cached, {
-    oddsMovement: {
-      home: matchId ? getOddsMovement(matchId, home) : null,
-      away: matchId ? getOddsMovement(matchId, away) : null,
-    }
-  }));
+  if (cached) {
+    const mvHome = matchId ? getOddsMovement(matchId, home) : null;
+    const mvAway = matchId ? getOddsMovement(matchId, away) : null;
+    return res.json(Object.assign({}, cached, {
+      oddsMovement: { homeTeam: mvHome, awayTeam: mvAway, drawTeam: null }
+    }));
+  }
 
   // Run all in parallel
   const [formHomeRes, formAwayRes, h2hRes, espnRes] = await Promise.allSettled([
@@ -1329,16 +1336,17 @@ app.get('/api/match-stats', async function(req, res) {
     })()
   ]);
 
+  const espnStats = espnRes.status === 'fulfilled' ? espnRes.value : null;
+  const mvHome    = matchId ? getOddsMovement(matchId, home) : null;
+  const mvAway    = matchId ? getOddsMovement(matchId, away) : null;
+
   const result = {
     home, away, sport,
-    formHome: formHomeRes.value  || null,
-    formAway: formAwayRes.value  || null,
-    h2h:      h2hRes.value       || null,
-    espn:     espnRes.value      || null,
-    oddsMovement: {
-      home: matchId ? getOddsMovement(matchId, home) : null,
-      away: matchId ? getOddsMovement(matchId, away) : null,
-    },
+    formHome:     formHomeRes.status === 'fulfilled' ? formHomeRes.value : null,
+    formAway:     formAwayRes.status === 'fulfilled' ? formAwayRes.value : null,
+    h2h:          h2hRes.status      === 'fulfilled' ? h2hRes.value      : null,
+    espnStats:    espnStats,
+    oddsMovement: { homeTeam: mvHome, awayTeam: mvAway, drawTeam: null },
   };
 
   // Cache 10 min (sans oddsMovement car dynamique)
@@ -1346,4 +1354,8 @@ app.get('/api/match-stats', async function(req, res) {
   cache.set(cacheKey, toCache, 600);
 
   res.json(result);
+  } catch(err) {
+    console.error('[match-stats]', err.message);
+    res.status(500).json({ error: err.message, home, away });
+  }
 });
