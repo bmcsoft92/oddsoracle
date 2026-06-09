@@ -9,6 +9,7 @@ const express    = require('express');
 const cors       = require('cors');
 const path       = require('path');
 const https      = require('https');
+const fs         = require('fs');
 
 const app  = express();
 const PORT = process.env.PORT || 3000;
@@ -185,6 +186,30 @@ function oddsApiFetch(endpoint, params = {}) {
   });
 }
 
+// -- QUOTA GUARD (évite de vider le quota) --
+function quotaOk() {
+  if (apiUsage.requestsRemaining === null) return true; // inconnu, autoriser
+  return apiUsage.requestsRemaining > 20;
+}
+
+// -- CACHE DISQUE (survit aux redémarrages du process) --
+const DISK_CACHE_DIR = '/tmp';
+function diskCacheSave(key, data) {
+  try {
+    const file = DISK_CACHE_DIR + '/oo_' + key.replace(/[^a-z0-9_]/gi, '_') + '.json';
+    fs.writeFileSync(file, JSON.stringify({ data, ts: Date.now() }));
+  } catch(e) { /* silencieux */ }
+}
+function diskCacheLoad(key, maxAgeMs) {
+  try {
+    const file = DISK_CACHE_DIR + '/oo_' + key.replace(/[^a-z0-9_]/gi, '_') + '.json';
+    if (!fs.existsSync(file)) return null;
+    const { data, ts } = JSON.parse(fs.readFileSync(file, 'utf8'));
+    if (Date.now() - ts > maxAgeMs) return null;
+    return data;
+  } catch(e) { return null; }
+}
+
 // -- HELPERS --
 function formatBookmakers(bookmakers) {
   return bookmakers
@@ -354,8 +379,23 @@ app.get('/api/quota', (req, res) => {
 // -- HELPER PARTAGE: charge les cotes d'un sport (reutilise le cache scanner) --
 async function loadOddsForSport(sport) {
   const cacheKey = 'odds_' + sport.key + '_all';
+  // 1. Cache mémoire (priorité)
   let data = cache.get(cacheKey);
   if (data) return data;
+  // 2. Cache disque (survit aux redémarrages — TTL 6h)
+  const disk = diskCacheLoad('odds_' + sport.key, 6 * 3600 * 1000);
+  if (disk) {
+    cache.set(cacheKey, disk, 21600);
+    console.log('[cache] disk hit pour ' + sport.key);
+    return disk;
+  }
+  // 3. Guard quota : servir le stale si quota bas
+  if (!quotaOk()) {
+    const stale = cache.get(cacheKey + '_stale');
+    if (stale) { console.warn('[quota] faible — stale servi pour ' + sport.key); return stale; }
+    throw new Error('Quota Odds API épuisé et pas de données stale');
+  }
+  // 4. Appel API
   const raw = await oddsApiFetch('/sports/' + sport.key + '/odds', {
     regions: 'eu', markets: 'h2h', oddsFormat: 'decimal',
     bookmakers: BOOKMAKERS.join(','),
@@ -375,8 +415,9 @@ async function loadOddsForSport(sport) {
       _raw:         event.bookmakers || [],
     };
   });
-  cache.set(cacheKey, data, 3600);
-  cache.set(cacheKey + '_stale', data, 86400);
+  cache.set(cacheKey, data, 21600);         // 6h mémoire
+  cache.set(cacheKey + '_stale', data, 604800); // 7j stale
+  diskCacheSave('odds_' + sport.key, data); // persist disque
   return data;
 }
 
@@ -844,29 +885,17 @@ app.get('/api/stream', (req, res) => {
 
 async function broadcastScores() {
   if (sseClients.size === 0) return;
-  const sports = [...new Set([...sseClients].map(c => c.sport))];
-  for (const sport of sports) {
-    try {
-      const cacheKey = 'scores_' + sport + '_1';
-      let data = cache.get(cacheKey);
-      if (!data && ODDS_API_KEY) {
-        const scores = await oddsApiFetch('/sports/' + sport + '/scores', { daysFrom: '1', dateFormat: 'iso' });
-        data = scores;
-        cache.set(cacheKey, data, 120);
-      }
-      if (!data) continue;
-      const liveMatches = data.filter(s => !s.completed);
-      const payload = JSON.stringify({ sport, liveMatches, timestamp: new Date().toISOString() });
-      sseClients.forEach(client => {
-        if (client.sport === sport) client.res.write('event: scores\ndata: ' + payload + '\n\n');
-      });
-    } catch(e) {
-      console.error('[broadcast]', e.message);
-    }
+  try {
+    // TheSportsDB uniquement — 0 quota Odds API
+    const liveEvents = await getLiveScores();
+    const payload = JSON.stringify({ liveMatches: liveEvents, timestamp: new Date().toISOString() });
+    sseClients.forEach(client => client.res.write('event: scores\ndata: ' + payload + '\n\n'));
+  } catch(e) {
+    console.error('[broadcast]', e.message);
   }
 }
 
-setInterval(broadcastScores, 120000);
+setInterval(broadcastScores, 600000); // 10 min (était 2 min)
 
 // -- KEEP-ALIVE (Render free tier) --
 if (process.env.NODE_ENV === 'production' && process.env.RENDER_EXTERNAL_URL) {
