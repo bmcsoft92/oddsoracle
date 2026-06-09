@@ -923,8 +923,13 @@ function renderMatchCard(match, isLive) {
     timeBadge = '<span class="mc-live-badge">&#9679; LIVE &middot; '+tod+'</span>';
   } else {
     var h = match.hoursLeft || 0;
-    var tl = h < 1 ? '&lt; 1h' : 'Dans '+Math.ceil(h)+'h';
-    timeBadge = '<span class="mc-time-badge'+(h<1?' mc-urgent':'')+'">'+tl+' &middot; '+tod+'</span>';
+    var tl, urgCls = '';
+    if (h < 0.5) { tl = '&lt; 30min'; urgCls = ' mc-urgent'; }
+    else if (h < 2)  { tl = 'Dans '+Math.ceil(h*60)+'min'; urgCls = ' mc-urgent'; }
+    else if (h < 6)  { tl = 'Dans '+Math.ceil(h)+'h'; }
+    else if (h < 24) { tl = "Auj. " + tod; }
+    else             { tl = 'Demain ' + tod; }
+    timeBadge = '<span class="mc-time-badge'+urgCls+'">'+tl+'</span>';
   }
 
   // Score live (si disponible via TheSportsDB)

@@ -435,7 +435,7 @@ app.get('/api/live/all', async (req, res) => {
   if (cached) return res.json({ data: cached, cached: true, fetchedAt: cached._fetchedAt, apiUsage });
 
   const now         = Date.now();
-  const cutoffFutur = now + 3 * 3600 * 1000; // matchs imminents < 3h
+  const cutoffFutur = now + 24 * 3600 * 1000; // matchs des prochaines 24h
   const liveMatches = [];
   const seenKeys    = new Set();
 
