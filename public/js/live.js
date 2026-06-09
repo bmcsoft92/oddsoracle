@@ -458,5 +458,5 @@ const LiveModule = (() => {
     el.style.color = activeCount >= 2 ? 'var(--red)' : 'var(--text-primary)';
   }
 
-  return { init };
+  return { init, updateSportContext: updateLiveSportContext };
 })();

@@ -1489,3 +1489,68 @@ select.form-control {
   background: rgba(255, 200, 0, 0.15);
   color: #ffc800;
 }
+
+/* ===== FEED CARDS CLICKABLE ===== */
+.feed-card-clickable {
+  cursor: pointer;
+  transition: transform 0.15s, box-shadow 0.15s, border-color 0.15s;
+}
+.feed-card-clickable:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(0,0,0,0.35);
+  border-color: var(--accent);
+}
+.feed-click-hint {
+  font-size: 0.7rem;
+  color: var(--accent);
+  opacity: 0.7;
+  margin: 2px 0 4px;
+  letter-spacing: 0.02em;
+}
+
+/* ===== STREAMING PANEL ===== */
+.streaming-card {
+  margin-bottom: 1rem;
+}
+.streaming-card .card-header {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+.streaming-note {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  font-style: italic;
+}
+.streaming-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  padding: 0.75rem 0 0.25rem;
+}
+.streaming-link {
+  display: inline-block;
+  padding: 0.35rem 0.85rem;
+  border-radius: 6px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  text-decoration: none;
+  color: #fff;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  transition: background 0.2s, transform 0.1s;
+}
+.streaming-link:hover {
+  background: var(--accent);
+  border-color: var(--accent);
+  transform: translateY(-1px);
+}
+.streaming-link-dazn   { border-left: 3px solid #00bcd4; }
+.streaming-link-canal  { border-left: 3px solid #0066cc; }
+.streaming-link-bein   { border-left: 3px solid #e53935; }
+.streaming-link-lequipe{ border-left: 3px solid #ff6f00; }
+.streaming-link-nba    { border-left: 3px solid #1565c0; }
+.streaming-link-tennis { border-left: 3px solid #2e7d32; }
+.streaming-link-ufc    { border-left: 3px solid #b71c1c; }
+.streaming-link-mlb    { border-left: 3px solid #1a237e; }

@@ -496,6 +496,11 @@ const LiveMatchSelector = (() => {
     document.getElementById('live-pA-name').textContent = home;
     document.getElementById('live-pB-name').textContent = away;
 
+    // Adapter les champs au sport selectionne (fix coherence tennis/basket/etc.)
+    if (typeof LiveModule !== 'undefined' && LiveModule.updateSportContext) {
+      LiveModule.updateSportContext(sport);
+    }
+
     // Remplir les cotes si disponibles
     const oddsData = oddsCache[matchId];
     if (oddsData) {
@@ -914,13 +919,22 @@ const LiveFeedModule = (() => {
 
   function renderCard(match) {
     const time = new Date(match.commenceTime).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
-    return '<div class="feed-card feed-card-live">'
+    const sels = match.selections || [];
+    const cotA = sels[0] ? sels[0].bestPrice.toFixed(2) : '';
+    const cotB = sels[sels.length - 1] ? sels[sels.length - 1].bestPrice.toFixed(2) : '';
+    const safeH = (match.homeTeam || '').replace(/"/g, '');
+    const safeA = (match.awayTeam || '').replace(/"/g, '');
+    return '<div class="feed-card feed-card-live feed-card-clickable" title="Cliquer pour remplir le formulaire" '
+      + 'data-home="' + safeH + '" data-away="' + safeA + '" '
+      + 'data-sport="' + (match.sportKey || '') + '" '
+      + 'data-cotea="' + cotA + '" data-coteb="' + cotB + '">'
       + '<div class="feed-card-header">'
       + '<span class="feed-sport-badge">' + (match.sportIcon || 'S') + ' ' + (match.sportLabel || '') + '</span>'
       + '<span class="feed-live-dot">LIVE</span>'
       + '<span class="feed-time">' + time + '</span>'
       + '</div>'
       + '<div class="feed-match-name">' + match.homeTeam + ' vs ' + match.awayTeam + '</div>'
+      + '<div class="feed-click-hint">&#128270; Cliquer pour analyser</div>'
       + '<div class="feed-selections">' + renderSelections(match.selections) + '</div>'
       + '</div>';
   }
@@ -934,6 +948,38 @@ const LiveFeedModule = (() => {
     }
     el.innerHTML = '<div class="feed-meta">' + data.count + ' match(s) en cours - Actualise toutes les 2 min</div>'
       + '<div class="feed-grid">' + data.matches.map(renderCard).join('') + '</div>';
+    // Click-to-fill: clic sur une carte => pré-remplit le formulaire Live Betting
+    el.querySelectorAll('.feed-card-clickable').forEach(function(card) {
+      card.addEventListener('click', function() {
+        const home  = card.dataset.home  || '';
+        const away  = card.dataset.away  || '';
+        const sport = card.dataset.sport || '';
+        const cotA  = card.dataset.cotea || '';
+        const cotB  = card.dataset.coteb || '';
+        const setV = function(id, v) { const e = document.getElementById(id); if (e) e.value = v; };
+        const setT = function(id, v) { const e = document.getElementById(id); if (e) e.textContent = v; };
+        setV('live-playerA', home); setT('live-pA-name', home);
+        setV('live-playerB', away); setT('live-pB-name', away);
+        if (cotA) setV('live-coteA', cotA);
+        if (cotB) setV('live-coteB', cotB);
+        // Adapter le sport
+        if (sport) {
+          const sportSel = document.getElementById('live-sport-select');
+          if (sportSel) {
+            // Trouver l'option correspondante
+            const opts = Array.from(sportSel.options);
+            const match = opts.find(function(o) { return sport.indexOf(o.value) !== -1 || o.value.indexOf(sport.split('_')[0]) !== -1; });
+            if (match) sportSel.value = match.value;
+          }
+          if (typeof LiveModule !== 'undefined' && LiveModule.updateSportContext) {
+            LiveModule.updateSportContext(sport);
+          }
+        }
+        // Scroll vers le formulaire
+        const form = document.getElementById('live-match-header');
+        if (form) form.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      });
+    });
   }
 
   async function load() {
@@ -1077,10 +1123,4 @@ document.addEventListener('DOMContentLoaded', () => {
 
   LiveFeedModule.load();
   PrematchFeedModule.load();
-
-  DashboardModule.refresh();
-  updateDatetime();
-  setInterval(updateDatetime, 60000);
-
-  console.log('OddsOracle v3.0 initialized -- Scanner IA + Auto Feed active');
 });
