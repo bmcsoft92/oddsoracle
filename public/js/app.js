@@ -899,7 +899,7 @@ function updateDatetime() {
 // -----------------------------------------------------------------
 
 // -----------------------------------------------------------------------
-// SHARED MATCH CARD RENDERER  (Betclic-style)
+// SHARED MATCH CARD RENDERER  (Betclic-style + live scores + Watch btn)
 // -----------------------------------------------------------------------
 function renderMatchCard(match, isLive) {
   var sels  = match.selections || [];
@@ -908,22 +908,38 @@ function renderMatchCard(match, isLive) {
   var cotA  = sels[0] ? sels[0].bestPrice.toFixed(2) : '';
   var cotB  = sels[sels.length-1] ? sels[sels.length-1].bestPrice.toFixed(2) : '';
 
-  // Best selection (highest edge)
+  // Statut réel du match (passé le commence_time = en cours)
+  var started = match.isLive || (match.isImminent === false && !!isLive);
+  var imminent = match.isImminent;
+
+  // Best selection
   var bestSel = sels.reduce(function(b,s){ return (!b||(s.edge||0)>(b.edge||0))?s:b; }, null);
 
   // Time badge
   var dt  = new Date(match.commenceTime);
   var tod = dt.toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'});
   var timeBadge;
-  if (isLive) {
+  if (started) {
     timeBadge = '<span class="mc-live-badge">&#9679; LIVE &middot; '+tod+'</span>';
   } else {
     var h = match.hoursLeft || 0;
-    var tl = h < 1 ? '&lt; 1h' : h < 24 ? 'Dans '+h+'h' : tod;
-    timeBadge = '<span class="mc-time-badge'+(h<2?' mc-urgent':'')+'">'+tl+' &middot; '+tod+'</span>';
+    var tl = h < 1 ? '&lt; 1h' : 'Dans '+Math.ceil(h)+'h';
+    timeBadge = '<span class="mc-time-badge'+(h<1?' mc-urgent':'')+'">'+tl+' &middot; '+tod+'</span>';
   }
 
-  // Odds columns (1 / X / 2  or  1 / 2)
+  // Score live (si disponible via TheSportsDB)
+  var scoreHtml = '';
+  if (match.liveScore) {
+    var sc = match.liveScore;
+    var prog = sc.progress ? '<span class="mc-score-prog">'+sc.progress+'</span>' : '';
+    scoreHtml = '<div class="mc-score">'
+      +'<span class="mc-score-h">'+(sc.homeScore != null ? sc.homeScore : '—')+'</span>'
+      +'<span class="mc-score-sep">:</span>'
+      +'<span class="mc-score-a">'+(sc.awayScore != null ? sc.awayScore : '—')+'</span>'
+      +prog+'</div>';
+  }
+
+  // Odds columns
   var oddsHtml = sels.map(function(s,i){
     var n    = sels.length;
     var lbl  = n===2 ? (i===0?'1':'2') : (i===0?'1': i===1?'X':'2');
@@ -948,29 +964,40 @@ function renderMatchCard(match, isLive) {
   // Kelly
   var kellyHtml = '';
   if (bestSel && (bestSel.edge||0)>0 && bestSel.trueProb) {
-    var p  = bestSel.trueProb/100;
-    var b  = (bestSel.bestPrice||2)-1;
-    var k  = Math.max(0,(p*b-(1-p))/b);
-    kellyHtml = '<span class="mc-kelly">Kelly '+( k/4*100).toFixed(1)+'%</span>';
+    var p = bestSel.trueProb/100;
+    var b = (bestSel.bestPrice||2)-1;
+    var k = Math.max(0,(p*b-(1-p))/b);
+    kellyHtml = '<span class="mc-kelly">Kelly '+(k/4*100).toFixed(1)+'%</span>';
   }
+
+  // Bouton Watch → sportplus.live
+  var watchHtml = started
+    ? '<a class="mc-watch" href="https://fr4.sportplus.live/" target="_blank" rel="noopener" onclick="event.stopPropagation()">&#9654; Watch</a>'
+    : '';
 
   // Footer
   var foot = bestSel ? '<div class="mc-footer">'
     +'<span class="mc-prob">Prob <strong>'+(bestSel.trueProb||0)+'%</strong></span>'
     +((bestSel.edge||0)>0?'<span class="mc-ep mc-ev">edge +'+bestSel.edge.toFixed(1)+'%</span>':'')
-    +kellyHtml+'</div>' : '';
+    +kellyHtml+watchHtml+'</div>' : watchHtml ? '<div class="mc-footer">'+watchHtml+'</div>' : '';
+
+  // data-score pour auto-fill form
+  var scoreData = match.liveScore
+    ? ' data-score-h="'+(match.liveScore.homeScore||0)+'" data-score-a="'+(match.liveScore.awayScore||0)+'" data-score-prog="'+(match.liveScore.progress||'')+'"'
+    : '';
 
   return '<div class="match-card feed-card-clickable"'
     +' data-home="'+safeH+'" data-away="'+safeA+'"'
     +' data-sport="'+(match.sportKey||'')+'"'
-    +' data-cotea="'+cotA+'" data-coteb="'+cotB+'">'
+    +' data-cotea="'+cotA+'" data-coteb="'+cotB+'"'
+    +scoreData+'>'
     +'<div class="mc-head">'
     +'<span class="mc-sport">'+(match.sportIcon||'⚡')+' '+(match.sportLabel||'')+'</span>'
     +timeBadge+predHtml
     +'</div>'
     +'<div class="mc-teams">'
     +'<span class="mc-team">'+safeH+'</span>'
-    +'<span class="mc-vs">vs</span>'
+    +(scoreHtml || '<span class="mc-vs">vs</span>')
     +'<span class="mc-team">'+safeA+'</span>'
     +'</div>'
     +'<div class="mc-odds">'+oddsHtml+'</div>'
@@ -992,6 +1019,11 @@ function attachCardClicks(container) {
       setV('live-playerB',away); setT('live-pB-name',away);
       if(cotA) setV('live-coteA',cotA);
       if(cotB) setV('live-coteB',cotB);
+      // Auto-remplir le score si disponible (TheSportsDB)
+      var sh = card.dataset.scoreH;
+      var sa = card.dataset.scoreA;
+      if(sh!=null){ setV('live-score-a',sh); setV('live-jeux-a',sh); }
+      if(sa!=null){ setV('live-score-b',sa); setV('live-jeux-b',sa); }
       if(sport){
         var sel=document.getElementById('live-sport-select');
         if(sel){ var o=Array.from(sel.options).find(function(x){ return sport.indexOf(x.value)!==-1||x.value.indexOf(sport.split('_')[0])!==-1; }); if(o) sel.value=o.value; }
@@ -1002,7 +1034,7 @@ function attachCardClicks(container) {
       if(adv&&adv.style.display==='none'){
         adv.style.display='block';
         var tog=adv.previousElementSibling;
-        if(tog&&tog.classList.contains('advanced-toggle')) tog.textContent='\u25be Analyse avan\u00e9e (score live, signaux, fiche)';
+        if(tog&&tog.classList.contains('advanced-toggle')) tog.textContent='\u25be Analyse avanc\u00e9e (score live, signaux, fiche)';
       }
       var form=document.getElementById('live-match-header');
       if(form) form.scrollIntoView({behavior:'smooth',block:'start'});

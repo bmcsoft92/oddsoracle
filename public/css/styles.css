@@ -580,3 +580,22 @@ option,optgroup{background:var(--bg1)}
   .mc-odds{flex-wrap:wrap}
   .mc-odd{min-width:calc(33% - .35rem)}
 }
+
+/* ===== LIVE SCORE dans les cartes ===== */
+.mc-score{
+  display:flex;align-items:center;gap:.3rem;
+  background:var(--bg3);border:1px solid var(--border1);
+  border-radius:6px;padding:.2rem .55rem;flex-shrink:0;
+}
+.mc-score-h,.mc-score-a{font-size:1.1rem;font-weight:800;color:var(--text0);font-family:var(--mono);min-width:18px;text-align:center}
+.mc-score-sep{color:var(--text2);font-size:.8rem}
+.mc-score-prog{font-size:.58rem;color:var(--yellow);font-family:var(--mono);margin-left:.3rem;white-space:nowrap}
+
+/* ===== Bouton Watch → sportplus.live ===== */
+.mc-watch{
+  margin-left:auto;display:inline-flex;align-items:center;gap:.3rem;
+  font-size:.65rem;font-weight:700;color:var(--red);
+  border:1px solid var(--red);border-radius:4px;padding:2px 8px;
+  text-decoration:none;transition:background .15s,color .15s;white-space:nowrap;
+}
+.mc-watch:hover{background:var(--red);color:#fff}

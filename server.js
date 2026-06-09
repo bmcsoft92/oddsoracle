@@ -352,33 +352,98 @@ function enrichEvent(event, sport) {
 }
 
 // -- LIVE ALL: tous les matchs en cours sur tous les sports --
+
+// -----------------------------------------------------------------------
+// SCORES LIVE — TheSportsDB (gratuit, sans quota)
+// -----------------------------------------------------------------------
+async function getLiveScores() {
+  try {
+    const resp = await axios.get(
+      'https://www.thesportsdb.com/api/v1/json/3/eventslive.php',
+      { timeout: 6000 }
+    );
+    return (resp.data && resp.data.events) ? resp.data.events : [];
+  } catch(e) {
+    console.warn('[thesportsdb] ' + e.message);
+    return [];
+  }
+}
+
+function normTeam(s) {
+  return (s || '').toLowerCase()
+    .replace(/\s+fc$/,'').replace(/^fc\s+/,'')
+    .replace(/[^a-z0-9]/g, '');
+}
+
+function teamMatch(a, b) {
+  const na = normTeam(a), nb = normTeam(b);
+  if (!na || !nb) return false;
+  return na === nb || na.includes(nb) || nb.includes(na);
+}
+
+function attachLiveScore(match, liveScores) {
+  const score = liveScores.find(function(s) {
+    return (teamMatch(s.strHomeTeam, match.homeTeam) && teamMatch(s.strAwayTeam, match.awayTeam))
+        || (teamMatch(s.strHomeTeam, match.awayTeam) && teamMatch(s.strAwayTeam, match.homeTeam));
+  });
+  if (!score) return null;
+  return {
+    homeScore: score.intHomeScore,
+    awayScore: score.intAwayScore,
+    progress:  score.strProgress  || '',
+    status:    score.strStatus    || '',
+    detail:    score.strResult    || ''
+  };
+}
+
 app.get('/api/live/all', async (req, res) => {
   const cacheKey = 'live_all';
   const cached   = cache.get(cacheKey);
   if (cached) return res.json({ data: cached, cached: true, fetchedAt: cached._fetchedAt, apiUsage });
 
-  const now    = Date.now();
-  const cutoff = now - 4 * 3600 * 1000;
+  const now         = Date.now();
+  const cutoffPast  = now - 5 * 3600 * 1000; // matchs commencés il y a max 5h
+  const cutoffFutur = now + 2 * 3600 * 1000; // matchs à venir dans 2h max
   const liveMatches = [];
+
+  // Scores live depuis TheSportsDB (gratuit, sans quota)
+  const liveScores = await getLiveScores();
 
   for (const sport of SPORTS) {
     try {
       const events = await loadOddsForSport(sport);
       for (const event of events) {
         const t = new Date(event.commenceTime).getTime();
-        if (t < cutoff || t > now) continue;
+        // Ignorer les matchs trop anciens ou trop loin dans le futur
+        if (t < cutoffPast || t > cutoffFutur) continue;
         const enriched = enrichEvent(event, sport);
-        if (enriched) liveMatches.push({ ...enriched, isLive: true });
+        if (!enriched) continue;
+        const isStarted = t <= now;
+        // Attacher le score live si disponible
+        const liveScore = isStarted ? attachLiveScore(enriched, liveScores) : null;
+        liveMatches.push({
+          ...enriched,
+          isLive:    isStarted,
+          isImminent: !isStarted,
+          liveScore: liveScore || undefined,
+          hoursLeft: isStarted ? 0 : Math.round((t - now) / 360000) / 10
+        });
       }
     } catch(e) {
       console.warn('[live/all] ' + sport.key + ': ' + e.message);
     }
   }
 
+  // Trier : matchs en cours d'abord (par edge), puis imminents (par heure)
   liveMatches.sort(function(a, b) {
-    const maxEdgeA = Math.max(...(a.selections || []).map(function(s) { return s.edge; }));
-    const maxEdgeB = Math.max(...(b.selections || []).map(function(s) { return s.edge; }));
-    return maxEdgeB - maxEdgeA;
+    if (a.isLive && !b.isLive) return -1;
+    if (!a.isLive && b.isLive) return  1;
+    if (a.isLive) {
+      const eA = Math.max(...(a.selections||[]).map(function(s){ return s.edge||0; }));
+      const eB = Math.max(...(b.selections||[]).map(function(s){ return s.edge||0; }));
+      return eB - eA;
+    }
+    return new Date(a.commenceTime) - new Date(b.commenceTime);
   });
 
   const result = { matches: liveMatches, count: liveMatches.length, _fetchedAt: new Date().toISOString() };
