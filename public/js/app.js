@@ -1550,6 +1550,25 @@ function renderTabForme(data, home, away) {
             + '<span>🥅 ' + (f.goalsConceded||0) + ' buts encaissés</span>'
             + '</div>';
     }
+    // Split domicile / extérieur (style Flashscore)
+    if ((f.homeForm && f.homeForm.length) || (f.awayForm && f.awayForm.length)) {
+      html += '<div class="form-ha-split">';
+      if (f.homeForm && f.homeForm.length) {
+        html += '<div class="form-ha-row">'
+              + '<span class="form-ha-label form-ha-home">🏠 Dom.</span>'
+              + '<span class="form-ha-badges">' + renderFormBadgesArr(f.homeForm, 5) + '</span>'
+              + (f.homeFormPct != null ? '<span class="form-ha-pct">' + f.homeFormPct + '%</span>' : '')
+              + '</div>';
+      }
+      if (f.awayForm && f.awayForm.length) {
+        html += '<div class="form-ha-row">'
+              + '<span class="form-ha-label form-ha-away">✈️ Ext.</span>'
+              + '<span class="form-ha-badges">' + renderFormBadgesArr(f.awayForm, 5) + '</span>'
+              + (f.awayFormPct != null ? '<span class="form-ha-pct">' + f.awayFormPct + '%</span>' : '')
+              + '</div>';
+      }
+      html += '</div>';
+    }
     if (f.form && f.form.length) {
       html += '<table class="stats-table" style="margin-top:8px">'
             + '<thead><tr><th>Date</th><th>Match</th><th class="stats-score">Score</th><th></th></tr></thead><tbody>';
@@ -1627,6 +1646,7 @@ function renderTabLive(data, home, away) {
     return html + '</div>';
   }
 
+  // Score + horloge
   if (esp.score) {
     html += '<div class="apercu-score" style="margin-bottom:16px">'
           + '<span class="asc-h">' + esp.score.home + '</span>'
@@ -1636,16 +1656,35 @@ function renderTabLive(data, home, away) {
           + '</div>';
   }
 
+  // Venue + Arbitre (style Flashscore)
+  if (esp.venue || esp.referee) {
+    html += '<div class="live-venue-bar">';
+    if (esp.venue && esp.venue.name) {
+      html += '<span class="live-venue-item">🏟️ ' + escHtml(esp.venue.name)
+            + (esp.venue.city ? ' <span class="live-venue-city">(' + escHtml(esp.venue.city) + ')</span>' : '')
+            + (esp.venue.capacity ? ' <span class="live-venue-cap">' + esp.venue.capacity.toLocaleString() + ' pl.</span>' : '')
+            + '</span>';
+    }
+    if (esp.referee && esp.referee.name) {
+      html += '<span class="live-venue-item">👁 ' + escHtml(esp.referee.name) + '</span>';
+    }
+    html += '</div>';
+  }
+
   var hStats = esp.statsA || {};
   var aStats = esp.statsB || {};
 
-  // Build stat rows from known keys
+  // Build stat rows — football + tennis complets
   var statDefs = [
     { key: 'possession', label: 'Possession (%)' },
     { key: 'shots', label: 'Tirs' },
     { key: 'shotsOnTarget', label: 'Tirs cadrés' },
+    { key: 'xGoals', label: 'xG (buts attendus)' },
     { key: 'corners', label: 'Corners' },
+    { key: 'fouls', label: 'Fautes' },
     { key: 'yellowCards', label: 'Cartons jaunes' },
+    { key: 'redCards', label: 'Cartons rouges' },
+    { key: 'offsides', label: 'Hors-jeux' },
     { key: 'aces', label: 'Aces' },
     { key: 'doubleFaults', label: 'Doubles fautes' },
     { key: 'firstServePct', label: '1er service (%)' },
@@ -1653,30 +1692,62 @@ function renderTabLive(data, home, away) {
 
   var rows = statDefs.filter(function(s){ return hStats[s.key] != null || aStats[s.key] != null; });
 
-  if (!rows.length) {
+  if (rows.length) {
+    html += '<table class="stats-table stats-live-table">';
+    html += '<thead><tr><th>' + escHtml(home) + '</th><th>Statistique</th><th>' + escHtml(away) + '</th></tr></thead><tbody>';
+    rows.forEach(function(s) {
+      var hv = hStats[s.key] || '0';
+      var av = aStats[s.key] || '0';
+      var hNum = parseFloat(hv) || 0;
+      var aNum = parseFloat(av) || 0;
+      var total = hNum + aNum;
+      var hPct = total > 0 ? Math.round(hNum/total*100) : 50;
+      var aPct = 100 - hPct;
+      html += '<tr>'
+            + '<td class="stat-cell"><span class="stat-num' + (hNum>aNum?' stat-winner':'') + '">' + hv + '</span>'
+            + '<div class="stat-bar-track"><div class="stat-bar-fill stat-bar-h" style="width:' + hPct + '%"></div></div></td>'
+            + '<td class="stat-label">' + s.label + '</td>'
+            + '<td class="stat-cell"><div class="stat-bar-track stat-bar-track-r"><div class="stat-bar-fill stat-bar-a" style="width:' + aPct + '%"></div></div>'
+            + '<span class="stat-num' + (aNum>hNum?' stat-winner':'') + '">' + av + '</span></td>'
+            + '</tr>';
+    });
+    html += '</tbody></table>';
+  } else {
     html += '<div class="stats-empty">Statistiques pas encore disponibles pour ce match</div>';
-    return html + '</div>';
   }
 
-  html += '<table class="stats-table stats-live-table">';
-  html += '<thead><tr><th>' + escHtml(home) + '</th><th>Statistique</th><th>' + escHtml(away) + '</th></tr></thead><tbody>';
-  rows.forEach(function(s) {
-    var hv = hStats[s.key] || '0';
-    var av = aStats[s.key] || '0';
-    var hNum = parseFloat(hv) || 0;
-    var aNum = parseFloat(av) || 0;
-    var total = hNum + aNum;
-    var hPct = total > 0 ? Math.round(hNum/total*100) : 50;
-    var aPct = 100 - hPct;
-    html += '<tr>'
-          + '<td class="stat-cell"><span class="stat-num' + (hNum>aNum?' stat-winner':'') + '">' + hv + '</span>'
-          + '<div class="stat-bar-track"><div class="stat-bar-fill stat-bar-h" style="width:' + hPct + '%"></div></div></td>'
-          + '<td class="stat-label">' + s.label + '</td>'
-          + '<td class="stat-cell"><div class="stat-bar-track stat-bar-track-r"><div class="stat-bar-fill stat-bar-a" style="width:' + aPct + '%"></div></div>'
-          + '<span class="stat-num' + (aNum>hNum?' stat-winner':'') + '">' + av + '</span></td>'
-          + '</tr>';
-  });
-  html += '</tbody></table>';
+  // Timeline incidents (style Flashscore) — buts, cartons, remplacement
+  var incidents = esp.incidents || [];
+  if (incidents.length) {
+    html += '<div class="stats-section-title" style="margin-top:18px">📋 Chronologie du match</div>';
+    html += '<div class="incident-timeline">';
+    // Trier par horloge (format "45+2'", "67'" → extraire le nombre)
+    var sorted = incidents.slice().sort(function(a, b) {
+      var pa = parseInt((a.clock||'0').replace(/[^0-9]/g,'')) || 0;
+      var pb = parseInt((b.clock||'0').replace(/[^0-9]/g,'')) || 0;
+      return pa - pb;
+    });
+    sorted.forEach(function(inc) {
+      var icon = '⚽';
+      var cls = 'inc-goal';
+      if (inc.redCard) { icon = '🟥'; cls = 'inc-red'; }
+      else if (inc.yellowCard) { icon = '🟨'; cls = 'inc-yellow'; }
+      else if (/sub|remplac/i.test(inc.type)) { icon = '🔄'; cls = 'inc-sub'; }
+      else if (!inc.scoring) { icon = '📌'; cls = 'inc-event'; }
+      if (inc.penalty) icon = '⚽ P';
+      var athlete = (inc.athletes && inc.athletes[0]) ? escHtml(inc.athletes[0]) : '';
+      var sideClass = inc.side === 'home' ? 'inc-side-home' : 'inc-side-away';
+      html += '<div class="incident-item ' + cls + ' ' + sideClass + '">'
+            + '<span class="inc-clock">' + escHtml(inc.clock) + '</span>'
+            + '<span class="inc-icon">' + icon + '</span>'
+            + '<span class="inc-info"><strong>' + (inc.side === 'home' ? escHtml(home) : escHtml(away)) + '</strong>'
+            + (athlete ? ' — ' + athlete : '')
+            + '</span>'
+            + '</div>';
+    });
+    html += '</div>';
+  }
+
   html += '</div>';
   return html;
 }
@@ -1858,4 +1929,107 @@ function autoAnalyzeCards(container) {
       delay += 50; // stagger slightly to avoid jank
     }
   });
+}
+
+       + advStr
+       + (isLive ? '<span class="cpb-live-tag">⏱ LIVE</span>' : '')
+       + '</div>';
+}
+
+function renderSignalBadges(signals) {
+  if (!signals) return '';
+  var ICONS = {
+    kineA: '⚕️ Kiné A', kineB: '⚕️ Kiné B',
+    breakA: '💥 Break A', breakB: '💥 Break B',
+    momentumA: '🔥 Momentum A', momentumB: '🔥 Momentum B',
+    suspension: '🟥 Suspension', boiterie: '🩹 Boiterie',
+    redCard: '🟥 Carton rouge', retirement: '🏳️ Abandon'
+  };
+  var active = Object.keys(signals).filter(function(k){ return signals[k] && ICONS[k]; });
+  if (!active.length) return '';
+  return '<div class="card-signals-row">'
+       + active.map(function(k){ return '<span class="csig">' + ICONS[k] + '</span>'; }).join('')
+       + '</div>';
+}
+
+var _analysisCache = {};
+var _analysisQueue = [];
+var _analysisRunning = false;
+
+function queueCardAnalysis(cardEl) {
+  var home  = cardEl.dataset.home;
+  var away  = cardEl.dataset.away;
+  var sport = cardEl.dataset.sport;
+  var isLive = cardEl.dataset.isLive === '1';
+  if (!home || !away) return;
+
+  var key = home + '|' + away + '|' + sport;
+
+  // Prédiction inline immédiate (pas d'API)
+  var edge = parseFloat(cardEl.dataset.edge) || 0;
+  var prob = parseFloat(cardEl.dataset.prob) || 0;
+  var sels = cardEl.querySelectorAll('.mc-odd');
+  // Find best team name from best-highlighted odd
+  var bestOdd = cardEl.querySelector('.mc-odd.mc-best');
+  var teamName = '';
+  if (bestOdd) {
+    var lbl = bestOdd.querySelector('.mc-ol');
+    if (lbl) {
+      var side = lbl.textContent.trim();
+      if (side === '1') teamName = home;
+      else if (side === '2') teamName = away;
+      else teamName = 'Nul';
+    }
+  }
+
+  var analysisDiv = cardEl.querySelector('.card-analysis');
+  if (!analysisDiv) return;
+
+  // Show inline prediction immediately
+  analysisDiv.innerHTML = buildInlinePred(edge, prob, teamName, isLive);
+
+  // For live matches only: queue ESPN signal fetch
+  if (isLive && !_analysisCache[key]) {
+    _analysisQueue.push({ key, home, away, sport, cardEl, analysisDiv, edge, prob, teamName });
+    if (!_analysisRunning) drainAnalysisQueue();
+  }
+}
+
+function drainAnalysisQueue() {
+  if (!_analysisQueue.length) { _analysisRunning = false; return; }
+  _analysisRunning = true;
+  var item = _analysisQueue.shift();
+  var url = '/api/live-signals?sport=' + encodeURIComponent(item.sport)
+           + '&home=' + encodeURIComponent(item.home)
+           + '&away=' + encodeURIComponent(item.away);
+  fetch(url)
+    .then(function(r){ return r.json(); })
+    .then(function(d) {
+      _analysisCache[item.key] = d;
+      var signals = d.signals || {};
+      var sigHtml = renderSignalBadges(signals);
+      // Update analysis div if card still in DOM
+      if (item.cardEl.isConnected && item.analysisDiv.isConnected) {
+        var pred = buildInlinePred(item.edge, item.prob, item.teamName, true);
+        item.analysisDiv.innerHTML = pred + sigHtml;
+      }
+    })
+    .catch(function(){})
+    .finally(function(){
+      setTimeout(drainAnalysisQueue, 400); // throttle 400ms between requests
+    });
+}
+
+function autoAnalyzeCards(container) {
+  var cards = container.querySelectorAll('.feed-card-clickable');
+  var delay = 0;
+  cards.forEach(function(card) {
+    var analysisDiv = card.querySelector('.card-analysis');
+    if (analysisDiv && analysisDiv.dataset.loaded !== '1') {
+      analysisDiv.dataset.loaded = '1';
+      setTimeout(function(){ queueCardAnalysis(card); }, delay);
+      delay += 50; // stagger slightly to avoid jank
+    }
+  });
+}
 }

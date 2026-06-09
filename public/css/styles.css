@@ -1003,3 +1003,133 @@ option,optgroup{background:var(--bg1)}
   .ia-quick-grid { grid-template-columns:repeat(2,1fr); }
   .stats-modal { max-height:96vh; }
 }
+
+/* ═══════════════════════════════════════════════════════════════════════
+   FORME — SPLIT DOMICILE / EXTÉRIEUR (style Flashscore)
+   ═══════════════════════════════════════════════════════════════════════ */
+.form-ha-split {
+  margin: 8px 0 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.form-ha-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.form-ha-label {
+  font-size: .7rem;
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: 4px;
+  min-width: 46px;
+  text-align: center;
+  letter-spacing: .03em;
+}
+.form-ha-home {
+  background: rgba(56,189,248,.15);
+  color: #38bdf8;
+  border: 1px solid rgba(56,189,248,.3);
+}
+.form-ha-away {
+  background: rgba(251,146,60,.15);
+  color: #fb923c;
+  border: 1px solid rgba(251,146,60,.3);
+}
+.form-ha-badges {
+  display: flex;
+  gap: 3px;
+}
+.form-ha-pct {
+  font-size: .7rem;
+  color: var(--text-muted);
+  margin-left: auto;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   LIVE — BARRE VENUE + ARBITRE
+   ═══════════════════════════════════════════════════════════════════════ */
+.live-venue-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+  padding: 8px 10px;
+  background: rgba(255,255,255,.04);
+  border: 1px solid rgba(255,255,255,.07);
+  border-radius: 8px;
+  margin-bottom: 14px;
+  font-size: .78rem;
+}
+.live-venue-item {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--text-secondary, #94a3b8);
+}
+.live-venue-city {
+  color: var(--text-muted, #64748b);
+  font-size: .72rem;
+}
+.live-venue-cap {
+  color: var(--text-muted, #64748b);
+  font-size: .7rem;
+  background: rgba(255,255,255,.06);
+  padding: 1px 5px;
+  border-radius: 3px;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   TIMELINE INCIDENTS (style Flashscore)
+   ═══════════════════════════════════════════════════════════════════════ */
+.incident-timeline {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 8px;
+}
+.incident-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 10px;
+  border-radius: 6px;
+  font-size: .8rem;
+  background: rgba(255,255,255,.03);
+  border-left: 3px solid transparent;
+  transition: background .15s;
+}
+.incident-item:hover { background: rgba(255,255,255,.07); }
+.inc-clock {
+  font-size: .72rem;
+  font-weight: 700;
+  color: var(--text-muted, #64748b);
+  min-width: 36px;
+  text-align: right;
+}
+.inc-icon {
+  font-size: 1rem;
+  min-width: 22px;
+  text-align: center;
+}
+.inc-info {
+  font-size: .78rem;
+  color: var(--text-secondary, #94a3b8);
+  flex: 1;
+}
+.inc-info strong {
+  color: var(--text-primary, #e2e8f0);
+}
+/* Goal */
+.inc-goal { border-left-color: #22c55e; }
+/* Yellow card */
+.inc-yellow { border-left-color: #eab308; }
+/* Red card */
+.inc-red { border-left-color: #ef4444; }
+/* Sub */
+.inc-sub { border-left-color: #38bdf8; }
+/* Other event */
+.inc-event { border-left-color: #6b7280; }
+/* Home side slightly brighter */
+.inc-side-home .inc-info strong { color: #38bdf8; }
+.inc-side-away .inc-info strong { color: #fb923c; }

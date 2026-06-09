@@ -1225,7 +1225,11 @@ async function fetchTeamRecentForm(name) {
         return { date: ev.dateEvent, home: ev.strHomeTeam, away: ev.strAwayTeam, homeScore: hs, awayScore: as, result, venue: ev.strVenue || '' };
       });
       const wins = form.filter(function(f){ return f.result === 'W'; }).length;
-      const result = { name: team.strTeam, badge: team.strTeamBadge || null, form, formPct: form.length ? Math.round(wins/form.length*100) : null, streak: calcStreak(form.map(function(f){ return f.result; })), goalsScored: form.reduce(function(acc,f){ const isH = teamMatch(f.home,name); return acc + (isH ? f.homeScore : f.awayScore); },0), goalsConceded: form.reduce(function(acc,f){ const isH = teamMatch(f.home,name); return acc + (isH ? f.awayScore : f.homeScore); },0) };
+      const homeFormArr = form.filter(function(f){ return teamMatch(f.home, name); });
+      const awayFormArr = form.filter(function(f){ return !teamMatch(f.home, name); });
+      const homeWinsH = homeFormArr.filter(function(f){ return f.result==='W'; }).length;
+      const awayWinsA = awayFormArr.filter(function(f){ return f.result==='W'; }).length;
+      const result = { name: team.strTeam, badge: team.strTeamBadge || null, form, homeForm: homeFormArr, awayForm: awayFormArr, homeFormPct: homeFormArr.length ? Math.round(homeWinsH/homeFormArr.length*100) : null, awayFormPct: awayFormArr.length ? Math.round(awayWinsA/awayFormArr.length*100) : null, formPct: form.length ? Math.round(wins/form.length*100) : null, streak: calcStreak(form.map(function(f){ return f.result; })), goalsScored: form.reduce(function(acc,f){ const isH = teamMatch(f.home,name); return acc + (isH ? f.homeScore : f.awayScore); },0), goalsConceded: form.reduce(function(acc,f){ const isH = teamMatch(f.home,name); return acc + (isH ? f.awayScore : f.homeScore); },0) };
       cache.set(cacheKey, result, 1800);
       return result;
     }
@@ -1322,13 +1326,73 @@ app.get('/api/match-stats', async function(req, res) {
           const statsA = (comps[0] || {}).statistics || [];
           const statsB = (comps[1] || {}).statistics || [];
           function gs(stats, name) { const s = stats.find(function(x){ return x.name === name || x.abbreviation === name; }); return s ? s.displayValue : null; }
+          // Incidents timeline (goals, cards, subs)
+          const rawDetails = comp.details || [];
+          const incidents = rawDetails.map(function(d) {
+            const type = (d.type && d.type.text) || '';
+            const clock = (d.clock && d.clock.displayValue) || '';
+            const athletes = (d.athletesInvolved || []).map(function(a){ return a.displayName || a.shortName || ''; });
+            const teamId = d.team ? String(d.team.id) : '';
+            const homeId = comps[0] && comps[0].team ? String(comps[0].team.id) : '';
+            const side = teamId === homeId ? 'home' : 'away';
+            return { type, clock, athletes, side, scoring: !!d.scoringPlay, penalty: !!d.penaltyPlay, yellowCard: !!d.yellowCard, redCard: !!d.redCard };
+          }).filter(function(d){ return d.type && d.clock; });
+          // Venue + referee
+          const venue = comp.venue ? { name: comp.venue.fullName || '', city: (comp.venue.address && comp.venue.address.city) || '', capacity: comp.venue.capacity || null } : null;
+          const officials = (comp.officials || []);
+          const referee = officials.find(function(o){ return /referee|arbitre/i.test((o.position && o.position.displayName) || ''); }) || officials[0] || null;
+          const refereeInfo = referee ? { name: referee.fullName || referee.displayName || '', role: (referee.position && referee.position.displayName) || 'Arbitre' } : null;
           return {
             found: true,
             score: { home: (comps[0]||{}).score||'0', away: (comps[1]||{}).score||'0' },
             period: (ev.status||{}).period || 1,
             clock:  (ev.status||{}).displayClock || '',
-            statsA: { possession: gs(statsA,'possessionPct'), shots: gs(statsA,'shots'), shotsOnTarget: gs(statsA,'shotsOnTarget'), corners: gs(statsA,'cornerKicks'), yellowCards: gs(statsA,'yellowCards'), aces: gs(statsA,'aces'), doubleFaults: gs(statsA,'doubleFaults'), firstServePct: gs(statsA,'firstServeIn') },
-            statsB: { possession: gs(statsB,'possessionPct'), shots: gs(statsB,'shots'), shotsOnTarget: gs(statsB,'shotsOnTarget'), corners: gs(statsB,'cornerKicks'), yellowCards: gs(statsB,'yellowCards'), aces: gs(statsB,'aces'), doubleFaults: gs(statsB,'doubleFaults'), firstServePct: gs(statsB,'firstServeIn') },
+            incidents,
+            venue,
+            referee: refereeInfo,
+            statsA: { possession: gs(statsA,'possessionPct'), shots: gs(statsA,'shots'), shotsOnTarget: gs(statsA,'shotsOnTarget'), corners: gs(statsA,'cornerKicks'), yellowCards: gs(statsA,'yellowCards'), redCards: gs(statsA,'redCards'), fouls: gs(statsA,'foulsCommitted'), offsides: gs(statsA,'offsides'), xGoals: gs(statsA,'expectedGoals'), aces: gs(statsA,'aces'), doubleFaults: gs(statsA,'doubleFaults'), firstServePct: gs(statsA,'firstServeIn') },
+            statsB: { possession: gs(statsB,'possessionPct'), shots: gs(statsB,'shots'), shotsOnTarget: gs(statsB,'shotsOnTarget'), corners: gs(statsB,'cornerKicks'), yellowCards: gs(statsB,'yellowCards'), redCards: gs(statsB,'redCards'), fouls: gs(statsB,'foulsCommitted'), offsides: gs(statsB,'offsides'), xGoals: gs(statsB,'expectedGoals'), aces: gs(statsB,'aces'), doubleFaults: gs(statsB,'doubleFaults'), firstServePct: gs(statsB,'firstServeIn') },
+          };
+        }
+        return { found: false };
+      } catch(e) { return null; }
+    })()
+  ]);
+
+  const espnStats = espnRes.status === 'fulfilled' ? espnRes.value : null;
+  const mvHome    = matchId ? getOddsMovement(matchId, home) : null;
+  const mvAway    = matchId ? getOddsMovement(matchId, away) : null;
+
+  const result = {
+    home, away, sport,
+    formHome:     formHomeRes.status === 'fulfilled' ? formHomeRes.value : null,
+    formAway:     formAwayRes.status === 'fulfilled' ? formAwayRes.value : null,
+    h2h:          h2hRes.status      === 'fulfilled' ? h2hRes.value      : null,
+    espnStats:    espnStats,
+    oddsMovement: { homeTeam: mvHome, awayTeam: mvAway, drawTeam: null },
+  };
+
+  // Cache 10 min (sans oddsMovement car dynamique)
+  const toCache = Object.assign({}, result, { oddsMovement: null });
+  cache.set(cacheKey, toCache, 600);
+
+  res.json(result);
+  } catch(err) {
+    console.error('[match-stats]', err.message);
+    res.status(500).json({ error: err.message, home, away });
+  }
+});
+.displayName || '', role: (referee.position && referee.position.displayName) || 'Arbitre' } : null;
+          return {
+            found: true,
+            score: { home: (comps[0]||{}).score||'0', away: (comps[1]||{}).score||'0' },
+            period: (ev.status||{}).period || 1,
+            clock:  (ev.status||{}).displayClock || '',
+            incidents,
+            venue,
+            referee: refereeInfo,
+            statsA: { possession: gs(statsA,'possessionPct'), shots: gs(statsA,'shots'), shotsOnTarget: gs(statsA,'shotsOnTarget'), corners: gs(statsA,'cornerKicks'), yellowCards: gs(statsA,'yellowCards'), redCards: gs(statsA,'redCards'), fouls: gs(statsA,'foulsCommitted'), offsides: gs(statsA,'offsides'), xGoals: gs(statsA,'expectedGoals'), aces: gs(statsA,'aces'), doubleFaults: gs(statsA,'doubleFaults'), firstServePct: gs(statsA,'firstServeIn') },
+            statsB: { possession: gs(statsB,'possessionPct'), shots: gs(statsB,'shots'), shotsOnTarget: gs(statsB,'shotsOnTarget'), corners: gs(statsB,'cornerKicks'), yellowCards: gs(statsB,'yellowCards'), redCards: gs(statsB,'redCards'), fouls: gs(statsB,'foulsCommitted'), offsides: gs(statsB,'offsides'), xGoals: gs(statsB,'expectedGoals'), aces: gs(statsB,'aces'), doubleFaults: gs(statsB,'doubleFaults'), firstServePct: gs(statsB,'firstServeIn') },
           };
         }
         return { found: false };
