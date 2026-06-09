@@ -599,3 +599,9 @@ option,optgroup{background:var(--bg1)}
   text-decoration:none;transition:background .15s,color .15s;white-space:nowrap;
 }
 .mc-watch:hover{background:var(--red);color:#fff}
+
+/* SportPlus primary streaming link */
+.streaming-link-primary{
+  color:var(--red)!important;border-color:var(--red)!important;font-weight:700;
+}
+.streaming-link-primary:hover{background:var(--red)!important;color:#fff!important}
