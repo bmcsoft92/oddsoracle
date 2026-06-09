@@ -157,6 +157,7 @@ const LiveModule = (() => {
     const group = getSportGroup(sportVal);
     const ctx = SPORT_CTX[group] || SPORT_CTX.tennis;
 
+    // Score form fields
     const setsRow   = document.getElementById('live-sets-row');
     const gamesRow  = document.getElementById('live-games-row');
     const setNumGrp = document.getElementById('live-setnum-group');
@@ -172,6 +173,49 @@ const LiveModule = (() => {
     lbl('live-gamesA-lbl',  ctx.gamesALbl);
     lbl('live-gamesB-lbl',  ctx.gamesBLbl);
     lbl('live-minutes-lbl', ctx.minutesLbl);
+
+    // === CONTEXT PANEL : visibilité sport-spécifique ===
+    var sv = sportVal || '';
+    var isTennis     = (group === 'tennis');
+    var isWTA        = isTennis && (sv.indexOf('wta') >= 0 || sv.indexOf('womens') >= 0);
+    var isFootball   = (group === 'football');
+    var isBasketball = (group === 'basketball');
+    var isMMA        = (group === 'mma');
+    var isBaseball   = (group === 'baseball');
+    var isHockey     = (group === 'hockey');
+
+    // Fonction utilitaire show/hide
+    var showEl  = function(id) { var e=document.getElementById(id); if(e) e.style.display=''; };
+    var hideEl  = function(id) { var e=document.getElementById(id); if(e) e.style.display='none'; };
+    var showCls = function(cls) { document.querySelectorAll('.'+cls).forEach(function(e){ e.style.display=''; }); };
+    var hideCls = function(cls) { document.querySelectorAll('.'+cls).forEach(function(e){ e.style.display='none'; }); };
+
+    // Surface — uniquement tennis
+    showCls('ctx-field-surface');
+    if (!isTennis) hideCls('ctx-field-surface');
+
+    // Cycle féminin — uniquement WTA
+    showCls('ctx-field-cycle');
+    if (!isWTA) hideCls('ctx-field-cycle');
+
+    // Blocs sport-spécifiques par groupe
+    ['ctx-sport-tennis','ctx-sport-football','ctx-sport-basketball',
+     'ctx-sport-mma','ctx-sport-baseball','ctx-sport-hockey'].forEach(function(c){ hideCls(c); });
+    if (isTennis)     showCls('ctx-sport-tennis');
+    if (isFootball)   showCls('ctx-sport-football');
+    if (isBasketball) showCls('ctx-sport-basketball');
+    if (isMMA)        showCls('ctx-sport-mma');
+    if (isBaseball)   showCls('ctx-sport-baseball');
+    if (isHockey)     showCls('ctx-sport-hockey');
+
+    // Libellé "Joueur" vs "Équipe"
+    var isTeamSport = !isTennis && !isMMA;
+    var ctxATitle = document.getElementById('ctx-a-title');
+    var ctxBTitle = document.getElementById('ctx-b-title');
+    var labA = document.getElementById('live-playerA') ? document.getElementById('live-playerA').value || '' : '';
+    var labB = document.getElementById('live-playerB') ? document.getElementById('live-playerB').value || '' : '';
+    if (ctxATitle && !labA) ctxATitle.textContent = isTeamSport ? 'Équipe domicile' : 'Joueur A';
+    if (ctxBTitle && !labB) ctxBTitle.textContent = isTeamSport ? 'Équipe extérieure' : 'Joueur B';
   }
 
   function collectLiveData() {
@@ -501,16 +545,55 @@ const LiveModule = (() => {
 
   // Calcule le delta pBase ajusté selon contexte
   function computeContextDelta(ctx, isA) {
+    const sv    = (document.getElementById('live-sport') || {}).value || '';
+    const grp   = getSportGroup(sv);
+    const isTennis = (grp === 'tennis');
+    const isWTA    = isTennis && (sv.indexOf('wta') >= 0 || sv.indexOf('womens') >= 0);
     let delta = 0;
-    delta += MENTAL_FACTORS[ctx.mental]   || 0;
+    delta += MENTAL_FACTORS[ctx.mental]    || 0;
     delta += PHYSICAL_FACTORS[ctx.physical] || 0;
-    delta += SURFACE_FACTORS[ctx.surface] || 0;
-    delta += FATIGUE_FACTORS[ctx.fatigue] || 0;
-    if (ctx.cycle) delta += CYCLE_FACTOR;
+    if (isTennis) delta += SURFACE_FACTORS[ctx.surface] || 0;  // surface pertinente seulement au tennis
+    delta += FATIGUE_FACTORS[ctx.fatigue]  || 0;
+    if (ctx.cycle && isWTA) delta += CYCLE_FACTOR;  // cycle féminin WTA uniquement
     if (isA) delta += matchCtx.h2hA || 0;
     else     delta += matchCtx.h2hB || 0;
     delta += ROUND_FACTORS[matchCtx.round] || 0;
+    // Facteurs sport-spécifiques
+    delta += sportSpecificDelta(ctx, grp, isA);
     return delta;
+  }
+
+  function sportSpecificDelta(ctx, group, isA) {
+    let d = 0;
+    if (group === 'tennis') {
+      // Traitement médical en cours (ex: Sinner) → perturbation mentale/physique
+      if (ctx.medicalTreatment === 'minor') d -= 0.02;
+      if (ctx.medicalTreatment === 'suspension_risk') d -= 0.05;
+      if (ctx.medicalTreatment === 'recovering') d -= 0.03;
+      // Zone de blessure
+      if (ctx.injuryZone === 'wrist') d -= 0.06;
+      if (ctx.injuryZone === 'shoulder') d -= 0.07;
+      if (ctx.injuryZone === 'ankle') d -= 0.05;
+      if (ctx.injuryZone === 'back') d -= 0.08;
+    }
+    if (group === 'football') {
+      // Joueur clé absent
+      if (ctx.keyPlayerOut === 'striker') d -= 0.04;
+      if (ctx.keyPlayerOut === 'goalkeeper') d -= 0.05;
+      if (ctx.keyPlayerOut === 'multiple') d -= 0.08;
+      // Cartons jaunes accumulés (pression)
+      if (ctx.yellowCards === 'oneaway') d -= 0.02;
+      if (ctx.yellowCards === 'suspended_next') d -= 0.01;
+    }
+    if (group === 'basketball') {
+      if (ctx.backToBack === 'yes') d -= 0.04;
+      if (ctx.starInjury === 'yes') d -= 0.06;
+    }
+    if (group === 'mma') {
+      if (ctx.weightCut === 'hard') d -= 0.06;
+      if (ctx.weightCut === 'extreme') d -= 0.10;
+    }
+    return d;
   }
 
   // Retourne pBase ajusté pour joueur A (en %)
@@ -696,12 +779,28 @@ const LiveModule = (() => {
     ctxA.surface  = (document.getElementById('ctx-a-surface')  || {}).value || 'neutral';
     ctxA.fatigue  = (document.getElementById('ctx-a-fatigue')  || {}).value || 'normal';
     ctxA.cycle    = !!(document.getElementById('ctx-a-cycle')  || {}).checked;
+    // Sport-specific
+    ctxA.medicalTreatment = (document.getElementById('ctx-a-medical')     || {}).value || 'none';
+    ctxA.injuryZone       = (document.getElementById('ctx-a-injury-zone') || {}).value || 'none';
+    ctxA.keyPlayerOut     = (document.getElementById('ctx-a-key-player')  || {}).value || 'none';
+    ctxA.yellowCards      = (document.getElementById('ctx-a-yellows')     || {}).value || 'none';
+    ctxA.backToBack       = (document.getElementById('ctx-a-b2b')         || {}).value || 'no';
+    ctxA.starInjury       = (document.getElementById('ctx-a-star-injury') || {}).value || 'no';
+    ctxA.weightCut        = (document.getElementById('ctx-a-weight-cut')  || {}).value || 'normal';
 
     ctxB.mental   = (document.getElementById('ctx-b-mental')   || {}).value || 'optimal';
     ctxB.physical = (document.getElementById('ctx-b-physical') || {}).value || 'optimal';
     ctxB.surface  = (document.getElementById('ctx-b-surface')  || {}).value || 'neutral';
     ctxB.fatigue  = (document.getElementById('ctx-b-fatigue')  || {}).value || 'normal';
     ctxB.cycle    = !!(document.getElementById('ctx-b-cycle')  || {}).checked;
+    // Sport-specific
+    ctxB.medicalTreatment = (document.getElementById('ctx-b-medical')     || {}).value || 'none';
+    ctxB.injuryZone       = (document.getElementById('ctx-b-injury-zone') || {}).value || 'none';
+    ctxB.keyPlayerOut     = (document.getElementById('ctx-b-key-player')  || {}).value || 'none';
+    ctxB.yellowCards      = (document.getElementById('ctx-b-yellows')     || {}).value || 'none';
+    ctxB.backToBack       = (document.getElementById('ctx-b-b2b')         || {}).value || 'no';
+    ctxB.starInjury       = (document.getElementById('ctx-b-star-injury') || {}).value || 'no';
+    ctxB.weightCut        = (document.getElementById('ctx-b-weight-cut')  || {}).value || 'normal';
 
     matchCtx.round = (document.getElementById('ctx-match-round') || {}).value || 'early';
     const h2hRaw   = parseInt((document.getElementById('ctx-h2h-adv') || {}).value) || 0;

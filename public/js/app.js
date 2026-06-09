@@ -1067,11 +1067,26 @@ const LiveFeedModule = (() => {
         + '</div>';
       return;
     }
-    el.innerHTML = '<div class="feed-meta-bar">'
-      + '<span>&#9679; '+data.count+' match'+(data.count>1?'s':'')+' en cours</span>'
-      + '<span class="fmb-right">auto-refresh 1min</span>'
-      + '</div>'
-      + '<div class="match-list">' + data.matches.map(function(m){ return renderMatchCard(m, true); }).join('') + '</div>';
+    var liveOnly   = data.matches.filter(function(m){ return m.isLive; });
+    var upcoming   = data.matches.filter(function(m){ return !m.isLive; });
+    var html = '';
+
+    if (liveOnly.length) {
+      html += '<div class="feed-section-header feed-section-live">'
+            + '<span class="live-dot-anim">&#9679;</span> EN DIRECT (' + liveOnly.length + ')'
+            + '</div>'
+            + '<div class="match-list">' + liveOnly.map(function(m){ return renderMatchCard(m, true); }).join('') + '</div>';
+    }
+    if (upcoming.length) {
+      html += '<div class="feed-section-header feed-section-upcoming">'
+            + '&#9201; &Agrave; VENIR — prochaines heures (' + upcoming.length + ')'
+            + '</div>'
+            + '<div class="match-list">' + upcoming.map(function(m){ return renderMatchCard(m, false); }).join('') + '</div>';
+    }
+    if (!liveOnly.length && upcoming.length) {
+      html = '<div class="feed-no-live">&#9679; Aucun match en direct — ' + upcoming.length + ' match' + (upcoming.length>1?'s':'') + ' &agrave; venir</div>' + html;
+    }
+    el.innerHTML = html;
     attachCardClicks(el);
   }
 

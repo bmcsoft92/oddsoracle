@@ -241,7 +241,7 @@
             </select>
           </div>
 
-          <div class="ctx-field">
+          <div class="ctx-field ctx-field-surface">
             <label>Confort surface</label>
             <select id="ctx-a-surface" class="form-control form-control-sm" onchange="if(typeof LiveModule!=='undefined')LiveModule.updateContext()">
               <option value="preferred">⭐ Surface de prédilection</option>
@@ -265,6 +265,71 @@
               <input type="checkbox" id="ctx-a-cycle" onchange="if(typeof LiveModule!=='undefined')LiveModule.updateContext()">
               <span>🔴 Cycle féminin (impact −4%)</span>
             </label>
+          </div>
+          <!-- Tennis spécifique A -->
+          <div class="ctx-field ctx-sport-tennis" style="display:none">
+            <label>Traitement médical / dossier</label>
+            <select id="ctx-a-medical" class="form-control form-control-sm" onchange="if(typeof LiveModule!=='undefined')LiveModule.updateContext()">
+              <option value="none">✅ Aucun</option>
+              <option value="recovering">🩺 En récupération blessure</option>
+              <option value="minor">💊 Traitement médical mineur</option>
+              <option value="suspension_risk">⚖️ Risque suspension (affaire)</option>
+            </select>
+          </div>
+          <div class="ctx-field ctx-sport-tennis" style="display:none">
+            <label>Zone de blessure</label>
+            <select id="ctx-a-injury-zone" class="form-control form-control-sm" onchange="if(typeof LiveModule!=='undefined')LiveModule.updateContext()">
+              <option value="none">✅ Aucune</option>
+              <option value="wrist">🤚 Poignet</option>
+              <option value="shoulder">💪 Épaule</option>
+              <option value="ankle">🦶 Cheville</option>
+              <option value="back">🔙 Dos / abdominaux</option>
+            </select>
+          </div>
+
+          <!-- Football spécifique A -->
+          <div class="ctx-field ctx-sport-football" style="display:none">
+            <label>Joueur clé absent</label>
+            <select id="ctx-a-key-player" class="form-control form-control-sm" onchange="if(typeof LiveModule!=='undefined')LiveModule.updateContext()">
+              <option value="none">✅ Effectif complet</option>
+              <option value="striker">⚽ Attaquant principal absent</option>
+              <option value="goalkeeper">🥅 Gardien titulaire absent</option>
+              <option value="multiple">🚨 Plusieurs titulaires absents</option>
+            </select>
+          </div>
+          <div class="ctx-field ctx-sport-football" style="display:none">
+            <label>Cartons jaunes accumulés</label>
+            <select id="ctx-a-yellows" class="form-control form-control-sm" onchange="if(typeof LiveModule!=='undefined')LiveModule.updateContext()">
+              <option value="none">✅ Aucune pression</option>
+              <option value="oneaway">🟡 Un jaune = suspension</option>
+              <option value="suspended_next">🟥 Suspendu prochain match</option>
+            </select>
+          </div>
+
+          <!-- Basketball spécifique A -->
+          <div class="ctx-field ctx-sport-basketball" style="display:none">
+            <label>Back-to-back</label>
+            <select id="ctx-a-b2b" class="form-control form-control-sm" onchange="if(typeof LiveModule!=='undefined')LiveModule.updateContext()">
+              <option value="no">✅ Non</option>
+              <option value="yes">😓 2ème match en 2 jours</option>
+            </select>
+          </div>
+          <div class="ctx-field ctx-sport-basketball" style="display:none">
+            <label>Joueur star blessé</label>
+            <select id="ctx-a-star-injury" class="form-control form-control-sm" onchange="if(typeof LiveModule!=='undefined')LiveModule.updateContext()">
+              <option value="no">✅ Non</option>
+              <option value="yes">🚑 Star absente</option>
+            </select>
+          </div>
+
+          <!-- MMA spécifique A -->
+          <div class="ctx-field ctx-sport-mma" style="display:none">
+            <label>Coupe de poids</label>
+            <select id="ctx-a-weight-cut" class="form-control form-control-sm" onchange="if(typeof LiveModule!=='undefined')LiveModule.updateContext()">
+              <option value="normal">✅ Normal</option>
+              <option value="hard">⚠️ Coupe difficile</option>
+              <option value="extreme">🚨 Coupe extrême / problèmes</option>
+            </select>
           </div>
         </div>
 
@@ -295,7 +360,7 @@
             </select>
           </div>
 
-          <div class="ctx-field">
+          <div class="ctx-field ctx-field-surface">
             <label>Confort surface</label>
             <select id="ctx-b-surface" class="form-control form-control-sm" onchange="if(typeof LiveModule!=='undefined')LiveModule.updateContext()">
               <option value="preferred">⭐ Surface de prédilection</option>
@@ -319,6 +384,71 @@
               <input type="checkbox" id="ctx-b-cycle" onchange="if(typeof LiveModule!=='undefined')LiveModule.updateContext()">
               <span>🔴 Cycle féminin (impact −4%)</span>
             </label>
+          </div>
+          <!-- Tennis spécifique A -->
+          <div class="ctx-field ctx-sport-tennis" style="display:none">
+            <label>Traitement médical / dossier</label>
+            <select id="ctx-b-medical" class="form-control form-control-sm" onchange="if(typeof LiveModule!=='undefined')LiveModule.updateContext()">
+              <option value="none">✅ Aucun</option>
+              <option value="recovering">🩺 En récupération blessure</option>
+              <option value="minor">💊 Traitement médical mineur</option>
+              <option value="suspension_risk">⚖️ Risque suspension (affaire)</option>
+            </select>
+          </div>
+          <div class="ctx-field ctx-sport-tennis" style="display:none">
+            <label>Zone de blessure</label>
+            <select id="ctx-b-injury-zone" class="form-control form-control-sm" onchange="if(typeof LiveModule!=='undefined')LiveModule.updateContext()">
+              <option value="none">✅ Aucune</option>
+              <option value="wrist">🤚 Poignet</option>
+              <option value="shoulder">💪 Épaule</option>
+              <option value="ankle">🦶 Cheville</option>
+              <option value="back">🔙 Dos / abdominaux</option>
+            </select>
+          </div>
+
+          <!-- Football spécifique A -->
+          <div class="ctx-field ctx-sport-football" style="display:none">
+            <label>Joueur clé absent</label>
+            <select id="ctx-b-key-player" class="form-control form-control-sm" onchange="if(typeof LiveModule!=='undefined')LiveModule.updateContext()">
+              <option value="none">✅ Effectif complet</option>
+              <option value="striker">⚽ Attaquant principal absent</option>
+              <option value="goalkeeper">🥅 Gardien titulaire absent</option>
+              <option value="multiple">🚨 Plusieurs titulaires absents</option>
+            </select>
+          </div>
+          <div class="ctx-field ctx-sport-football" style="display:none">
+            <label>Cartons jaunes accumulés</label>
+            <select id="ctx-b-yellows" class="form-control form-control-sm" onchange="if(typeof LiveModule!=='undefined')LiveModule.updateContext()">
+              <option value="none">✅ Aucune pression</option>
+              <option value="oneaway">🟡 Un jaune = suspension</option>
+              <option value="suspended_next">🟥 Suspendu prochain match</option>
+            </select>
+          </div>
+
+          <!-- Basketball spécifique A -->
+          <div class="ctx-field ctx-sport-basketball" style="display:none">
+            <label>Back-to-back</label>
+            <select id="ctx-b-b2b" class="form-control form-control-sm" onchange="if(typeof LiveModule!=='undefined')LiveModule.updateContext()">
+              <option value="no">✅ Non</option>
+              <option value="yes">😓 2ème match en 2 jours</option>
+            </select>
+          </div>
+          <div class="ctx-field ctx-sport-basketball" style="display:none">
+            <label>Joueur star blessé</label>
+            <select id="ctx-b-star-injury" class="form-control form-control-sm" onchange="if(typeof LiveModule!=='undefined')LiveModule.updateContext()">
+              <option value="no">✅ Non</option>
+              <option value="yes">🚑 Star absente</option>
+            </select>
+          </div>
+
+          <!-- MMA spécifique A -->
+          <div class="ctx-field ctx-sport-mma" style="display:none">
+            <label>Coupe de poids</label>
+            <select id="ctx-b-weight-cut" class="form-control form-control-sm" onchange="if(typeof LiveModule!=='undefined')LiveModule.updateContext()">
+              <option value="normal">✅ Normal</option>
+              <option value="hard">⚠️ Coupe difficile</option>
+              <option value="extreme">🚨 Coupe extrême / problèmes</option>
+            </select>
           </div>
         </div>
 

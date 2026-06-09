@@ -876,3 +876,24 @@ option,optgroup{background:var(--bg1)}
   .stats-quick-row { flex-wrap: wrap; }
   .quick-stat { min-width: 80px; }
 }
+
+/* ===== LIVE FEED SECTIONS ===== */
+.feed-section-header {
+  padding: 8px 14px; font-size: .78rem; font-weight: 700;
+  letter-spacing: .08em; text-transform: uppercase;
+  border-radius: 6px; margin: 10px 0 6px;
+}
+.feed-section-live {
+  background: rgba(255,82,82,.12); color: #ff5252;
+  border: 1px solid rgba(255,82,82,.25);
+}
+.feed-section-upcoming {
+  background: rgba(79,195,247,.08); color: var(--accent, #4fc3f7);
+  border: 1px solid rgba(79,195,247,.2);
+}
+.feed-no-live {
+  padding: 6px 12px; font-size: .78rem; color: var(--text-muted);
+  background: rgba(255,82,82,.06); border-radius: 6px; margin-bottom: 8px;
+}
+.live-dot-anim { animation: blink 1s infinite; }
+@keyframes blink { 0%,100%{opacity:1} 50%{opacity:.3} }
