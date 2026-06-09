@@ -395,6 +395,39 @@ function attachLiveScore(match, liveScores) {
     detail:    score.strResult    || ''
   };
 }
+// Mapper sport TheSportsDB → clé The Odds API (pour enrichissement cotes)
+const SPORTSDB_MAP = {
+  'Soccer':              ['soccer_france_ligue1','soccer_epl','soccer_europe_champs','soccer_spain_la_liga',
+                          'soccer_italy_serie_a','soccer_germany_bundesliga','soccer_portugal_primeira_liga',
+                          'soccer_netherlands_eredivisie','soccer_usa_mls','soccer_brazil_campeonato',
+                          'soccer_argentina_primera_division','soccer_colombia_primera_a'],
+  'Tennis':              ['tennis_atp','tennis_wta'],
+  'Basketball':          ['basketball_nba','basketball_nba_championship','basketball_wnba','basketball_euroleague'],
+  'Baseball':            ['baseball_mlb'],
+  'Ice Hockey':          ['icehockey_nhl'],
+  'American Football':   ['americanfootball_nfl'],
+  'Mixed Martial Arts':  ['mma_mixed_martial_arts'],
+};
+
+// Icône + label par sport TheSportsDB
+const SPORTSDB_META = {
+  'Soccer':             { icon: '⚽', label: 'Football' },
+  'Tennis':             { icon: '🎾', label: 'Tennis' },
+  'Basketball':         { icon: '🏀', label: 'Basketball' },
+  'Baseball':           { icon: '⚾', label: 'Baseball' },
+  'Ice Hockey':         { icon: '🏒', label: 'Hockey' },
+  'American Football':  { icon: '🏈', label: 'NFL' },
+  'Mixed Martial Arts': { icon: '🥊', label: 'MMA' },
+};
+
+// Trouver l'event Odds API qui correspond à un event TheSportsDB
+function matchOddsEvent(oddsEvents, sdbEvent) {
+  return oddsEvents.find(function(e) {
+    return (teamMatch(e.homeTeam, sdbEvent.strHomeTeam) && teamMatch(e.awayTeam, sdbEvent.strAwayTeam))
+        || (teamMatch(e.homeTeam, sdbEvent.strAwayTeam) && teamMatch(e.awayTeam, sdbEvent.strHomeTeam));
+  });
+}
+
 
 app.get('/api/live/all', async (req, res) => {
   const cacheKey = 'live_all';
@@ -402,45 +435,88 @@ app.get('/api/live/all', async (req, res) => {
   if (cached) return res.json({ data: cached, cached: true, fetchedAt: cached._fetchedAt, apiUsage });
 
   const now         = Date.now();
-  const cutoffPast  = now - 5 * 3600 * 1000; // matchs commencés il y a max 5h
-  const cutoffFutur = now + 2 * 3600 * 1000; // matchs à venir dans 2h max
   const liveMatches = [];
+  const seenKeys    = new Set(); // éviter les doublons
 
-  // Scores live depuis TheSportsDB (gratuit, sans quota)
-  const liveScores = await getLiveScores();
+  // ── PARTIE 1 : matchs EN COURS depuis TheSportsDB (source principale) ──
+  const sdbEvents = await getLiveScores();
+  // Pré-charger les odds pour les sports pertinents (1 appel par sport trouvé)
+  const loadedOdds = {};
+  for (const sdbEv of sdbEvents) {
+    const sportName = sdbEv.strSport || '';
+    const meta      = SPORTSDB_META[sportName] || { icon: '⚡', label: sportName };
+    const sportKeys = SPORTSDB_MAP[sportName]  || [];
+    // Essayer de trouver les cotes
+    let enrichedOdds = null;
+    for (const key of sportKeys) {
+      try {
+        if (!loadedOdds[key]) {
+          const sportObj = SPORTS.find(function(s){ return s.key === key; });
+          if (sportObj) loadedOdds[key] = await loadOddsForSport(sportObj);
+        }
+        const oddsEvents = loadedOdds[key] || [];
+        const matched = matchOddsEvent(oddsEvents, sdbEv);
+        if (matched) { enrichedOdds = enrichEvent(matched, SPORTS.find(function(s){ return s.key === key; })); break; }
+      } catch(e) {}
+    }
+    // Construire la carte match (avec ou sans cotes)
+    const matchKey = normTeam(sdbEv.strHomeTeam) + '|' + normTeam(sdbEv.strAwayTeam);
+    if (seenKeys.has(matchKey)) continue;
+    seenKeys.add(matchKey);
+    const liveScore = {
+      homeScore: sdbEv.intHomeScore,
+      awayScore: sdbEv.intAwayScore,
+      progress:  sdbEv.strProgress || sdbEv.strStatus || '',
+      status:    sdbEv.strStatus   || ''
+    };
+    liveMatches.push({
+      homeTeam:    sdbEv.strHomeTeam,
+      awayTeam:    sdbEv.strAwayTeam,
+      sportKey:    (enrichedOdds && enrichedOdds.sportKey) || sportKeys[0] || 'unknown',
+      sportLabel:  meta.label,
+      sportIcon:   meta.icon,
+      commenceTime: (sdbEv.dateEvent||'') + 'T' + (sdbEv.strTime||'00:00:00'),
+      isLive:      true,
+      isImminent:  false,
+      liveScore,
+      selections:  enrichedOdds ? (enrichedOdds.selections || []) : [],
+      league:      sdbEv.strLeague || ''
+    });
+  }
 
+  // ── PARTIE 2 : matchs IMMINENTS depuis The Odds API (prochaines 2h) ──
+  const cutoffFutur = now + 2 * 3600 * 1000;
   for (const sport of SPORTS) {
     try {
       const events = await loadOddsForSport(sport);
       for (const event of events) {
         const t = new Date(event.commenceTime).getTime();
-        // Ignorer les matchs trop anciens ou trop loin dans le futur
-        if (t < cutoffPast || t > cutoffFutur) continue;
+        if (t <= now || t > cutoffFutur) continue; // seulement les futurs < 2h
         const enriched = enrichEvent(event, sport);
         if (!enriched) continue;
-        const isStarted = t <= now;
-        // Attacher le score live si disponible
-        const liveScore = isStarted ? attachLiveScore(enriched, liveScores) : null;
+        const matchKey = normTeam(enriched.homeTeam) + '|' + normTeam(enriched.awayTeam);
+        if (seenKeys.has(matchKey)) continue; // pas de doublon avec TheSportsDB
+        seenKeys.add(matchKey);
+        const h = (t - now) / 3600000;
         liveMatches.push({
           ...enriched,
-          isLive:    isStarted,
-          isImminent: !isStarted,
-          liveScore: liveScore || undefined,
-          hoursLeft: isStarted ? 0 : Math.round((t - now) / 360000) / 10
+          isLive:    false,
+          isImminent: true,
+          hoursLeft: Math.round(h * 10) / 10
         });
       }
     } catch(e) {
-      console.warn('[live/all] ' + sport.key + ': ' + e.message);
+      console.warn('[upcoming-imminent] ' + sport.key + ': ' + e.message);
     }
   }
 
-  // Trier : matchs en cours d'abord (par edge), puis imminents (par heure)
+  // Trier : en cours d'abord (par edge), puis imminents par heure
   liveMatches.sort(function(a, b) {
     if (a.isLive && !b.isLive) return -1;
     if (!a.isLive && b.isLive) return  1;
     if (a.isLive) {
-      const eA = Math.max(...(a.selections||[]).map(function(s){ return s.edge||0; }));
-      const eB = Math.max(...(b.selections||[]).map(function(s){ return s.edge||0; }));
+      const eA = Math.max(0, ...(a.selections||[]).map(function(s){ return s.edge||0; }));
+      const eB = Math.max(0, ...(b.selections||[]).map(function(s){ return s.edge||0; }));
       return eB - eA;
     }
     return new Date(a.commenceTime) - new Date(b.commenceTime);
