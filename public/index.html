@@ -639,28 +639,28 @@
                 <input type="text" id="live-playerB" class="form-control" placeholder="Nom joueur B" />
               </div>
             </div>
-            <div class="form-row">
+            <div class="form-row" id="live-sets-row">
               <div class="form-group">
-                <label>Sets A</label>
-                <input type="number" id="live-setsA" class="form-control" min="0" max="3" value="0" />
+                <label id="live-setsA-lbl">Sets A</label>
+                <input type="number" id="live-setsA" class="form-control" min="0" max="9" value="0" />
               </div>
               <div class="form-group">
-                <label>Sets B</label>
-                <input type="number" id="live-setsB" class="form-control" min="0" max="3" value="0" />
+                <label id="live-setsB-lbl">Sets B</label>
+                <input type="number" id="live-setsB" class="form-control" min="0" max="9" value="0" />
               </div>
-              <div class="form-group">
-                <label>Set actuel</label>
-                <input type="number" id="live-setNum" class="form-control" min="1" max="5" value="1" />
+              <div class="form-group" id="live-setnum-group">
+                <label id="live-setNum-lbl">Set actuel</label>
+                <input type="number" id="live-setNum" class="form-control" min="1" max="9" value="1" />
               </div>
             </div>
-            <div class="form-row">
+            <div class="form-row" id="live-games-row">
               <div class="form-group">
-                <label>Jeux A (set actuel)</label>
-                <input type="number" id="live-gamesA" class="form-control" min="0" max="7" value="0" />
+                <label id="live-gamesA-lbl">Jeux A (set actuel)</label>
+                <input type="number" id="live-gamesA" class="form-control" min="0" max="99" value="0" />
               </div>
               <div class="form-group">
-                <label>Jeux B (set actuel)</label>
-                <input type="number" id="live-gamesB" class="form-control" min="0" max="7" value="0" />
+                <label id="live-gamesB-lbl">Jeux B (set actuel)</label>
+                <input type="number" id="live-gamesB" class="form-control" min="0" max="99" value="0" />
               </div>
             </div>
             <div class="form-row">
@@ -675,11 +675,11 @@
             </div>
             <div class="form-row">
               <div class="form-group">
-                <label>P base A (pré-match %)</label>
+                <label>P base A (pre-match %)</label>
                 <input type="number" id="live-pbaseA" class="form-control" min="0" max="100" placeholder="60" />
               </div>
               <div class="form-group">
-                <label>Minutes jouées</label>
+                <label id="live-minutes-lbl">Minutes jouees</label>
                 <input type="number" id="live-minutes" class="form-control" min="0" placeholder="45" />
               </div>
             </div>
