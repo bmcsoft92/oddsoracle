@@ -991,11 +991,19 @@ function renderMatchCard(match, isLive) {
     ? ' data-score-h="'+(match.liveScore.homeScore||0)+'" data-score-a="'+(match.liveScore.awayScore||0)+'" data-score-prog="'+(match.liveScore.progress||'')+'"'
     : '';
 
+  var cardEdge = bestSel ? (bestSel.edge||0) : 0;
+  var cardProb = bestSel ? (bestSel.trueProb||0) : 0;
+  var cardTeam = bestSel && bestSel.name ? bestSel.name : '';
+  var isLiveCard = !!(match.isLive);
+
   return '<div class="match-card feed-card-clickable"'
     +' data-home="'+safeH+'" data-away="'+safeA+'"'
     +' data-sport="'+(match.sportKey||'')+'"'
     +' data-cotea="'+cotA+'" data-coteb="'+cotB+'"'
     +' data-match-id="'+(match.id||'')+'"'
+    +' data-edge="'+cardEdge.toFixed(2)+'"'
+    +' data-prob="'+cardProb+'"'
+    +' data-is-live="'+(isLiveCard?'1':'0')+'"'
     +scoreData+'>'
     +'<div class="mc-head">'
     +'<span class="mc-sport">'+(match.sportIcon||'⚡')+' '+(match.sportLabel||'')+'</span>'
@@ -1008,6 +1016,7 @@ function renderMatchCard(match, isLive) {
     +'</div>'
     +'<div class="mc-odds">'+oddsHtml+'</div>'
     +foot
+    +'<div class="card-analysis" data-loaded="0"></div>'
     +'</div>';
 }
 
@@ -1088,6 +1097,7 @@ const LiveFeedModule = (() => {
     }
     el.innerHTML = html;
     attachCardClicks(el);
+    autoAnalyzeCards(el);
   }
 
   async function load() {
@@ -1159,6 +1169,7 @@ const PrematchFeedModule = (() => {
       + '</div>'
       + '<div class="match-list">' + data.matches.map(function(m){ return renderMatchCard(m, false); }).join('') + '</div>';
     attachCardClicks(el);
+    autoAnalyzeCards(el);
   }
 
   async function load() {
@@ -1581,4 +1592,130 @@ function makeQuickStat(label, valH, valA) {
 
 function escHtml(s) {
   return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+
+/* ===== AUTO-ANALYSE CARTES ===== */
+
+function buildInlinePred(edge, prob, teamName, isLive) {
+  // Prédiction basée sur edge et probabilité, sans appel API
+  var strength, icon, cls, advice;
+  if (edge >= 5) {
+    icon = '🔥'; strength = 'Value forte'; cls = 'pred-hot'; advice = 'BET';
+  } else if (edge >= 2) {
+    icon = '✅'; strength = 'Value modérée'; cls = 'pred-good'; advice = 'Envisager';
+  } else if (edge >= 0.5) {
+    icon = '💡'; strength = 'Légère value'; cls = 'pred-ok'; advice = 'Surveiller';
+  } else if (edge > -1) {
+    icon = '⚖️'; strength = 'Marché serré'; cls = 'pred-neutral'; advice = '';
+  } else {
+    icon = '❌'; strength = 'Pas de value'; cls = 'pred-bad'; advice = '';
+  }
+  var probStr = prob > 0 ? Math.round(prob) + '%' : '';
+  var teamStr = teamName ? ' <strong>' + teamName + '</strong>' : '';
+  var advStr  = advice && teamName ? ' → ' + advice + teamStr : '';
+  return '<div class="card-pred-bar ' + cls + '">'
+       + '<span class="cpb-icon">' + icon + '</span>'
+       + '<span class="cpb-label">' + strength + '</span>'
+       + (probStr ? '<span class="cpb-prob">' + probStr + '</span>' : '')
+       + advStr
+       + (isLive ? '<span class="cpb-live-tag">⏱ LIVE</span>' : '')
+       + '</div>';
+}
+
+function renderSignalBadges(signals) {
+  if (!signals) return '';
+  var ICONS = {
+    kineA: '⚕️ Kiné A', kineB: '⚕️ Kiné B',
+    breakA: '💥 Break A', breakB: '💥 Break B',
+    momentumA: '🔥 Momentum A', momentumB: '🔥 Momentum B',
+    suspension: '🟥 Suspension', boiterie: '🩹 Boiterie',
+    redCard: '🟥 Carton rouge', retirement: '🏳️ Abandon'
+  };
+  var active = Object.keys(signals).filter(function(k){ return signals[k] && ICONS[k]; });
+  if (!active.length) return '';
+  return '<div class="card-signals-row">'
+       + active.map(function(k){ return '<span class="csig">' + ICONS[k] + '</span>'; }).join('')
+       + '</div>';
+}
+
+var _analysisCache = {};
+var _analysisQueue = [];
+var _analysisRunning = false;
+
+function queueCardAnalysis(cardEl) {
+  var home  = cardEl.dataset.home;
+  var away  = cardEl.dataset.away;
+  var sport = cardEl.dataset.sport;
+  var isLive = cardEl.dataset.isLive === '1';
+  if (!home || !away) return;
+
+  var key = home + '|' + away + '|' + sport;
+
+  // Prédiction inline immédiate (pas d'API)
+  var edge = parseFloat(cardEl.dataset.edge) || 0;
+  var prob = parseFloat(cardEl.dataset.prob) || 0;
+  var sels = cardEl.querySelectorAll('.mc-odd');
+  // Find best team name from best-highlighted odd
+  var bestOdd = cardEl.querySelector('.mc-odd.mc-best');
+  var teamName = '';
+  if (bestOdd) {
+    var lbl = bestOdd.querySelector('.mc-ol');
+    if (lbl) {
+      var side = lbl.textContent.trim();
+      if (side === '1') teamName = home;
+      else if (side === '2') teamName = away;
+      else teamName = 'Nul';
+    }
+  }
+
+  var analysisDiv = cardEl.querySelector('.card-analysis');
+  if (!analysisDiv) return;
+
+  // Show inline prediction immediately
+  analysisDiv.innerHTML = buildInlinePred(edge, prob, teamName, isLive);
+
+  // For live matches only: queue ESPN signal fetch
+  if (isLive && !_analysisCache[key]) {
+    _analysisQueue.push({ key, home, away, sport, cardEl, analysisDiv, edge, prob, teamName });
+    if (!_analysisRunning) drainAnalysisQueue();
+  }
+}
+
+function drainAnalysisQueue() {
+  if (!_analysisQueue.length) { _analysisRunning = false; return; }
+  _analysisRunning = true;
+  var item = _analysisQueue.shift();
+  var url = '/api/live-signals?sport=' + encodeURIComponent(item.sport)
+           + '&home=' + encodeURIComponent(item.home)
+           + '&away=' + encodeURIComponent(item.away);
+  fetch(url)
+    .then(function(r){ return r.json(); })
+    .then(function(d) {
+      _analysisCache[item.key] = d;
+      var signals = d.signals || {};
+      var sigHtml = renderSignalBadges(signals);
+      // Update analysis div if card still in DOM
+      if (item.cardEl.isConnected && item.analysisDiv.isConnected) {
+        var pred = buildInlinePred(item.edge, item.prob, item.teamName, true);
+        item.analysisDiv.innerHTML = pred + sigHtml;
+      }
+    })
+    .catch(function(){})
+    .finally(function(){
+      setTimeout(drainAnalysisQueue, 400); // throttle 400ms between requests
+    });
+}
+
+function autoAnalyzeCards(container) {
+  var cards = container.querySelectorAll('.feed-card-clickable');
+  var delay = 0;
+  cards.forEach(function(card) {
+    var analysisDiv = card.querySelector('.card-analysis');
+    if (analysisDiv && analysisDiv.dataset.loaded !== '1') {
+      analysisDiv.dataset.loaded = '1';
+      setTimeout(function(){ queueCardAnalysis(card); }, delay);
+      delay += 50; // stagger slightly to avoid jank
+    }
+  });
 }

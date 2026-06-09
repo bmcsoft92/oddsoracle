@@ -897,3 +897,30 @@ option,optgroup{background:var(--bg1)}
 }
 .live-dot-anim { animation: blink 1s infinite; }
 @keyframes blink { 0%,100%{opacity:1} 50%{opacity:.3} }
+
+/* ===== CARD AUTO-ANALYSE ===== */
+.card-analysis { padding: 0 12px 10px; }
+
+.card-pred-bar {
+  display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
+  padding: 6px 10px; border-radius: 6px; font-size: .78rem;
+  border: 1px solid transparent; margin-top: 4px;
+}
+.pred-hot   { background: rgba(255,82,82,.12);  border-color: rgba(255,82,82,.3);  color: #ff5252; }
+.pred-good  { background: rgba(76,175,80,.12);  border-color: rgba(76,175,80,.3);  color: #66bb6a; }
+.pred-ok    { background: rgba(79,195,247,.1);  border-color: rgba(79,195,247,.25); color: #4fc3f7; }
+.pred-neutral { background: rgba(136,136,136,.08); border-color: rgba(136,136,136,.2); color: #999; }
+.pred-bad   { background: rgba(255,152,0,.08);  border-color: rgba(255,152,0,.2);  color: #ffa726; }
+
+.cpb-icon   { font-size: .9rem; }
+.cpb-label  { font-weight: 600; }
+.cpb-prob   { background: rgba(255,255,255,.1); border-radius: 4px; padding: 1px 5px; font-size: .72rem; font-weight: 700; }
+.cpb-live-tag { margin-left: auto; font-size: .68rem; font-weight: 700; opacity: .7; letter-spacing: .04em; }
+
+.card-signals-row {
+  display: flex; flex-wrap: wrap; gap: 4px; margin-top: 5px;
+}
+.csig {
+  background: rgba(255,193,7,.12); border: 1px solid rgba(255,193,7,.3);
+  color: #ffc107; border-radius: 4px; padding: 2px 7px; font-size: .72rem; font-weight: 600;
+}
