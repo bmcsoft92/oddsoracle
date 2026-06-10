@@ -1674,7 +1674,11 @@ app.get('/api/check-result', async (req, res) => {
       const ev = events[0];
       if (!ev) continue;
 
-      const finished = ev.strStatus === 'Match Finished' || ev.strStatus === 'FT' || ev.intHomeScore !== null;
+      // Statuts "terminé" connus de TheSportsDB. On NE se base PAS sur la
+      // présence d'un score (intHomeScore), car les matchs LIVE ont déjà
+      // un score renseigné -> ça marquait des matchs en cours comme finis.
+      const FINISHED_STATUSES = /^(match finished|ft|aet|aot|finished|ended|final|full time)$/i;
+      const finished = FINISHED_STATUSES.test((ev.strStatus || '').trim());
       if (!finished) return res.json({ result: 'pending', status: ev.strStatus });
       const hs = parseInt(ev.intHomeScore || 0);
       const as = parseInt(ev.intAwayScore || 0);
