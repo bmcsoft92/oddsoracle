@@ -92,6 +92,9 @@ const JournalModule = (() => {
                 <button class="btn btn-sm btn-secondary" onclick="JournalModule.markResult(${bet.id},'win')">✅</button>
                 <button class="btn btn-sm btn-secondary" onclick="JournalModule.markResult(${bet.id},'loss')">❌</button>
               ` : ''}
+              ${bet.result === 'win' || bet.result === 'loss' ? `
+                <button class="btn btn-sm btn-secondary" onclick="JournalModule.recheckBet(${bet.id})" title="Revérifier le résultat réel">🔄</button>
+              ` : ''}
               <button class="btn btn-sm btn-danger" onclick="JournalModule.removeBet(${bet.id})">🗑</button>
             </td>
           </tr>
@@ -254,5 +257,60 @@ const JournalModule = (() => {
     _autoCheckRunning = false;
   }
 
-  return { init, renderTable, markResult, removeBet, getAllBets, calcStats, autoCheckPendingBets };
+  // -----------------------------------------------------------------------
+  // RE-VÉRIFICATION MANUELLE : recalcule le résultat réel d'un pari déjà
+  // marqué Gagné/Perdu (correction d'une erreur de résolution antérieure)
+  // -----------------------------------------------------------------------
+  async function recheckBet(id) {
+    const bet = bets.find(b => b.id === id);
+    if (!bet || !bet.match || !bet.selection) return;
+
+    const parts = bet.match.split(/\s+vs\s+/i);
+    if (parts.length < 2) { alert('⚠️ Format du match invalide.'); return; }
+    const home = parts[0].trim();
+    const away = parts[1].trim();
+
+    const params = new URLSearchParams({
+      home, away,
+      date: bet.date || '',
+      selection: bet.selection || '',
+      sport: bet.sportKey || bet.sport || ''
+    });
+
+    try {
+      const r = await fetch('/api/check-result?' + params);
+      if (!r.ok) { alert('⚠️ Impossible de vérifier le résultat pour le moment.'); return; }
+      const data = await r.json();
+
+      if (data.result !== 'win' && data.result !== 'loss') {
+        alert('ℹ️ Match pas encore terminé (statut: ' + (data.status || data.reason || 'inconnu') + ').');
+        return;
+      }
+
+      if (data.result === bet.result) {
+        alert('✅ Résultat confirmé : ' + resultLabel(data.result) + (data.score ? ' (' + data.score + ')' : ''));
+        return;
+      }
+
+      // Annule l'impact bankroll de l'ancien résultat (incorrect)
+      const oldPnl = calcPnl(bet);
+      if (oldPnl > 0) BankrollManager.recordLoss(oldPnl, bet.type === 'live');
+      else if (oldPnl < 0) BankrollManager.recordWin(-oldPnl, bet.type === 'live');
+
+      // Applique le résultat réel
+      bet.result = data.result;
+      save();
+      const newPnl = calcPnl(bet);
+      if (newPnl > 0) BankrollManager.recordWin(newPnl, bet.type === 'live');
+      else if (newPnl < 0) BankrollManager.recordLoss(-newPnl, bet.type === 'live');
+
+      renderTable();
+      DashboardModule.refresh();
+      alert('🔄 Résultat corrigé : ' + resultLabel(data.result) + (data.score ? ' (' + data.score + ')' : ''));
+    } catch(e) {
+      alert('⚠️ Erreur lors de la vérification.');
+    }
+  }
+
+  return { init, renderTable, markResult, removeBet, recheckBet, getAllBets, calcStats, autoCheckPendingBets };
 })();
