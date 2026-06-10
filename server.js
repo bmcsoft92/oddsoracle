@@ -976,6 +976,24 @@ const ESPN_MAP = {
   mma_mixed_martial_arts: 'mma/ufc',
 };
 
+// Mapping sport générique (utilisé par le Journal) → clés ESPN_MAP à essayer
+// Permet à /api/check-result de retrouver un match même quand le pari ne
+// connaît que le label générique (ex: "hockey") et non la clé API précise
+// (ex: "icehockey_nhl").
+const GENERIC_SPORT_ESPN_KEYS = {
+  tennis: ['tennis_atp', 'tennis_wta'],
+  basketball: ['basketball_nba'],
+  baseball: ['baseball_mlb'],
+  hockey: ['icehockey_nhl'],
+  mma: ['mma_mixed_martial_arts'],
+  american_football: ['americanfootball_nfl'],
+  football: [
+    'soccer_epl', 'soccer_france_ligue1', 'soccer_spain_la_liga',
+    'soccer_germany_bundesliga', 'soccer_italy_serie_a', 'soccer_usa_mls',
+    'soccer_brazil_campeonato', 'soccer_europe_champs'
+  ],
+};
+
 function espnName(c) {
   return (c && c.team && c.team.displayName) ||
          (c && c.athlete && c.athlete.displayName) || '';
@@ -1461,8 +1479,14 @@ app.get('/api/check-result', async (req, res) => {
   }
 
   // ── 1. ESPN scoreboard ──────────────────────────────────────────────
-  const espnPath = ESPN_MAP[sport];
-  if (espnPath) {
+  // Si le sport est une clé API précise (ex: 'icehockey_nhl'), on l'utilise
+  // directement. Sinon (label générique du Journal, ex: 'hockey'), on essaie
+  // les clés ESPN correspondantes via GENERIC_SPORT_ESPN_KEYS.
+  const espnPaths = ESPN_MAP[sport]
+    ? [ESPN_MAP[sport]]
+    : (GENERIC_SPORT_ESPN_KEYS[sport] || []).map(k => ESPN_MAP[k]).filter(Boolean);
+
+  if (espnPaths.length) {
     try {
       const ctrl = new AbortController();
       setTimeout(function(){ ctrl.abort(); }, 7000);
@@ -1475,51 +1499,54 @@ app.get('/api/check-result', async (req, res) => {
           dates.push(dd.toISOString().slice(0,10).replace(/-/g,''));
         }
       }
-      const urls = dates.length
-        ? dates.map(d => `https://site.api.espn.com/apis/site/v2/sports/${espnPath}/scoreboard?dates=${d}`)
-        : [`https://site.api.espn.com/apis/site/v2/sports/${espnPath}/scoreboard`];
 
-      for (const url of urls) {
-        const r = await fetch(url, { signal: ctrl.signal });
-        if (!r.ok) continue;
-        const sb = await r.json();
-        const events = sb.events || [];
-        for (const ev of events) {
-          const comp  = (ev.competitions || [])[0] || {};
-          const comps = comp.competitors || [];
-          const n0 = (comps[0]&&comps[0].team&&(comps[0].team.displayName||comps[0].team.shortDisplayName))||'';
-          const n1 = (comps[1]&&comps[1].team&&(comps[1].team.displayName||comps[1].team.shortDisplayName))||'';
-          if (!((teamMatch(n0,home)&&teamMatch(n1,away))||(teamMatch(n0,away)&&teamMatch(n1,home)))) continue;
+      for (const espnPath of espnPaths) {
+        const urls = dates.length
+          ? dates.map(d => `https://site.api.espn.com/apis/site/v2/sports/${espnPath}/scoreboard?dates=${d}`)
+          : [`https://site.api.espn.com/apis/site/v2/sports/${espnPath}/scoreboard`];
 
-          const status  = (ev.status||{});
-          const state   = (status.type||{}).state || ''; // pre / in / post
-          if (state !== 'post') return res.json({ result: 'pending', status: state, score: null });
+        for (const url of urls) {
+          const r = await fetch(url, { signal: ctrl.signal });
+          if (!r.ok) continue;
+          const sb = await r.json();
+          const events = sb.events || [];
+          for (const ev of events) {
+            const comp  = (ev.competitions || [])[0] || {};
+            const comps = comp.competitors || [];
+            const n0 = (comps[0]&&comps[0].team&&(comps[0].team.displayName||comps[0].team.shortDisplayName))||'';
+            const n1 = (comps[1]&&comps[1].team&&(comps[1].team.displayName||comps[1].team.shortDisplayName))||'';
+            if (!((teamMatch(n0,home)&&teamMatch(n1,away))||(teamMatch(n0,away)&&teamMatch(n1,home)))) continue;
 
-          const s0 = parseFloat(comps[0].score||0);
-          const s1 = parseFloat(comps[1].score||0);
-          const homeIsComp0 = teamMatch(n0, home);
-          const homeScore = homeIsComp0 ? s0 : s1;
-          const awayScore = homeIsComp0 ? s1 : s0;
+            const status  = (ev.status||{});
+            const state   = (status.type||{}).state || ''; // pre / in / post
+            if (state !== 'post') return res.json({ result: 'pending', status: state, score: null });
 
-          let winner = null;
-          if (homeScore > awayScore) winner = home;
-          else if (awayScore > homeScore) winner = away;
-          else winner = 'draw';
+            const s0 = parseFloat(comps[0].score||0);
+            const s1 = parseFloat(comps[1].score||0);
+            const homeIsComp0 = teamMatch(n0, home);
+            const homeScore = homeIsComp0 ? s0 : s1;
+            const awayScore = homeIsComp0 ? s1 : s0;
 
-          // Détermine win/loss selon la sélection
-          let result = 'loss';
-          const sel = norm(selection);
-          if (sel === 'nul' || sel === 'draw' || sel === 'x') {
-            result = winner === 'draw' ? 'win' : 'loss';
-          } else if (teamMatch(selection, winner)) {
-            result = 'win';
+            let winner = null;
+            if (homeScore > awayScore) winner = home;
+            else if (awayScore > homeScore) winner = away;
+            else winner = 'draw';
+
+            // Détermine win/loss selon la sélection
+            let result = 'loss';
+            const sel = norm(selection);
+            if (sel === 'nul' || sel === 'draw' || sel === 'x') {
+              result = winner === 'draw' ? 'win' : 'loss';
+            } else if (teamMatch(selection, winner)) {
+              result = 'win';
+            }
+
+            return res.json({
+              result, winner,
+              score: homeScore + '-' + awayScore,
+              home, away, source: 'espn'
+            });
           }
-
-          return res.json({
-            result, winner,
-            score: homeScore + '-' + awayScore,
-            home, away, source: 'espn'
-          });
         }
       }
     } catch(e) { /* ESPN timeout ou erreur, continuer */ }

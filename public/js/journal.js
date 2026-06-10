@@ -198,6 +198,8 @@ const JournalModule = (() => {
     renderTable();
     // Vérifie automatiquement les paris en attente au démarrage
     setTimeout(autoCheckPendingBets, 2000);
+    // Puis re-vérifie périodiquement (utile pour les paris LIVE en cours)
+    setInterval(autoCheckPendingBets, 120000); // toutes les 2 minutes
   }
 
   // -----------------------------------------------------------------------
