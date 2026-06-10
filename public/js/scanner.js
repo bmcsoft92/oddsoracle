@@ -334,7 +334,12 @@ const ScannerModule = (() => {
       mk.opps.sort((a, b) => (b.edge || 0) - (a.edge || 0));
       dedupedOpps.push(mk.opps[0]);
     }
-    dedupedOpps.sort((a, b) => (b.edge || 0) - (a.edge || 0));
+    // Tri final : score affiné (edge + forme/H2H quand dispo) puis edge brut
+    dedupedOpps.sort((a, b) => {
+      const sa = a.adjustedScore != null ? a.adjustedScore : (a.predScore != null ? a.predScore : a.edge || 0);
+      const sb = b.adjustedScore != null ? b.adjustedScore : (b.predScore != null ? b.predScore : b.edge || 0);
+      return (sb - sa) || ((b.edge || 0) - (a.edge || 0));
+    });
 
     const opps = dedupedOpps;
     const html = opps.map((opp, i) => renderCard(opp, i)).join('');
@@ -417,6 +422,15 @@ const ScannerModule = (() => {
       </div>
 
       ${bkHtml ? `<div class="sc2-bk-section"><div class="sc2-bk-title">Comparateur de cotes</div>${bkHtml}</div>` : ''}
+
+      ${(opp.adjustedScore != null) ? `
+      <div class="sc2-ai-section">
+        <div class="sc2-ai-score">
+          <span class="sc2-ai-score-val">${opp.adjustedScore}<small>/100</small></span>
+          <span class="sc2-ai-score-lbl">Score IA${opp.formAdj ? ` <span class="${opp.formAdj > 0 ? 'sc2-ai-adj-pos' : 'sc2-ai-adj-neg'}">(${opp.formAdj > 0 ? '+' : ''}${opp.formAdj})</span>` : ''}</span>
+        </div>
+        <span class="sc2-ai-note">${opp.formNote || (opp.confidence === 'low' ? '<span class="sc2-low-conf">⚠ confiance faible (cotes peu convergentes)</span>' : 'Pas de donnée forme/H2H')}</span>
+      </div>` : ''}
 
       ${kelly ? `
       <div class="sc2-kelly">

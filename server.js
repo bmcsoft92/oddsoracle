@@ -528,6 +528,7 @@ async function getLiveScores() {
 
 function normTeam(s) {
   return (s || '').toLowerCase()
+    .normalize('NFD').replace(/[̀-ͯ]/g, '') // retire les accents (Náutico -> Nautico)
     .replace(/\s+fc$/,'').replace(/^fc\s+/,'')
     .replace(/[^a-z0-9]/g, '');
 }
@@ -536,6 +537,56 @@ function teamMatch(a, b) {
   const na = normTeam(a), nb = normTeam(b);
   if (!na || !nb) return false;
   return na === nb || na.includes(nb) || nb.includes(na);
+}
+
+// Analyse la cohérence des cotes entre bookmakers pour une sélection donnée.
+// Une "edge" élevée n'est une vraie value que si le marché est globalement
+// d'accord avec la cote sharp (Pinnacle) : si la meilleure cote est très
+// isolée par rapport au reste du marché, c'est probablement une ligne
+// périmée/erronée chez ce bookmaker plutôt qu'une vraie opportunité.
+function analyzeConsensus(allBookmakers, bestPrice) {
+  const n = allBookmakers.length;
+  if (n < 2) return { consensus: 'thin', isOutlier: false, deviationPct: 0 };
+  const others = allBookmakers.map(b => b.price).filter(p => p !== bestPrice);
+  const avgOthers = others.length
+    ? others.reduce((a, b) => a + b, 0) / others.length
+    : bestPrice;
+  const deviationPct = avgOthers > 0
+    ? Math.round(((bestPrice - avgOthers) / avgOthers) * 1000) / 10
+    : 0;
+  return {
+    consensus:   n >= 4 ? 'strong' : n >= 3 ? 'moderate' : 'thin',
+    isOutlier:   n >= 3 && deviationPct > 25,   // ligne très isolée → probable erreur
+    lowAgreement: n >= 3 && deviationPct > 12,  // ligne isolée → confiance réduite
+    deviationPct,
+    avgOthers: Math.round(avgOthers * 100) / 100,
+  };
+}
+
+// Calcule un ajustement de score basé sur la forme récente et le H2H,
+// sans se substituer à l'edge marché (qui reste le signal principal) —
+// sert juste à départager / affiner la confiance sur le top des opportunités.
+function computeFormAdjustment(opp, formHome, formAway, h2h) {
+  let adj = 0;
+  const notes = [];
+  const isHomeSel = teamMatch(opp.selection, opp.homeTeam);
+  const isAwaySel = teamMatch(opp.selection, opp.awayTeam);
+  if (!isHomeSel && !isAwaySel) return { adj: 0, notes: [] };
+
+  const selForm = isHomeSel ? formHome : formAway;
+  const oppForm = isHomeSel ? formAway : formHome;
+  if (selForm && oppForm && selForm.formPct != null && oppForm.formPct != null) {
+    const diff = selForm.formPct - oppForm.formPct;
+    adj += diff / 25; // ±4 pts max pour 100% d'écart de forme
+    notes.push('Forme 5 derniers: ' + selForm.formPct + '% vs ' + oppForm.formPct + '%');
+  }
+  if (h2h && h2h.total >= 3) {
+    const selWins = isHomeSel ? h2h.homeWins : h2h.awayWins;
+    const h2hPct = (selWins / h2h.total) * 100;
+    adj += (h2hPct - 50) / 33; // ±1.5 pts max
+    notes.push('H2H: ' + selWins + '/' + h2h.total + ' victoires');
+  }
+  return { adj: Math.round(adj * 10) / 10, notes };
 }
 
 function attachLiveScore(match, liveScores) {
@@ -817,15 +868,25 @@ app.get('/api/scanner', async (req, res) => {
 
           if (!bestBookKey) continue;
 
+          const sortedBooks = allBookmakers.sort(function(a,b) { return b.price - a.price; });
+          const consensus = analyzeConsensus(sortedBooks, bestPrice);
+
           const edge = (trueProb * bestPrice - 1) * 100;
           if (edge < 2) continue;
 
-          const confidence = pinnacle ? 'high' : rawBk.length >= 3 ? 'medium' : 'low';
+          // Cote très isolée par rapport au reste du marché (>25%) :
+          // probablement une ligne périmée/erronée, pas une vraie value.
+          if (consensus.isOutlier) continue;
+
+          let confidence = pinnacle ? 'high' : rawBk.length >= 3 ? 'medium' : 'low';
+          if (consensus.lowAgreement) confidence = 'low';
+
           const hoursLeft  = (t - now) / 3600000;
           const urgency    = isLive ? 'live' : hoursLeft < 2 ? 'soon' : hoursLeft < 6 ? 'today' : 'upcoming';
 
           const predScore  = Math.min(99, Math.round(trueProb * (1 + edge / 100)));
-          const predLabel  = edge >= 10 ? 'FORTE' : edge >= 6 ? 'BONNE' : 'CORRECTE';
+          let predLabel  = edge >= 10 ? 'FORTE' : edge >= 6 ? 'BONNE' : 'CORRECTE';
+          if (confidence === 'low' && predLabel === 'FORTE') predLabel = 'BONNE';
 
           opportunities.push({
             sport:          sport.key,
@@ -843,9 +904,10 @@ app.get('/api/scanner', async (req, res) => {
             sharpPrice:     o.price,
             bestPrice,
             bestBook:       bestBookName || bestBookKey,
-            allBookmakers:  allBookmakers.sort(function(a,b) { return b.price - a.price; }),
+            allBookmakers:  sortedBooks,
             edge:           Math.round(edge * 10) / 10,
             confidence,
+            marketConsensus: consensus.consensus,
             ev:             Math.round((trueProb * bestPrice - 1) * 1000) / 10,
             predScore,
             predLabel,
@@ -860,6 +922,38 @@ app.get('/api/scanner', async (req, res) => {
   opportunities.sort(function(a, b) {
     if (a.isLive !== b.isLive) return a.isLive ? -1 : 1;
     return b.edge - a.edge;
+  });
+
+  // -- Affinage IA : forme récente + H2H (TheSportsDB, gratuit) sur le top --
+  // L'edge marché reste le signal principal ; la forme/H2H sert à départager
+  // et affiner la confiance des meilleures opportunités.
+  const TOP_N_REFINE = 8;
+  const topPicks = opportunities.slice(0, TOP_N_REFINE);
+  await Promise.allSettled(topPicks.map(async function(opp) {
+    try {
+      const [formHomeRes, formAwayRes, h2hRes] = await Promise.allSettled([
+        fetchTeamRecentForm(opp.homeTeam),
+        fetchTeamRecentForm(opp.awayTeam),
+        fetchH2H(opp.homeTeam, opp.awayTeam),
+      ]);
+      const formHome = formHomeRes.status === 'fulfilled' ? formHomeRes.value : null;
+      const formAway = formAwayRes.status === 'fulfilled' ? formAwayRes.value : null;
+      const h2h      = h2hRes.status === 'fulfilled' ? h2hRes.value : null;
+
+      const { adj, notes } = computeFormAdjustment(opp, formHome, formAway, h2h);
+      opp.formAdj = adj;
+      opp.formNote = notes.length ? notes.join(' · ') : null;
+      opp.adjustedScore = Math.max(1, Math.min(99, Math.round(opp.predScore + adj)));
+    } catch (e) {
+      opp.adjustedScore = opp.predScore;
+    }
+  }));
+  opportunities.forEach(function(o) { if (o.adjustedScore == null) o.adjustedScore = o.predScore; });
+
+  // Re-tri final : live d'abord, puis score affiné (edge + forme/H2H), puis edge brut
+  opportunities.sort(function(a, b) {
+    if (a.isLive !== b.isLive) return a.isLive ? -1 : 1;
+    return (b.adjustedScore - a.adjustedScore) || (b.edge - a.edge);
   });
 
   const result = {
@@ -1553,15 +1647,24 @@ app.get('/api/check-result', async (req, res) => {
   }
 
   // ── 2. TheSportsDB fallback ─────────────────────────────────────────
-  try {
-    const query = encodeURIComponent(home + ' ' + away);
-    const ctrl2 = new AbortController();
-    setTimeout(function(){ ctrl2.abort(); }, 6000);
-    const r = await fetch(
-      'https://www.thesportsdb.com/api/v1/json/3/searchevents.php?e=' + query,
-      { signal: ctrl2.signal }
-    );
-    if (r.ok) {
+  // searchevents.php attend un format "Equipe1 vs Equipe2" et échoue si un
+  // mot supplémentaire traîne (ex: suffixe d'état brésilien "Nautico PE").
+  // On essaie donc le nom complet, puis sans ce suffixe.
+  function stripRegionSuffix(s) { return s.replace(/\s+[A-Z]{2}$/, ''); }
+  const homeAlt = stripRegionSuffix(home);
+  const awayAlt = stripRegionSuffix(away);
+  const tsdbQueries = [home + ' vs ' + away];
+  if (homeAlt !== home || awayAlt !== away) tsdbQueries.push(homeAlt + ' vs ' + awayAlt);
+
+  for (const q of tsdbQueries) {
+    try {
+      const ctrl2 = new AbortController();
+      setTimeout(function(){ ctrl2.abort(); }, 6000);
+      const r = await fetch(
+        'https://www.thesportsdb.com/api/v1/json/3/searchevents.php?e=' + encodeURIComponent(q),
+        { signal: ctrl2.signal }
+      );
+      if (!r.ok) continue;
       const d = await r.json();
       const events = (d.event || []).filter(function(ev) {
         if (!teamMatch(ev.strHomeTeam, home) || !teamMatch(ev.strAwayTeam, away)) return false;
@@ -1569,28 +1672,28 @@ app.get('/api/check-result', async (req, res) => {
         return true;
       });
       const ev = events[0];
-      if (ev) {
-        const finished = ev.strStatus === 'Match Finished' || ev.strStatus === 'FT' || ev.intHomeScore !== null;
-        if (!finished) return res.json({ result: 'pending', status: ev.strStatus });
-        const hs = parseInt(ev.intHomeScore || 0);
-        const as = parseInt(ev.intAwayScore || 0);
-        let winner = null;
-        if (hs > as) winner = ev.strHomeTeam;
-        else if (as > hs) winner = ev.strAwayTeam;
-        else winner = 'draw';
+      if (!ev) continue;
 
-        const sel = norm(selection);
-        let result = 'loss';
-        if (sel === 'nul' || sel === 'draw' || sel === 'x') {
-          result = winner === 'draw' ? 'win' : 'loss';
-        } else if (teamMatch(selection, winner)) {
-          result = 'win';
-        }
+      const finished = ev.strStatus === 'Match Finished' || ev.strStatus === 'FT' || ev.intHomeScore !== null;
+      if (!finished) return res.json({ result: 'pending', status: ev.strStatus });
+      const hs = parseInt(ev.intHomeScore || 0);
+      const as = parseInt(ev.intAwayScore || 0);
+      let winner = null;
+      if (hs > as) winner = ev.strHomeTeam;
+      else if (as > hs) winner = ev.strAwayTeam;
+      else winner = 'draw';
 
-        return res.json({ result, winner, score: hs+'-'+as, home, away, source: 'thesportsdb' });
+      const sel = norm(selection);
+      let result = 'loss';
+      if (sel === 'nul' || sel === 'draw' || sel === 'x') {
+        result = winner === 'draw' ? 'win' : 'loss';
+      } else if (teamMatch(selection, winner)) {
+        result = 'win';
       }
-    }
-  } catch(e) { /* timeout */ }
+
+      return res.json({ result, winner, score: hs+'-'+as, home, away, source: 'thesportsdb' });
+    } catch(e) { /* timeout, essaie la requête suivante */ }
+  }
 
   return res.json({ result: 'pending', reason: 'match non trouvé' });
 });

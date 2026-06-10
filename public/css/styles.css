@@ -385,6 +385,15 @@ option,optgroup{background:var(--bg1)}
 .sc2-edge-val.ev-forte{color:#f59e0b}
 .sc2-edge-val.ev-bonne{color:var(--green)}
 .sc2-edge-val.ev-ok{color:var(--blue)}
+/* Affinage IA (forme + H2H) */
+.sc2-ai-section{display:flex;align-items:center;justify-content:space-between;gap:.5rem;padding:.4rem .8rem;border-bottom:1px solid var(--border0);background:rgba(139,92,246,.05)}
+.sc2-ai-score{display:flex;align-items:baseline;gap:.3rem;flex-shrink:0}
+.sc2-ai-score-val{font-family:var(--mono);font-weight:800;font-size:.95rem;color:#a78bfa}
+.sc2-ai-score-lbl{font-size:.55rem;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--text2)}
+.sc2-ai-note{font-size:.65rem;color:var(--text2);text-align:right;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sc2-ai-adj-pos{color:var(--green)}
+.sc2-ai-adj-neg{color:var(--red)}
+.sc2-low-conf{font-size:.6rem;color:var(--amber,#f59e0b);font-weight:700}
 /* Bookmaker comparison */
 .sc2-bk-section{padding:.45rem .8rem;border-bottom:1px solid var(--border0)}
 .sc2-bk-title{font-size:.6rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text2);margin-bottom:.35rem}
