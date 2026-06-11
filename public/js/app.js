@@ -1586,9 +1586,68 @@ function bindIaRetry(box, home, away, sport, edge, prob) {
   if (btn) btn.addEventListener('click', function(){ loadIaAnalysis(home, away, sport, edge, prob); });
 }
 
+// Correspondance clés JSON (réponse de secours de Gemini) -> émoji/classe/libellé attendus
+var IA_JSON_KEY_MAP = [
+  { emoji: '🎯', cls: 'ia-llm-marche',    label: 'MARCHÉ',                     match: 'MARCHE' },
+  { emoji: '📊', cls: 'ia-llm-signal',    label: 'SIGNAL',                     match: 'SIGNAL' },
+  { emoji: '🧮', cls: 'ia-llm-proba',     label: 'PROBABILITÉ RÉELLE ESTIMÉE', match: 'PROBABILITE REELLE ESTIMEE' },
+  { emoji: '💰', cls: 'ia-llm-cote',      label: 'COTE MINIMUM POUR VALEUR',   match: 'COTE MINIMUM POUR VALEUR' },
+  { emoji: '⚡', cls: 'ia-llm-edge',      label: 'EDGE ESTIMÉ',                match: 'EDGE ESTIME' },
+  { emoji: '🔒', cls: 'ia-llm-confiance', label: 'CONFIANCE',                  match: 'CONFIANCE' },
+  { emoji: '⚠️', cls: 'ia-llm-risque',    label: 'RISQUES',                    match: 'RISQUES' },
+  { emoji: '✅', cls: 'ia-llm-reco',      label: 'RECOMMANDATION',             match: 'RECOMMANDATION' },
+  { emoji: '📌', cls: 'ia-llm-mise',      label: 'MISE SUGGÉRÉE',              match: 'MISE SUGGEREE' }
+];
+
+// Normalise une clé (accents retirés, majuscules, lettres uniquement) pour matcher IA_JSON_KEY_MAP
+function normIaKey(s) {
+  return String(s).normalize('NFD').replace(/[̀-ͯ]/g, '').toUpperCase().replace(/[^A-Z]+/g, ' ').trim();
+}
+
+// Tente d'extraire un tableau JSON (éventuellement dans un bloc ```json ... ```) de la réponse du LLM
+function tryParseIaJsonArray(text) {
+  var t = text.trim();
+  var fence = t.match(/```(?:json)?\s*([\s\S]*?)```/i);
+  if (fence) t = fence[1].trim();
+  if (t[0] !== '[' && t[0] !== '{') return null;
+  try {
+    var parsed = JSON.parse(t);
+    if (Array.isArray(parsed)) return parsed;
+    if (parsed && typeof parsed === 'object') return [parsed];
+  } catch (e) {}
+  return null;
+}
+
+// Met en forme un tableau JSON de pronos (format de secours) en blocs HTML identiques au format attendu
+function formatIaAnalysisFromJson(items) {
+  return items.map(function(obj){
+    var normalized = {};
+    Object.keys(obj || {}).forEach(function(k){ normalized[normIaKey(k)] = obj[k]; });
+    var html = '<div class="ia-llm-prono">';
+    IA_JSON_KEY_MAP.forEach(function(def){
+      var value = normalized[def.match];
+      if (value === undefined || value === null || value === '') return;
+      html += '<div class="ia-llm-line ' + def.cls + '">'
+            + '<span class="ia-llm-emoji">' + def.emoji + '</span>'
+            + '<span class="ia-llm-label">' + escHtml(def.label) + '</span>'
+            + '<span class="ia-llm-value">' + escHtml(String(value)) + '</span>'
+            + '</div>';
+    });
+    html += '</div>';
+    return html;
+  }).join('');
+}
+
 // Met en forme la réponse texte du LLM (format 🎯📊🧮💰⚡🔒⚠️✅📌) en blocs HTML
 function formatIaAnalysis(text) {
   if (!text || !text.trim()) return '<div class="ia-llm-empty">Aucune analyse disponible pour ce match.</div>';
+
+  // Repli : si Gemini a renvoyé un JSON (au lieu du format ligne attendu), on le parse directement
+  var jsonItems = tryParseIaJsonArray(text);
+  if (jsonItems && jsonItems.length) {
+    var jsonHtml = formatIaAnalysisFromJson(jsonItems);
+    if (jsonHtml) return jsonHtml;
+  }
 
   var LABELS = {
     '🎯': 'ia-llm-marche',
