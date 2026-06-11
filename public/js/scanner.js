@@ -340,14 +340,14 @@ const ScannerModule = (() => {
         }
       });
 
+      const displayedCount = renderResults(json.data, json.scannedAt, json.cached);
+
+      // Le badge de l'onglet reflete lui aussi les cartes affichees (apres deduplication)
       const badgeEl = document.getElementById('scanner-badge');
       if (badgeEl) {
-        const count = opps.length;
-        badgeEl.textContent = count;
-        badgeEl.style.display = count > 0 ? 'inline-flex' : 'none';
+        badgeEl.textContent = displayedCount;
+        badgeEl.style.display = displayedCount > 0 ? 'inline-flex' : 'none';
       }
-
-      renderResults(json.data, json.scannedAt, json.cached);
 
       if (status) {
         const t = new Date(json.scannedAt).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
@@ -357,7 +357,9 @@ const ScannerModule = (() => {
 
       if (meta && json.data && json.data.meta) {
         const m = json.data.meta;
-        meta.textContent = `${m.sportsScanned} sports -- ${m.eventsFound} matchs -- ${m.totalOpportunities} opportunites`;
+        // Le compteur reflete les cartes reellement affichees (apres deduplication par match),
+        // pas le total brut d'opportunites detectees cote serveur.
+        meta.textContent = `${m.sportsScanned} sports -- ${m.eventsFound} matchs -- ${displayedCount} opportunites`;
       }
 
     } catch (err) {
@@ -382,9 +384,10 @@ const ScannerModule = (() => {
   // -----------------------------------------------------------------
   // RENDER
   // -----------------------------------------------------------------
+  // Retourne le nombre de cartes effectivement affichees (apres deduplication par match)
   function renderResults(data, scannedAt, cached) {
     const container = document.getElementById('scanner-results');
-    if (!container) return;
+    if (!container) return 0;
 
     if (!data || !data.opportunities || !data.opportunities.length) {
       container.innerHTML = `
@@ -396,7 +399,7 @@ const ScannerModule = (() => {
             Reessayez plus tard ou verifiez que votre cle API est configuree.
           </div>
         </div>`;
-      return;
+      return 0;
     }
 
     // -- Déduplication : 1 seule sélection par match, filtre données aberrantes --
@@ -427,6 +430,7 @@ const ScannerModule = (() => {
     _dedupedOpps = opps;
     const html = opps.map((opp, i) => renderCard(opp, i)).join('');
     container.innerHTML = `<div class="scanner-grid">${html}</div>`;
+    return opps.length;
   }
 
   function renderCard(opp, rank) {

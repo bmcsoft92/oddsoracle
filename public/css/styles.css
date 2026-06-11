@@ -865,7 +865,7 @@ option,optgroup{background:var(--bg1)}
 .stats-tab.active, .stats-tab:hover { color: var(--accent, #4fc3f7); }
 .stats-tab.active { border-bottom-color: var(--accent, #4fc3f7); background: rgba(79,195,247,.07); }
 .stats-modal-body {
-  flex: 1; overflow-y: auto; padding: 18px;
+  flex: 1; min-height: 0; overflow-y: auto; padding: 18px;
 }
 .stats-loading, .stats-empty, .stats-error {
   text-align: center; padding: 40px 20px; color: var(--text-muted, #8892b0);
