@@ -18,7 +18,7 @@ const ODDS_API_KEY  = process.env.ODDS_API_KEY  || '';
 const ODDS_API_BASE = 'https://api.the-odds-api.com/v4';
 
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY || '';
-const GEMINI_MODEL   = process.env.GEMINI_MODEL   || 'gemini-2.5-pro';
+const GEMINI_MODEL   = process.env.GEMINI_MODEL   || 'gemini-2.5-flash';
 const GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/';
 
 // ═══════════════════════════════════════════════════════════════════════

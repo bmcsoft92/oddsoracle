@@ -424,6 +424,7 @@ option,optgroup{background:var(--bg1)}
 .sc2-btn-logged{background:rgba(16,185,129,.12);color:var(--green)}
 .sc2-btn-ghost{background:var(--bg2);color:var(--text2);border:1px solid var(--border0)}
 .sc2-btn-watch{background:rgba(245,158,11,.15);color:#f59e0b}
+.sc2-btn-stats{background:rgba(79,195,247,.15);color:#4fc3f7}
 
 /* ===== LIVE SECTION ===== */
 .live-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(310px,1fr));gap:.7rem}

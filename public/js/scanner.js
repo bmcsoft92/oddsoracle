@@ -9,6 +9,7 @@ const ScannerModule = (() => {
 
   let _autoRefreshTimer = null;
   let _lastScanData     = null;
+  let _dedupedOpps      = null;
   let _bankroll         = 1000;
   const REFRESH_INTERVAL = 10 * 60 * 1000; // 10 min
 
@@ -341,6 +342,7 @@ const ScannerModule = (() => {
     });
 
     const opps = dedupedOpps;
+    _dedupedOpps = opps;
     const html = opps.map((opp, i) => renderCard(opp, i)).join('');
     container.innerHTML = `<div class="scanner-grid">${html}</div>`;
   }
@@ -450,6 +452,7 @@ const ScannerModule = (() => {
           ${isLogged ? '✓ Loggé' : '+ Journal'}
         </button>
         <div class="sc2-footer-right">
+          <button class="sc2-btn sc2-btn-stats" onclick="ScannerModule.openStats(${rank})">&#x1F4CA; Stats</button>
           <button class="sc2-btn sc2-btn-ghost" onclick="ScannerModule.focusSport('${opp.sport}')">Ce sport</button>
           <button class="sc2-btn sc2-btn-watch" onclick="ScannerModule.watchMatch('${homeEsc}','${awayEsc}','${opp.sport}')">&#9654; Watch</button>
         </div>
@@ -587,6 +590,26 @@ const ScannerModule = (() => {
   }
 
   // -----------------------------------------------------------------
+  // OUVRIR LA MODALE STATS / ANALYSE IA
+  // -----------------------------------------------------------------
+  function openStats(rank) {
+    if (!_dedupedOpps) return;
+    const opp = _dedupedOpps[rank];
+    if (!opp) return;
+    if (typeof openMatchStats !== 'function') return;
+    openMatchStats({
+      dataset: {
+        home:    opp.homeTeam || '',
+        away:    opp.awayTeam || '',
+        sport:   opp.sport || '',
+        matchId: opp.matchId || '',
+        edge:    String(opp.edge != null ? opp.edge : ''),
+        prob:    String(opp.trueProb != null ? opp.trueProb : ''),
+      }
+    });
+  }
+
+  // -----------------------------------------------------------------
   // AJOUTER AU JOURNAL (bouton manuel)
   // -----------------------------------------------------------------
   function addToJournal(rank) {
@@ -690,5 +713,5 @@ const ScannerModule = (() => {
     }
   }
 
-  return { init, runScan, addToJournal, applyFilters, focusSport, watchMatch };
+  return { init, runScan, addToJournal, applyFilters, focusSport, watchMatch, openStats };
 })();
