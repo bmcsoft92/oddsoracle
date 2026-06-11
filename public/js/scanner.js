@@ -10,6 +10,7 @@ const ScannerModule = (() => {
   let _autoRefreshTimer = null;
   let _lastScanData     = null;
   let _dedupedOpps      = null;
+  let _displayedOpps    = null; // sous-ensemble actuellement affiche (apres filtres) -- source pour openStats/addToJournal
   let _bankroll         = 1000;
   const REFRESH_INTERVAL = 10 * 60 * 1000; // 10 min
 
@@ -399,6 +400,8 @@ const ScannerModule = (() => {
             Reessayez plus tard ou verifiez que votre cle API est configuree.
           </div>
         </div>`;
+      _dedupedOpps   = [];
+      _displayedOpps = [];
       return 0;
     }
 
@@ -427,7 +430,8 @@ const ScannerModule = (() => {
     });
 
     const opps = dedupedOpps;
-    _dedupedOpps = opps;
+    _dedupedOpps   = opps;
+    _displayedOpps = opps;
     const html = opps.map((opp, i) => renderCard(opp, i)).join('');
     container.innerHTML = `<div class="scanner-grid">${html}</div>`;
     return opps.length;
@@ -558,7 +562,7 @@ const ScannerModule = (() => {
   // FILTRES
   // -----------------------------------------------------------------
   function applyFilters() {
-    if (!_lastScanData || !_lastScanData.opportunities) return;
+    if (!_dedupedOpps) return;
     const sportEl  = document.getElementById('scan-filter-sport');
     const edgeEl   = document.getElementById('scan-filter-edge');
     const liveEl   = document.getElementById('scan-filter-live');
@@ -566,7 +570,9 @@ const ScannerModule = (() => {
     const minEdge  = parseFloat(edgeEl ? edgeEl.value : 0);
     const onlyLive = liveEl ? liveEl.checked : false;
 
-    const filtered = _lastScanData.opportunities.filter(o => {
+    // On filtre la liste deja dedupliquee (1 carte par match), pour rester
+    // coherent avec le badge et les boutons Stats/Journal qui indexent _displayedOpps.
+    const filtered = _dedupedOpps.filter(o => {
       if (sport !== 'all' && SPORT_MAP[o.sport] !== sport) return false;
       if (o.edge < minEdge) return false;
       if (onlyLive && !o.isLive) return false;
@@ -576,12 +582,31 @@ const ScannerModule = (() => {
     const container = document.getElementById('scanner-results');
     if (!container) return;
 
+    _displayedOpps = filtered;
+
+    const badgeEl = document.getElementById('scanner-badge');
+    const meta    = document.getElementById('scanner-meta');
+
     if (!filtered.length) {
       container.innerHTML = '<div class="scanner-empty">Aucune opportunite avec ces filtres</div>';
+      if (badgeEl) { badgeEl.textContent = '0'; badgeEl.style.display = 'none'; }
+      if (meta && _lastScanData && _lastScanData.meta) {
+        const m = _lastScanData.meta;
+        meta.textContent = `${m.sportsScanned} sports -- ${m.eventsFound} matchs -- 0 opportunites`;
+      }
       return;
     }
 
     container.innerHTML = `<div class="scanner-grid">${filtered.map((o, i) => renderCard(o, i)).join('')}</div>`;
+
+    if (badgeEl) {
+      badgeEl.textContent = filtered.length;
+      badgeEl.style.display = 'inline-flex';
+    }
+    if (meta && _lastScanData && _lastScanData.meta) {
+      const m = _lastScanData.meta;
+      meta.textContent = `${m.sportsScanned} sports -- ${m.eventsFound} matchs -- ${filtered.length} opportunites`;
+    }
   }
 
   function focusSport(sportKey) {
@@ -679,8 +704,8 @@ const ScannerModule = (() => {
   // OUVRIR LA MODALE STATS / ANALYSE IA
   // -----------------------------------------------------------------
   function openStats(rank) {
-    if (!_dedupedOpps) return;
-    const opp = _dedupedOpps[rank];
+    if (!_displayedOpps) return;
+    const opp = _displayedOpps[rank];
     if (!opp) return;
     if (typeof openMatchStats !== 'function') return;
     openMatchStats({
@@ -699,8 +724,8 @@ const ScannerModule = (() => {
   // AJOUTER AU JOURNAL (bouton manuel)
   // -----------------------------------------------------------------
   function addToJournal(rank) {
-    if (!_lastScanData || !_lastScanData.opportunities) return;
-    const opp   = _lastScanData.opportunities[rank];
+    if (!_displayedOpps) return;
+    const opp   = _displayedOpps[rank];
     if (!opp) return;
     const kelly = autoKelly(opp.trueProb, opp.bestPrice, _bankroll, opp.isLive);
 
