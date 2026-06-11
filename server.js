@@ -267,6 +267,33 @@ SIGNAUX D'ALERTE (réduire confiance) :
 🏈 NFL : Total points mi-temps | Spread | Rushing yards
 
 ══════════════════════════════════════════════
+🔴 ANALYSE EN COURS (MATCH LIVE)
+══════════════════════════════════════════════
+Si les données fournies indiquent "MATCH EN COURS" (score actuel, période/manche/
+temps de jeu), le match a déjà commencé : tu DOIS quand même produire une analyse
+et des pronos adaptés au LIVE BETTING — ne refuse JAMAIS d'analyser au seul motif
+que le match est en cours.
+- Base ton analyse sur l'état ACTUEL du match : score, période/manche/set, temps
+  écoulé/restant, dynamique récente (qui domine depuis le coup d'envoi), et les
+  stats live fournies (tirs, possession, incidents, etc. si disponibles).
+- Les pronos doivent porter sur LA SUITE du match à partir de maintenant :
+  vainqueur final, total buts/points/jeux restants, prochain but/point/score,
+  handicap ou over/under live, etc. — pas sur l'issue "pré-match".
+- "PROBABILITÉ RÉELLE ESTIMÉE", "COTE MINIMUM POUR VALEUR" et "EDGE ESTIMÉ"
+  doivent refléter la situation ACTUELLE (compte tenu du score et du temps
+  restant), pas la probabilité pré-match. Si tu ne disposes pas de la cote live
+  exacte, donne une fourchette de cote raisonnable basée sur ton estimation et
+  indique-le clairement.
+- Si les statistiques détaillées habituelles (xG, ERA, bullpen, etc.) manquent
+  pour ce match, base-toi sur le score actuel, le rythme du match et ta
+  connaissance générale des équipes/joueurs pour une estimation qualitative —
+  précise alors que l'estimation est qualitative plutôt que statistique.
+- Le bloc "(pré-match)" sur la cote/probabilité/edge du modèle local (s'il est
+  fourni) est calculé avant ou au début du match et peut être obsolète une fois
+  le match en cours : utilise-le seulement comme indice de contexte, sans qu'il
+  bloque ton analyse.
+
+══════════════════════════════════════════════
 📥 DONNÉES FOURNIES POUR CE MATCH
 ══════════════════════════════════════════════
 Tu reçois ci-dessous UNIQUEMENT les statistiques réellement disponibles via les
@@ -2140,13 +2167,19 @@ function buildIaUserMessage(params) {
   const sportLabel = sportInfo ? sportInfo.label : (sport || 'Sport inconnu');
   const sportGroup = sportInfo ? sportInfo.group : '';
 
+  // Le match est-il déjà en cours ? (score ESPN dispo) -- sert à qualifier les
+  // valeurs "modèle local" ci-dessous, qui sont calculées avant/au début du match
+  // et peuvent être obsolètes une fois la rencontre lancée.
+  const isLiveMatch = !!(stats && stats.espnStats && stats.espnStats.found);
+  const localValSuffix = isLiveMatch ? ' (pré-match, à titre indicatif)' : '';
+
   const lines = [];
   lines.push('MATCH : ' + home + ' vs ' + away);
   lines.push('SPORT : ' + sportLabel + (sportGroup ? ' (groupe: ' + sportGroup + ')' : ''));
   if (market) lines.push('MARCHÉ ANALYSÉ PAR LE MODÈLE LOCAL : ' + market);
-  if (cote !== undefined && cote !== null && cote !== '') lines.push('COTE PROPOSÉE : ' + cote);
-  if (prob !== undefined && prob !== null && prob !== '') lines.push('PROBABILITÉ ESTIMÉE PAR LE MODÈLE LOCAL : ' + prob + '%');
-  if (edge !== undefined && edge !== null && edge !== '') lines.push('EDGE ESTIMÉ PAR LE MODÈLE LOCAL (vs marché) : ' + edge + '%');
+  if (cote !== undefined && cote !== null && cote !== '') lines.push('COTE PROPOSÉE' + localValSuffix + ' : ' + cote);
+  if (prob !== undefined && prob !== null && prob !== '') lines.push('PROBABILITÉ ESTIMÉE PAR LE MODÈLE LOCAL' + localValSuffix + ' : ' + prob + '%');
+  if (edge !== undefined && edge !== null && edge !== '') lines.push('EDGE ESTIMÉ PAR LE MODÈLE LOCAL (vs marché)' + localValSuffix + ' : ' + edge + '%');
 
   const fh = (stats && stats.formHome) || null;
   const fa = (stats && stats.formAway) || null;
