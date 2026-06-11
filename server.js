@@ -281,35 +281,143 @@ const SPORTS = [
   // Tennis
   { key: 'tennis_atp',                   label: 'Tennis ATP',          icon: 'T', group: 'tennis' },
   { key: 'tennis_wta',                   label: 'Tennis WTA',          icon: 'T', group: 'tennis' },
-  // Football -- Europe
+  // Tennis -- Grands Chelems
+  { key: 'tennis_atp_aus_open_singles',  label: 'Open Australie (ATP)',icon: 'T', group: 'tennis' },
+  { key: 'tennis_atp_french_open',       label: 'Roland-Garros (ATP)', icon: 'T', group: 'tennis' },
+  { key: 'tennis_atp_wimbledon',         label: 'Wimbledon (ATP)',     icon: 'T', group: 'tennis' },
+  { key: 'tennis_atp_us_open',           label: 'US Open (ATP)',       icon: 'T', group: 'tennis' },
+  { key: 'tennis_wta_aus_open_singles',  label: 'Open Australie (WTA)',icon: 'T', group: 'tennis' },
+  { key: 'tennis_wta_french_open',       label: 'Roland-Garros (WTA)', icon: 'T', group: 'tennis' },
+  { key: 'tennis_wta_wimbledon',         label: 'Wimbledon (WTA)',     icon: 'T', group: 'tennis' },
+  { key: 'tennis_wta_us_open',           label: 'US Open (WTA)',       icon: 'T', group: 'tennis' },
+  // Football -- Europe (ligues majeures)
   { key: 'soccer_france_ligue1',         label: 'Ligue 1',             icon: 'F', group: 'football' },
+  { key: 'soccer_france_ligue_two',      label: 'Ligue 2',             icon: 'F', group: 'football' },
+  { key: 'soccer_france_coupe_de_france',label: 'Coupe de France',     icon: 'F', group: 'football' },
   { key: 'soccer_epl',                   label: 'Premier League',      icon: 'F', group: 'football' },
+  { key: 'soccer_efl_champ',             label: 'Championship (ENG)',  icon: 'F', group: 'football' },
+  { key: 'soccer_england_league1',       label: 'League One (ENG)',    icon: 'F', group: 'football' },
+  { key: 'soccer_england_league2',       label: 'League Two (ENG)',    icon: 'F', group: 'football' },
+  { key: 'soccer_fa_cup',                label: 'FA Cup',              icon: 'F', group: 'football' },
+  { key: 'soccer_england_efl_cup',       label: 'EFL Cup',             icon: 'F', group: 'football' },
   { key: 'soccer_europe_champs',         label: 'Champions League',    icon: 'F', group: 'football' },
+  { key: 'soccer_uefa_champs_league',    label: 'Ligue des Champions', icon: 'F', group: 'football' },
+  { key: 'soccer_uefa_champs_league_qualification', label: 'LdC - Qualifications', icon: 'F', group: 'football' },
+  { key: 'soccer_uefa_europa_league',    label: 'Ligue Europa',        icon: 'F', group: 'football' },
+  { key: 'soccer_uefa_europa_conference_league', label: 'Ligue Conférence Europa', icon: 'F', group: 'football' },
   { key: 'soccer_spain_la_liga',         label: 'La Liga',             icon: 'F', group: 'football' },
+  { key: 'soccer_spain_segunda_division',label: 'La Liga 2',           icon: 'F', group: 'football' },
+  { key: 'soccer_spain_copa_del_rey',    label: 'Copa del Rey',        icon: 'F', group: 'football' },
   { key: 'soccer_italy_serie_a',         label: 'Serie A',             icon: 'F', group: 'football' },
+  { key: 'soccer_italy_serie_b',         label: 'Serie B',             icon: 'F', group: 'football' },
+  { key: 'soccer_italy_coppa_italia',    label: 'Coppa Italia',        icon: 'F', group: 'football' },
   { key: 'soccer_germany_bundesliga',    label: 'Bundesliga',          icon: 'F', group: 'football' },
+  { key: 'soccer_germany_bundesliga2',   label: 'Bundesliga 2',        icon: 'F', group: 'football' },
+  { key: 'soccer_germany_dfb_pokal',     label: 'DFB-Pokal',           icon: 'F', group: 'football' },
   { key: 'soccer_portugal_primeira_liga',label: 'Primeira Liga',       icon: 'F', group: 'football' },
   { key: 'soccer_netherlands_eredivisie',label: 'Eredivisie',          icon: 'F', group: 'football' },
-  // Football -- Ameriques
+  { key: 'soccer_belgium_first_div',     label: 'Belgique - Pro League', icon: 'F', group: 'football' },
+  { key: 'soccer_austria_bundesliga',    label: 'Autriche - Bundesliga', icon: 'F', group: 'football' },
+  { key: 'soccer_switzerland_superleague', label: 'Suisse - Super League', icon: 'F', group: 'football' },
+  { key: 'soccer_turkey_super_league',   label: 'Turquie - Super Lig', icon: 'F', group: 'football' },
+  { key: 'soccer_greece_super_league',   label: 'Grèce - Super League',icon: 'F', group: 'football' },
+  { key: 'soccer_denmark_superliga',     label: 'Danemark - Superliga',icon: 'F', group: 'football' },
+  { key: 'soccer_norway_eliteserien',    label: 'Norvège - Eliteserien', icon: 'F', group: 'football' },
+  { key: 'soccer_sweden_allsvenskan',    label: 'Suède - Allsvenskan', icon: 'F', group: 'football' },
+  { key: 'soccer_sweden_superettan',     label: 'Suède - Superettan',  icon: 'F', group: 'football' },
+  { key: 'soccer_finland_veikkausliiga', label: 'Finlande - Veikkausliiga', icon: 'F', group: 'football' },
+  { key: 'soccer_poland_ekstraklasa',    label: 'Pologne - Ekstraklasa', icon: 'F', group: 'football' },
+  { key: 'soccer_russia_premier_league', label: 'Russie - Premier League', icon: 'F', group: 'football' },
+  { key: 'soccer_spl',                   label: 'Écosse - Premiership',icon: 'F', group: 'football' },
+  { key: 'soccer_saudi_arabia_pro_league', label: 'Arabie Saoudite - Pro League', icon: 'F', group: 'football' },
+  // Football -- Compétitions internationales
+  { key: 'soccer_fifa_world_cup',        label: 'Coupe du Monde FIFA', icon: 'F', group: 'football' },
+  { key: 'soccer_fifa_world_cup_qualifiers_europe', label: 'CM - Qualif. Europe', icon: 'F', group: 'football' },
+  { key: 'soccer_fifa_world_cup_qualifiers_south_america', label: 'CM - Qualif. Amerique du Sud', icon: 'F', group: 'football' },
+  { key: 'soccer_fifa_world_cup_womens', label: 'Coupe du Monde Feminine', icon: 'F', group: 'football' },
+  { key: 'soccer_fifa_club_world_cup',   label: 'Coupe du Monde des Clubs', icon: 'F', group: 'football' },
+  { key: 'soccer_uefa_european_championship', label: 'Euro (UEFA)',    icon: 'F', group: 'football' },
+  { key: 'soccer_uefa_euro_qualification', label: 'Euro - Qualifications', icon: 'F', group: 'football' },
+  { key: 'soccer_uefa_nations_league',   label: 'Ligue des Nations UEFA', icon: 'F', group: 'football' },
+  { key: 'soccer_africa_cup_of_nations', label: 'CAN (Afrique)',       icon: 'F', group: 'football' },
+  { key: 'soccer_conmebol_copa_america', label: 'Copa America',        icon: 'F', group: 'football' },
+  { key: 'soccer_conmebol_copa_libertadores', label: 'Copa Libertadores', icon: 'F', group: 'football' },
+  { key: 'soccer_conmebol_copa_sudamericana', label: 'Copa Sudamericana', icon: 'F', group: 'football' },
+  { key: 'soccer_concacaf_gold_cup',     label: 'Gold Cup (CONCACAF)', icon: 'F', group: 'football' },
+  { key: 'soccer_concacaf_leagues_cup',  label: 'Leagues Cup',         icon: 'F', group: 'football' },
+  // Football -- Ameriques & Asie
   { key: 'soccer_usa_mls',               label: 'MLS',                 icon: 'F', group: 'football' },
+  { key: 'soccer_mexico_ligamx',         label: 'Liga MX',             icon: 'F', group: 'football' },
   { key: 'soccer_colombia_primera_a',    label: 'Colombia Primera A',  icon: 'F', group: 'football' },
   { key: 'soccer_brazil_campeonato',     label: 'Brasileirao',         icon: 'F', group: 'football' },
   { key: 'soccer_argentina_primera_division', label: 'Argentina Liga', icon: 'F', group: 'football' },
+  { key: 'soccer_japan_j_league',        label: 'J League (Japon)',    icon: 'F', group: 'football' },
+  { key: 'soccer_korea_kleague1',        label: 'K League 1 (Coree)',  icon: 'F', group: 'football' },
+  { key: 'soccer_china_superleague',     label: 'Super League (Chine)',icon: 'F', group: 'football' },
+  { key: 'soccer_australia_aleague',     label: 'A-League (Australie)',icon: 'F', group: 'football' },
   // Basketball
   { key: 'basketball_nba',               label: 'NBA',                 icon: 'B', group: 'basketball' },
   { key: 'basketball_nba_championship',  label: 'NBA Playoffs',        icon: 'B', group: 'basketball' },
   { key: 'basketball_wnba',              label: 'WNBA',                icon: 'B', group: 'basketball' },
   { key: 'basketball_euroleague',        label: 'Euroleague',          icon: 'B', group: 'basketball' },
   { key: 'basketball_ncaab',             label: 'NCAA Basketball',     icon: 'B', group: 'basketball' },
+  { key: 'basketball_wncaab',            label: 'NCAA Basketball Fem.',icon: 'B', group: 'basketball' },
+  { key: 'basketball_nbl',               label: 'NBL (Australie)',     icon: 'B', group: 'basketball' },
   // Baseball
   { key: 'baseball_mlb',                 label: 'MLB',                 icon: 'X', group: 'baseball' },
+  { key: 'baseball_npb',                 label: 'NPB (Japon)',         icon: 'X', group: 'baseball' },
+  { key: 'baseball_kbo',                 label: 'KBO (Coree)',         icon: 'X', group: 'baseball' },
+  { key: 'baseball_milb',                label: 'Minor League Baseball', icon: 'X', group: 'baseball' },
+  { key: 'baseball_ncaa',                label: 'NCAA Baseball',       icon: 'X', group: 'baseball' },
   // Hockey sur glace
   { key: 'icehockey_nhl',               label: 'NHL',                  icon: 'H', group: 'hockey' },
-  // MMA
+  { key: 'icehockey_ahl',               label: 'AHL',                  icon: 'H', group: 'hockey' },
+  { key: 'icehockey_liiga',             label: 'Liiga (Finlande)',     icon: 'H', group: 'hockey' },
+  { key: 'icehockey_mestis',            label: 'Mestis (Finlande)',    icon: 'H', group: 'hockey' },
+  { key: 'icehockey_sweden_hockey_league', label: 'SHL (Suede)',       icon: 'H', group: 'hockey' },
+  { key: 'icehockey_sweden_allsvenskan', label: 'HockeyAllsvenskan (Suede)', icon: 'H', group: 'hockey' },
+  // MMA / Boxe
   { key: 'mma_mixed_martial_arts',       label: 'MMA/UFC',             icon: 'M', group: 'mma' },
-  // NFL (hors saison en juin -- disponible en septembre)
+  { key: 'boxing_boxing',                label: 'Boxe',                icon: 'M', group: 'mma' },
+  // Football americain
   { key: 'americanfootball_nfl',         label: 'NFL',                 icon: 'A', group: 'american_football' },
+  { key: 'americanfootball_ncaaf',       label: 'NCAAF',               icon: 'A', group: 'american_football' },
+  { key: 'americanfootball_cfl',         label: 'CFL',                 icon: 'A', group: 'american_football' },
+  { key: 'americanfootball_ufl',         label: 'UFL',                 icon: 'A', group: 'american_football' },
+  // Rugby
+  { key: 'rugbyleague_nrl',              label: 'NRL',                 icon: 'R', group: 'rugby' },
+  { key: 'rugbyleague_nrl_state_of_origin', label: 'State of Origin',  icon: 'R', group: 'rugby' },
+  { key: 'rugbyunion_six_nations',       label: 'Six Nations',         icon: 'R', group: 'rugby' },
+  // Cricket
+  { key: 'cricket_ipl',                  label: 'IPL (Inde)',          icon: 'C', group: 'cricket' },
+  { key: 'cricket_big_bash',             label: 'Big Bash League',     icon: 'C', group: 'cricket' },
+  { key: 'cricket_icc_world_cup',        label: 'Coupe du Monde ICC',  icon: 'C', group: 'cricket' },
+  { key: 'cricket_t20_world_cup',        label: 'Coupe du Monde T20',  icon: 'C', group: 'cricket' },
+  { key: 'cricket_international_t20',    label: 'T20 International',  icon: 'C', group: 'cricket' },
+  { key: 'cricket_odi',                  label: 'One Day International', icon: 'C', group: 'cricket' },
+  { key: 'cricket_test_match',           label: 'Test Match',          icon: 'C', group: 'cricket' },
+  { key: 'cricket_the_hundred',          label: 'The Hundred',         icon: 'C', group: 'cricket' },
+  // Handball
+  { key: 'handball_germany_bundesliga',  label: 'Handball-Bundesliga', icon: 'D', group: 'handball' },
+  // Aussie Rules
+  { key: 'aussierules_afl',              label: 'AFL (Australie)',     icon: 'U', group: 'aussie_rules' },
+  // Lacrosse
+  { key: 'lacrosse_pll',                 label: 'Premier Lacrosse League', icon: 'L', group: 'lacrosse' },
 ];
+
+// ── Sports prioritaires pour le Scanner IA (toujours scannés en priorité) ──
+const SPORTS_PRIORITY = new Set([
+  'tennis_atp', 'tennis_wta',
+  'tennis_atp_aus_open_singles', 'tennis_atp_french_open', 'tennis_atp_wimbledon', 'tennis_atp_us_open',
+  'tennis_wta_aus_open_singles', 'tennis_wta_french_open', 'tennis_wta_wimbledon', 'tennis_wta_us_open',
+  'soccer_france_ligue1', 'soccer_epl', 'soccer_europe_champs', 'soccer_uefa_champs_league',
+  'soccer_spain_la_liga', 'soccer_italy_serie_a', 'soccer_germany_bundesliga',
+  'soccer_uefa_europa_league', 'soccer_fifa_world_cup', 'soccer_uefa_european_championship',
+  'soccer_uefa_nations_league', 'soccer_conmebol_copa_libertadores', 'soccer_conmebol_copa_america',
+  'basketball_nba', 'basketball_euroleague',
+  'icehockey_nhl', 'baseball_mlb',
+  'mma_mixed_martial_arts', 'americanfootball_nfl',
+]);
 
 const BOOKMAKERS = ['betclic', 'unibet', 'pinnacle', 'winamax', 'bet365'];
 // ── Icône par groupe de sport ──────────────────────────────────────────────
@@ -464,6 +572,15 @@ function quotaOk() {
   _apiCallsMadeUnknown = 0;
   return apiUsage.requestsRemaining > 20;
 }
+
+// ── ROTATION SCANNER : ne pas scanner TOUS les sports actifs à chaque cycle ──
+// Les sports "prioritaires" (SPORTS_PRIORITY) sont scannés à chaque cycle.
+// Les autres sports actifs (ligues secondaires) sont scannés par petits lots
+// tournants, pour étaler la consommation de quota dans le temps.
+let _scanRotationIndex = 0;
+const SCAN_ROTATION_BATCH      = 5;    // nb de sports secondaires scannés par cycle
+const SCAN_ODDS_TTL_PRIORITY   = 1800; // 30 min — sports prioritaires
+const SCAN_ODDS_TTL_SECONDARY  = 3600; // 60 min — sports secondaires (rotation)
 
 // -- CHARGEMENT SÉRIALISÉ avec vérification quota entre chaque sport --
 // Remplace Promise.allSettled pour éviter 36 appels simultanés au démarrage
@@ -1052,39 +1169,65 @@ app.get('/api/scanner', async (req, res) => {
   }
 
   const activeSportsScan = await getActiveSports();
+
+  // ── Scan par paliers : sports prioritaires à chaque cycle + rotation sur les sports secondaires ──
+  const prioritySports  = activeSportsScan.filter(s => SPORTS_PRIORITY.has(s.key));
+  const secondarySports = activeSportsScan.filter(s => !SPORTS_PRIORITY.has(s.key));
+  let rotationBatch = [];
+  if (secondarySports.length) {
+    const batchSize = Math.min(SCAN_ROTATION_BATCH, secondarySports.length);
+    for (let i = 0; i < batchSize; i++) {
+      rotationBatch.push(secondarySports[(_scanRotationIndex + i) % secondarySports.length]);
+    }
+    _scanRotationIndex = (_scanRotationIndex + batchSize) % secondarySports.length;
+  }
+  const sportsToScan = prioritySports.concat(rotationBatch);
+
   const opportunities = [];
   const now = Date.now();
   const h48 = now + 48 * 3600 * 1000;
   let sportsScanned = 0;
   let eventsFound   = 0;
 
-  for (const sport of activeSportsScan) {
+  for (const sport of sportsToScan) {
     try {
       const oddsCacheKey = 'odds_' + sport.key + '_all';
       let oddsData = cache.get(oddsCacheKey);
 
       if (!oddsData) {
-        const raw = await oddsApiFetch('/sports/' + sport.key + '/odds', {
-          regions:    'eu',
-          markets:    'h2h',
-          oddsFormat: 'decimal',
-          bookmakers: BOOKMAKERS.join(','),
-        });
-        oddsData = (Array.isArray(raw) ? raw : [raw]).map(event => {
-          recordOddsSnapshot(event.id, event.home_team, event.away_team, event.bookmakers || []);
-          return {
-            id:           event.id,
-            sport:        event.sport_key,
-            homeTeam:     event.home_team,
-            awayTeam:     event.away_team,
-            commenceTime: event.commence_time,
-            bookmakers:   formatBookmakers(event.bookmakers || []),
-            bestOdds:     extractBestOdds(event.bookmakers || []),
-            _raw:         event.bookmakers || [],
-          };
-        });
-        cache.set(oddsCacheKey, oddsData, 900);
-        cache.set(oddsCacheKey + '_stale', oddsData, 7200);
+        if (!quotaOk()) {
+          // Quota bas : on sert le stale si dispo, sinon on saute ce sport ce cycle-ci
+          const stale = cache.get(oddsCacheKey + '_stale');
+          if (stale) {
+            oddsData = stale;
+            console.warn('[quota] faible — stale servi pour ' + sport.key + ' (scanner)');
+          } else {
+            continue;
+          }
+        } else {
+          const raw = await oddsApiFetch('/sports/' + sport.key + '/odds', {
+            regions:    'eu',
+            markets:    'h2h',
+            oddsFormat: 'decimal',
+            bookmakers: BOOKMAKERS.join(','),
+          });
+          oddsData = (Array.isArray(raw) ? raw : [raw]).map(event => {
+            recordOddsSnapshot(event.id, event.home_team, event.away_team, event.bookmakers || []);
+            return {
+              id:           event.id,
+              sport:        event.sport_key,
+              homeTeam:     event.home_team,
+              awayTeam:     event.away_team,
+              commenceTime: event.commence_time,
+              bookmakers:   formatBookmakers(event.bookmakers || []),
+              bestOdds:     extractBestOdds(event.bookmakers || []),
+              _raw:         event.bookmakers || [],
+            };
+          });
+          const ttl = SPORTS_PRIORITY.has(sport.key) ? SCAN_ODDS_TTL_PRIORITY : SCAN_ODDS_TTL_SECONDARY;
+          cache.set(oddsCacheKey, oddsData, ttl);
+          cache.set(oddsCacheKey + '_stale', oddsData, 604800); // 7j stale
+        }
       }
 
       sportsScanned++;
@@ -1223,7 +1366,13 @@ app.get('/api/scanner', async (req, res) => {
 
   const result = {
     opportunities: opportunities.slice(0, 25),
-    meta: { sportsScanned, eventsFound, totalOpportunities: opportunities.length },
+    meta: {
+      sportsScanned, eventsFound, totalOpportunities: opportunities.length,
+      activeSportsTotal:    activeSportsScan.length,
+      prioritySportsCount:  prioritySports.length,
+      secondaryScannedThisCycle: rotationBatch.map(s => s.key),
+      secondaryRotationTotal: secondarySports.length,
+    },
     _scannedAt: new Date().toISOString(),
   };
 
