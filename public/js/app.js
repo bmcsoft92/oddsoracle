@@ -1216,6 +1216,100 @@ const PrematchFeedModule = (() => {
 })();
 
 // -----------------------------------------------------------------
+// PRONOS DU JOUR -- top 3 opportunites du scanner avec verdict IA
+// -----------------------------------------------------------------
+const PronosDuJourModule = (() => {
+
+  function renderPick(p, idx) {
+    var safeH = (p.homeTeam || '').replace(/["\'<>]/g, '');
+    var safeA = (p.awayTeam || '').replace(/["\'<>]/g, '');
+    var safeSel = (p.selection || '').replace(/["\'<>]/g, '');
+    var safeVerdict = (p.verdict || '').replace(/["\'<>]/g, '');
+
+    // Badge horaire (meme logique que renderMatchCard)
+    var dt  = new Date(p.commenceTime);
+    var tod = dt.toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'});
+    var timeBadge;
+    if (p.isLive) {
+      timeBadge = '<span class="mc-live-badge">&#9679; LIVE &middot; '+tod+'</span>';
+    } else {
+      var h = (dt - new Date()) / 3600000;
+      var tl, urgCls = '';
+      if (h < 0.5) { tl = '&lt; 30min'; urgCls = ' mc-urgent'; }
+      else if (h < 2)  { tl = 'Dans '+Math.ceil(h*60)+'min'; urgCls = ' mc-urgent'; }
+      else if (h < 6)  { tl = 'Dans '+Math.ceil(h)+'h'; }
+      else if (h < 24) { tl = "Auj. " + tod; }
+      else             { tl = 'Demain ' + tod; }
+      timeBadge = '<span class="mc-time-badge'+urgCls+'">'+tl+'</span>';
+    }
+
+    var predHtml = p.predLabel
+      ? '<span class="mc-pred feed-pred feed-pred-'+p.predLabel.toLowerCase()+'">'+p.predLabel+'</span>'
+      : '';
+
+    var verdictHtml = safeVerdict
+      ? '<div class="prono-verdict">'+safeVerdict+'</div>'
+      : '';
+
+    return '<div class="match-card prono-card">'
+      + '<div class="mc-head">'
+      + '<span class="prono-rank">#'+(idx+1)+'</span>'
+      + '<span class="mc-sport">'+(p.sportIcon||'⚡')+' '+(p.sportLabel||'')+'</span>'
+      + timeBadge + predHtml
+      + '</div>'
+      + '<div class="mc-teams">'
+      + '<span class="mc-team">'+safeH+'</span>'
+      + '<span class="mc-vs">vs</span>'
+      + '<span class="mc-team">'+safeA+'</span>'
+      + '</div>'
+      + '<div class="prono-pick">Pari conseill&eacute; : <strong>'+safeSel+'</strong>'
+      + ' @ '+(p.bestPrice ? p.bestPrice.toFixed(2) : '—')
+      + (p.bestBook ? ' ('+p.bestBook+')' : '')
+      + (p.edge!=null ? ' <span class="mc-ep mc-ev">edge +'+p.edge.toFixed(1)+'%</span>' : '')
+      + (p.adjustedScore!=null ? ' <span class="prono-score">'+p.adjustedScore+'/100</span>' : '')
+      + '</div>'
+      + verdictHtml
+      + '</div>';
+  }
+
+  function render(data) {
+    var el = document.getElementById('pronos-du-jour-list');
+    if (!el) return;
+    if (!data || !data.picks || !data.picks.length) {
+      el.innerHTML = '<div class="feed-empty">Aucun prono disponible pour le moment.</div>';
+      return;
+    }
+    el.innerHTML = '<div class="match-list">' + data.picks.map(renderPick).join('') + '</div>';
+  }
+
+  async function load() {
+    const el = document.getElementById('pronos-du-jour-list');
+    if (!el) return;
+    el.innerHTML = '<div class="feed-loading">Chargement des pronos du jour...</div>';
+    try {
+      const ctrl = new AbortController();
+      const tid  = setTimeout(function(){ ctrl.abort(); }, 20000);
+      const resp = await fetch('/api/pronos-du-jour', { signal: ctrl.signal });
+      clearTimeout(tid);
+      const json = await resp.json();
+      if (!resp.ok) throw new Error(json && json.error ? json.error : 'Erreur ' + resp.status);
+      render(json.data);
+    } catch(e) {
+      if (el) el.innerHTML = '<div class="feed-empty">Erreur: ' + e.message + '</div>';
+    }
+  }
+
+  function init() {
+    const tab = document.getElementById('tab-prematch');
+    if (tab) {
+      tab.addEventListener('click', function() { load(); });
+    }
+  }
+
+  return { init, load };
+})();
+
+// -----------------------------------------------------------------
 // INIT
 // -----------------------------------------------------------------
 document.addEventListener('DOMContentLoaded', () => {
@@ -1233,9 +1327,11 @@ document.addEventListener('DOMContentLoaded', () => {
   ScannerModule.init();
   LiveFeedModule.init();
   PrematchFeedModule.init();
+  PronosDuJourModule.init();
 
   LiveFeedModule.load();
   PrematchFeedModule.load();
+  PronosDuJourModule.load();
 });
 
 /* ===== STATS MODAL - Grand Jeu ===== */

@@ -653,6 +653,23 @@ option,optgroup{background:var(--bg1)}
   border:1px dashed var(--border1);border-radius:8px;
 }
 
+/* ===== PRONOS DU JOUR ===== */
+.prono-card::before{background:var(--yellow)}
+.prono-rank{
+  font-size:.65rem;font-family:var(--mono);font-weight:700;color:var(--yellow);
+  border:1px solid var(--yellow);border-radius:3px;padding:1px 6px;letter-spacing:.04em;
+}
+.prono-pick{font-size:.78rem;color:var(--text1);margin-bottom:.4rem;display:flex;align-items:center;gap:.5rem;flex-wrap:wrap}
+.prono-pick strong{color:var(--text0)}
+.prono-score{
+  font-size:.62rem;font-family:var(--mono);font-weight:700;color:var(--blue);
+  background:var(--blue-d);border-radius:3px;padding:1px 6px;margin-left:auto;
+}
+.prono-verdict{
+  font-size:.74rem;color:var(--text1);line-height:1.4;
+  padding-top:.5rem;border-top:1px solid var(--border0);
+}
+
 /* Responsive match cards */
 @media(max-width:480px){
   .mc-teams{flex-direction:column;gap:.25rem;align-items:flex-start}

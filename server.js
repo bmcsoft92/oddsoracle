@@ -1161,13 +1161,15 @@ app.get('/api/upcoming', async (req, res) => {
 });
 
 // -- SCANNER IA --
-app.get('/api/scanner', async (req, res) => {
+// Logique de scan + affinage forme/H2H, factorisee pour etre reutilisee par
+// /api/scanner et /api/pronos-du-jour. Renvoie { error } ou { data, cached, scannedAt }.
+async function getScannerData() {
   const cacheKey = 'scanner_results';
   const cached   = cache.get(cacheKey);
-  if (cached) return res.json({ data: cached, cached: true, apiUsage, scannedAt: cached._scannedAt });
+  if (cached) return { data: cached, cached: true, scannedAt: cached._scannedAt };
 
   if (!ODDS_API_KEY) {
-    return res.status(503).json({ error: 'ODDS_API_KEY non configuree', apiUsage });
+    return { error: 'ODDS_API_KEY non configuree' };
   }
 
   const activeSportsScan = await getActiveSports();
@@ -1379,7 +1381,119 @@ app.get('/api/scanner', async (req, res) => {
   };
 
   cache.set(cacheKey, result, 900);
-  res.json({ data: result, cached: false, apiUsage, scannedAt: result._scannedAt });
+  return { data: result, cached: false, scannedAt: result._scannedAt };
+}
+
+app.get('/api/scanner', async (req, res) => {
+  const r = await getScannerData();
+  if (r.error) return res.status(503).json({ error: r.error, apiUsage });
+  res.json({ data: r.data, cached: r.cached, apiUsage, scannedAt: r.scannedAt });
+});
+
+// -- PRONOS DU JOUR --
+// Construit le prompt Gemini groupe pour les meilleurs pronos du jour : un
+// verdict court par match, format strict "MATCH n: <texte>" pour parsing simple.
+function buildPronosDuJourPrompt(picks) {
+  const lines = [
+    'Voici les ' + picks.length + ' meilleures opportunites de paris detectees aujourd\'hui (edge marche + forme/H2H).',
+    'Pour CHAQUE match, redige un verdict court (2 phrases maximum, en francais, sans markdown) expliquant pourquoi ce pari ressort.',
+    'Reponds STRICTEMENT selon ce format, une seule ligne par match :',
+    'MATCH 1: <verdict>',
+    'MATCH 2: <verdict>',
+    'MATCH 3: <verdict>',
+    '',
+  ];
+  picks.forEach(function(p, i) {
+    lines.push('MATCH ' + (i + 1) + ' -- ' + p.homeTeam + ' vs ' + p.awayTeam + ' (' + p.sportLabel + ')');
+    lines.push('Selection : ' + p.selection + ' @ ' + p.bestPrice + ' (' + p.bestBook + ')');
+    lines.push('Edge marche : +' + p.edge + '% -- Score ajuste : ' + p.adjustedScore + '/100 (' + p.predLabel + ')');
+    if (p.formNote) lines.push('Forme/H2H : ' + p.formNote);
+    lines.push('');
+  });
+  return lines.join('\n');
+}
+
+// Extrait les verdicts "MATCH n: ..." du texte renvoye par Gemini.
+function parsePronosVerdicts(text, count) {
+  const out = new Array(count).fill(null);
+  const re = /MATCH\s*(\d+)\s*[:\-]\s*(.+)/gi;
+  let m;
+  while ((m = re.exec(text || ''))) {
+    const idx = parseInt(m[1], 10) - 1;
+    if (idx >= 0 && idx < count && m[2].trim()) out[idx] = m[2].trim();
+  }
+  return out;
+}
+
+// Top 3 opportunites du scanner (edge + forme/H2H affines), avec un court
+// verdict IA genere en UN SEUL appel Gemini groupe (menage le quota gratuit).
+// Si Gemini est indisponible/non configure, on retombe sur formNote (gratuit,
+// deja calcule via TheSportsDB). Resultat mis en cache 30 min.
+app.get('/api/pronos-du-jour', async (req, res) => {
+  const cacheKey = 'pronos_du_jour';
+  const cached = cache.get(cacheKey);
+  if (cached) return res.json({ data: cached, cached: true, apiUsage });
+
+  const scan = await getScannerData();
+  if (scan.error) return res.status(503).json({ error: scan.error, apiUsage });
+
+  const top = (scan.data.opportunities || []).slice(0, 3);
+  if (!top.length) {
+    const empty = { picks: [], generatedAt: new Date().toISOString() };
+    cache.set(cacheKey, empty, 600);
+    return res.json({ data: empty, cached: false, apiUsage });
+  }
+
+  const picks = top.map(function(o) {
+    return {
+      sport: o.sport, sportLabel: o.sportLabel, sportIcon: o.sportIcon,
+      homeTeam: o.homeTeam, awayTeam: o.awayTeam, commenceTime: o.commenceTime,
+      isLive: o.isLive, selection: o.selection, edge: o.edge, bestPrice: o.bestPrice,
+      bestBook: o.bestBook, adjustedScore: o.adjustedScore, predLabel: o.predLabel,
+      verdict: o.formNote || null, // fallback gratuit, remplace par le verdict IA si dispo
+    };
+  });
+
+  if (GEMINI_API_KEY) {
+    try {
+      const prompt = buildPronosDuJourPrompt(picks);
+      const payload = {
+        systemInstruction: { parts: [{ text: ODDSORACLE_SYSTEM_PROMPT }] },
+        contents: [{ role: 'user', parts: [{ text: prompt }] }],
+        generationConfig: { maxOutputTokens: 1024, thinkingConfig: { thinkingBudget: 0 } },
+      };
+      const modelsToTry = [GEMINI_MODEL, GEMINI_MODEL_FALLBACK].filter(function(m, i, arr) {
+        return m && arr.indexOf(m) === i;
+      });
+      let resp = null;
+      outer:
+      for (let m = 0; m < modelsToTry.length; m++) {
+        const model = modelsToTry[m];
+        for (let attempt = 0; attempt < 2; attempt++) {
+          resp = await callGeminiOnce(model, payload);
+          if (resp.ok) break outer;
+          if (!GEMINI_RETRYABLE_STATUSES.includes(resp.status)) break outer;
+          if (attempt === 0) await new Promise(function(r){ setTimeout(r, 1200); });
+        }
+      }
+      if (resp && resp.ok) {
+        const data  = resp.data;
+        const cand  = (data.candidates || [])[0] || {};
+        const parts = (cand.content && cand.content.parts) || [];
+        const text  = parts.map(function(p){ return p.text || ''; }).join('');
+        const verdicts = parsePronosVerdicts(text, picks.length);
+        verdicts.forEach(function(v, i) { if (v && picks[i]) picks[i].verdict = v; });
+      } else if (resp) {
+        console.warn('[pronos-du-jour] Gemini ' + resp.status + ' (' + resp.model + '): ' + resp.errText);
+      }
+    } catch (err) {
+      console.warn('[pronos-du-jour] verdicts IA: ' + err.message);
+    }
+  }
+
+  const result = { picks, generatedAt: new Date().toISOString() };
+  cache.set(cacheKey, result, 1800); // 30 min
+  res.json({ data: result, cached: false, apiUsage });
 });
 
 app.post('/api/cache/clear', (req, res) => {
@@ -1870,16 +1984,25 @@ async function fetchH2H(homeTeam, awayTeam) {
     setTimeout(function(){ ctrl.abort(); }, 5000);
     const r = await fetch('https://www.thesportsdb.com/api/v1/json/3/searchevents.php?e=' + encodeURIComponent(query), { signal: ctrl.signal });
     const d = await r.json();
-    const events = (d.event || []).slice(0, 10).map(function(ev) {
-      return {
-        date: ev.dateEvent,
-        home: ev.strHomeTeam, away: ev.strAwayTeam,
-        homeScore: parseInt(ev.intHomeScore) || 0,
-        awayScore: parseInt(ev.intAwayScore) || 0,
-        venue: ev.strVenue || '',
-        season: ev.strSeason || '',
-      };
-    });
+    const events = (d.event || [])
+      // On exclut les matchs sans score reel (a venir / pas encore joues -- ex: le
+      // match du jour lui-meme), sinon ils sont comptes comme un "0-0 nul" et
+      // faussent les confrontations directes.
+      .filter(function(ev) {
+        return ev.intHomeScore !== null && ev.intHomeScore !== undefined && ev.intHomeScore !== ''
+            && ev.intAwayScore !== null && ev.intAwayScore !== undefined && ev.intAwayScore !== '';
+      })
+      .slice(0, 10)
+      .map(function(ev) {
+        return {
+          date: ev.dateEvent,
+          home: ev.strHomeTeam, away: ev.strAwayTeam,
+          homeScore: parseInt(ev.intHomeScore) || 0,
+          awayScore: parseInt(ev.intAwayScore) || 0,
+          venue: ev.strVenue || '',
+          season: ev.strSeason || '',
+        };
+      });
     const homeWins  = events.filter(function(e){ return teamMatch(e.home, homeTeam) ? e.homeScore > e.awayScore : e.awayScore > e.homeScore; }).length;
     const awayWins  = events.filter(function(e){ return teamMatch(e.away, homeTeam) ? e.homeScore > e.awayScore : e.awayScore > e.homeScore; }).length;
     const draws     = events.filter(function(e){ return e.homeScore === e.awayScore; }).length;
