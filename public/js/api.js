@@ -175,7 +175,7 @@ const APIClient = (() => {
       const r = await apiFetch('/health');
       return {
         online:    true,
-        apiKeySet: !r.apiUsage?.requestsRemaining === null,
+        apiKeySet: r.apiUsage?.requestsRemaining !== null,
         uptime:    r.uptime,
         apiUsage:  r.apiUsage,
       };

@@ -178,6 +178,7 @@ const ScannerModule = (() => {
     const bet = {
       date:      new Date().toISOString().split('T')[0],
       sport:     SPORT_MAP[opp.sport] || 'tennis',
+      sportKey:  opp.sport,
       match:     `${opp.homeTeam} vs ${opp.awayTeam}`,
       type:      opp.isLive ? 'live' : 'prematch',
       market:    'Vainqueur match',
@@ -243,9 +244,7 @@ const ScannerModule = (() => {
       if (!res.ok) throw new Error(json.error || 'Erreur serveur');
 
       _lastScanData = json.data;
-      _bankroll = BankrollManager.get
-        ? BankrollManager.get().current
-        : (BankrollManager.getState ? BankrollManager.getState().current : 1000) || 1000;
+      _bankroll = (BankrollManager.getState && BankrollManager.getState().current) || 1000;
 
       const opps = json.data && json.data.opportunities ? json.data.opportunities : [];
       opps.forEach(opp => {
@@ -350,8 +349,8 @@ const ScannerModule = (() => {
     const kelly   = autoKelly(opp.trueProb, opp.bestPrice, _bankroll, opp.isLive);
     const conf    = CONF_META[opp.confidence] || CONF_META.low;
     const urgency = URGENCY_META[opp.urgency]  || URGENCY_META.upcoming;
-    const edgeCls = opp.edge >= 10 ? 'ev-forte' : opp.edge >= 5 ? 'ev-bonne' : 'ev-ok';
-    const predLbl = opp.edge >= 10 ? 'FORTE'    : opp.edge >= 5 ? 'BONNE'    : 'CORRECTE';
+    const edgeCls = opp.edge >= 10 ? 'ev-forte' : opp.edge >= 6 ? 'ev-bonne' : 'ev-ok';
+    const predLbl = opp.predLabel || (opp.edge >= 10 ? 'FORTE' : opp.edge >= 6 ? 'BONNE' : 'CORRECTE');
 
     const selLabel = opp.selection === opp.homeTeam
       ? '🏠 ' + opp.homeTeam
@@ -456,161 +455,6 @@ const ScannerModule = (() => {
         </div>
       </div>
 
-    </div>`;
-  }
-
-  // -- Ancienne fonction garder pour compat (non utilisee)
-  function _renderCardOld(opp, rank) {
-    const kelly    = autoKelly(opp.trueProb, opp.bestPrice, _bankroll, opp.isLive);
-    const conf     = CONF_META[opp.confidence] || CONF_META.low;
-    const urgency  = URGENCY_META[opp.urgency] || URGENCY_META.upcoming;
-    const bookName = opp.bestBook || '?';
-    const edgeCls  = opp.edge >= 10 ? 'edge-very-high' : opp.edge >= 6 ? 'edge-high' : 'edge-medium';
-
-    const matchTime = opp.isLive
-      ? '<span class="match-live-tag">EN COURS</span>'
-      : `<span class="match-time">${formatTime(opp.commenceTime)}</span>`;
-
-    const selectionDisplay = opp.selection === opp.homeTeam
-      ? 'Dom. ' + opp.homeTeam
-      : 'Ext. ' + opp.awayTeam;
-
-    const isLogged = _loggedIds.has(oppId(opp));
-    const homeEsc  = opp.homeTeam.replace(/'/g, "\\'");
-    const awayEsc  = opp.awayTeam.replace(/'/g, "\\'");
-
-    return `
-    <div class="scanner-card ${opp.isLive ? 'scanner-card-live' : ''}" data-rank="${rank}">
-      <div class="sc-header">
-        <div class="sc-rank">#${rank + 1}</div>
-        <div class="sc-sport">${opp.sportLabel || opp.sport}</div>
-        <div class="sc-urgency ${urgency.cls}">${urgency.label}</div>
-      </div>
-
-      <div class="sc-match">
-        <div class="sc-teams">${opp.homeTeam} <span class="vs-tag">VS</span> ${opp.awayTeam}</div>
-        <div class="sc-time">${matchTime}</div>
-      </div>
-
-      <div class="sc-selection">
-        <span class="sc-sel-label">PARIER SUR</span>
-        <span class="sc-sel-name">${selectionDisplay}</span>
-      </div>
-
-      <div class="sc-metrics">
-        <div class="sc-metric">
-          <span class="sc-metric-label">Cote</span>
-          <span class="sc-metric-val sc-cote">${opp.bestPrice.toFixed(2)}</span>
-          <span class="sc-metric-sub">${bookName}</span>
-        </div>
-        <div class="sc-metric">
-          <span class="sc-metric-label">Prob. vraie</span>
-          <span class="sc-metric-val">${opp.trueProb}%</span>
-          <span class="sc-metric-sub">Ligne sharp</span>
-        </div>
-        <div class="sc-metric">
-          <span class="sc-metric-label">Edge</span>
-          <span class="sc-metric-val sc-edge ${edgeCls}">+${opp.edge}%</span>
-          <span class="sc-metric-sub">Valeur attendue</span>
-        </div>
-        <div class="sc-metric">
-          <span class="sc-metric-label">Confiance</span>
-          <span class="sc-metric-val"><span class="conf-badge ${conf.cls}">${conf.label}</span></span>
-          <span class="sc-metric-sub">${conf.desc}</span>
-        </div>
-      </div>
-
-      ${(opp.allBookmakers && opp.allBookmakers.length > 1) ? `
-      <div class="sc-bookmakers">
-        <div class="sc-bk-header">Comparateur cotes — ${opp.selection}</div>
-        <div class="sc-bk-list">
-          ${opp.allBookmakers.map(function(bk) {
-            const isBest = bk.price === opp.bestPrice;
-            const impliedProb = Math.round(100 / bk.price * 10) / 10;
-            return '<div class="sc-bk-row' + (isBest ? ' sc-bk-best' : '') + '">'
-              + '<span class="sc-bk-name">' + bk.name + (isBest ? ' [MEILLEUR]' : '') + '</span>'
-              + '<span class="sc-bk-price">' + bk.price.toFixed(2) + '</span>'
-              + '<span class="sc-bk-implied">' + impliedProb + '%</span>'
-              + '</div>';
-          }).join('')}
-        </div>
-      </div>` : ''}
-
-      <div class="sc-prediction">
-        <div class="sc-pred-header">Prediction Scanner IA</div>
-        <div class="sc-pred-bar-wrap">
-          <div class="sc-pred-bar" style="width:${opp.predScore || opp.trueProb}%"></div>
-        </div>
-        <div class="sc-pred-meta">
-          <span class="sc-pred-label sc-pred-${(opp.predLabel || 'CORRECTE').toLowerCase().replace('/','')}">${opp.predLabel || 'CORRECTE'}</span>
-          <span>Probabilite reelle: <strong>${opp.trueProb}%</strong></span>
-          <span>EV: <strong class="text-green">+${opp.ev}%</strong></span>
-        </div>
-      </div>
-
-      ${(opp.allBookmakers && opp.allBookmakers.length > 1) ? `
-      <div class="sc-bookmakers">
-        <div class="sc-bk-header">Comparateur cotes</div>
-        <div class="sc-bk-list">
-          ${opp.allBookmakers.map(function(bk) {
-            const isBest = bk.price === opp.bestPrice;
-            const impliedProb = Math.round(100 / bk.price * 10) / 10;
-            return '<div class="sc-bk-row' + (isBest ? ' sc-bk-best' : '') + '">'
-              + '<span class="sc-bk-name">' + bk.name + (isBest ? ' [BEST]' : '') + '</span>'
-              + '<span class="sc-bk-price">' + bk.price.toFixed(2) + '</span>'
-              + '<span class="sc-bk-implied">' + impliedProb + '%</span>'
-              + '</div>';
-          }).join('')}
-        </div>
-      </div>` : ''}
-
-      <div class="sc-prediction">
-        <div class="sc-pred-header">Prediction Scanner IA</div>
-        <div class="sc-pred-bar-wrap">
-          <div class="sc-pred-bar" style="width:${opp.predScore || opp.trueProb}%"></div>
-        </div>
-        <div class="sc-pred-meta">
-          <span class="sc-pred-label sc-pred-${(opp.predLabel||'CORRECTE').toLowerCase()}">${opp.predLabel||'CORRECTE'}</span>
-          <span>Prob. reelle: <strong>${opp.trueProb}%</strong></span>
-          <span>EV: <strong class="text-green">+${opp.ev}%</strong></span>
-        </div>
-      </div>
-
-      ${kelly ? `
-      <div class="sc-kelly">
-        <div class="sc-kelly-header">
-          <span>Mise recommandee (Kelly ${opp.isLive ? '1/6' : '1/4'})</span>
-          <span class="sc-kelly-mode">${opp.isLive ? 'LIVE -40%' : 'PRE-MATCH'}</span>
-        </div>
-        <div class="sc-kelly-body">
-          <div class="sc-kelly-stake">${kelly.stake}</div>
-          <div class="sc-kelly-detail">
-            <span>Gain si gagne: <strong class="text-green">+${kelly.pnlWin} EUR</strong></span>
-            <span>Perte si perd: <strong class="text-red">${kelly.pnlLoss} EUR</strong></span>
-            <span>Fraction Kelly: ${kelly.fraction}%</span>
-          </div>
-        </div>
-      </div>` : `
-      <div class="sc-kelly sc-kelly-invalid">
-        Edge insuffisant pour une mise Kelly positive
-      </div>`}
-
-      <div class="sc-footer">
-        <button class="btn btn-sm btn-secondary sc-journal-btn ${isLogged ? 'btn-logged' : ''}"
-                onclick="ScannerModule.addToJournal(${rank})">
-          ${isLogged ? 'Logge' : '+ Journal'}
-        </button>
-        <div style="display:flex;gap:.4rem">
-          <button class="btn btn-sm btn-ghost sc-sport-btn"
-                  onclick="ScannerModule.focusSport('${opp.sport}')">
-            Ce sport
-          </button>
-          <button class="btn btn-sm sc-watch-btn"
-                  onclick="ScannerModule.watchMatch('${homeEsc}','${awayEsc}','${opp.sport}')">
-            Watch
-          </button>
-        </div>
-      </div>
     </div>`;
   }
 

@@ -1041,7 +1041,12 @@ function attachCardClicks(container) {
       if(sa!=null){ setV('live-score-b',sa); setV('live-jeux-b',sa); }
       if(sport){
         var sel=document.getElementById('live-sport-select');
-        if(sel){ var o=Array.from(sel.options).find(function(x){ return sport.indexOf(x.value)!==-1||x.value.indexOf(sport.split('_')[0])!==-1; }); if(o) sel.value=o.value; }
+        if(sel){
+          var opts=Array.from(sel.options);
+          var o = opts.find(function(x){ return x.value===sport; })
+               || opts.find(function(x){ return sport.indexOf(x.value)!==-1||x.value.indexOf(sport.split('_')[0])!==-1; });
+          if(o) sel.value=o.value;
+        }
       }
       // Ouvrir la section avancée si fermée
       var adv=document.getElementById('live-advanced');
@@ -1352,14 +1357,6 @@ function renderTabIA(data, home, away, edge, prob) {
   var om  = data.oddsMovement || {};
   var mvH = om.homeTeam || {}; var mvA = om.awayTeam || {};
 
-  // Determine recommended side
-  var rec = null, recCls = '', recIcon = '';
-  if (edge >= 2) {
-    rec = 'Cuiabá'; // placeholder, actually computed from bestSel
-    recCls = edge >= 5 ? 'ia-rec-hot' : 'ia-rec-good';
-    recIcon = edge >= 5 ? '🔥' : '✅';
-  }
-
   // Find best side from bestSel stored in meta
   var meta = window._statsModalMeta || {};
   var bestTeam = '';
@@ -1376,16 +1373,6 @@ function renderTabIA(data, home, away, edge, prob) {
       break;
     }
   }
-
-  // Build confidence score (0-100)
-  var confidence = Math.min(95, Math.max(10,
-    (prob > 0 ? Math.min(40, prob * 0.5) : 20)
-    + (Math.abs(edge) > 0 ? Math.min(25, Math.abs(edge) * 3) : 0)
-    + (fh.form && fh.form.length ? 10 : 0)
-    + (h2h.total > 0 ? 10 : 0)
-    + (mvH.direction ? 5 : 0)
-    + (Math.abs((mvH.pctChange||0)) > 3 ? 10 : 0)
-  ));
 
   var edgeCls = edge >= 3 ? 'edge-hot' : edge >= 1 ? 'edge-ok' : edge >= 0 ? 'edge-neutral' : 'edge-neg';
   var edgeSign = edge >= 0 ? '+' : '';
@@ -1411,25 +1398,9 @@ function renderTabIA(data, home, away, edge, prob) {
 
   var html = '<div class="ia-panel">';
 
-  // Recommandation principale
-  var recLabel = edge >= 5 ? 'FORT BET' : edge >= 2 ? 'BET' : edge >= 0.5 ? 'SURVEILLER' : 'PASSER';
-  var recColor = edge >= 5 ? '#ff5252' : edge >= 2 ? '#66bb6a' : edge >= 0.5 ? '#4fc3f7' : '#888';
-  html += '<div class="ia-rec-box" style="border-color:' + recColor + '20;background:' + recColor + '0d">'
-        + '<div class="ia-rec-label" style="color:' + recColor + '">' + recLabel + '</div>'
-        + (bestTeam ? '<div class="ia-rec-team">' + escHtml(bestTeam) + '</div>' : '')
-        + '<div class="ia-rec-meta">'
-        + (prob > 0 ? '<span class="ia-meta-badge">Prob ' + Math.round(prob) + '%</span>' : '')
-        + (edge !== 0 ? '<span class="ia-meta-badge" style="color:' + recColor + '">' + edgeSign + edge.toFixed(1) + '% edge</span>' : '')
-        + '</div>'
-        + '</div>';
-
-  // Confidence gauge
-  html += '<div class="ia-confidence">'
-        + '<div class="ia-conf-label">Niveau de confiance IA</div>'
-        + '<div class="ia-conf-bar-wrap">'
-        + '<div class="ia-conf-bar" style="width:' + confidence + '%;background:' + recColor + '"></div>'
-        + '</div>'
-        + '<div class="ia-conf-pct">' + Math.round(confidence) + '%</div>'
+  // Analyse IA (Claude / OddsOracle) — chargée de façon asynchrone
+  html += '<div class="ia-llm-box" id="ia-llm-result">'
+        + '<div class="ia-llm-loading"><span class="stats-spinner ia-llm-spinner"></span>Analyse IA en cours…</div>'
         + '</div>';
 
   // Factors
@@ -1454,6 +1425,10 @@ function renderTabIA(data, home, away, edge, prob) {
   html += '</div>';
 
   html += '</div>';
+
+  // Lance le chargement de l'analyse IA après l'injection du HTML dans le DOM
+  setTimeout(function(){ loadIaAnalysis(home, away, meta.sport || '', edge, prob); }, 0);
+
   return html;
 }
 
@@ -1462,6 +1437,94 @@ function iaQuickCard(label, val, sub) {
        + '<div class="ia-qcard-label">' + label + '</div>'
        + (sub ? '<div class="ia-qcard-sub">' + escHtml(sub) + '</div>' : '')
        + '</div>';
+}
+
+/* ---- ANALYSE IA AVANCÉE (Claude / OddsOracle) ---- */
+function loadIaAnalysis(home, away, sport, edge, prob) {
+  var url = '/api/ia-analysis?home=' + encodeURIComponent(home)
+          + '&away=' + encodeURIComponent(away)
+          + '&sport=' + encodeURIComponent(sport || '')
+          + '&edge=' + encodeURIComponent(edge || 0)
+          + '&prob=' + encodeURIComponent(prob || 0);
+
+  fetch(url)
+    .then(function(r){
+      return r.json().then(function(d){ return { ok: r.ok, data: d }; });
+    })
+    .then(function(res){
+      // Le modal a peut-être changé de match ou d'onglet entre-temps
+      var meta = window._statsModalMeta || {};
+      if (meta.home !== home || meta.away !== away) return;
+      var box = document.getElementById('ia-llm-result');
+      if (!box) return;
+      if (!res.ok) {
+        box.innerHTML = '<div class="ia-llm-error">⚠️ ' + escHtml((res.data && res.data.error) || 'Analyse IA indisponible') + '</div>';
+        return;
+      }
+      box.innerHTML = formatIaAnalysis((res.data && res.data.analysis) || '');
+    })
+    .catch(function(err){
+      var meta = window._statsModalMeta || {};
+      if (meta.home !== home || meta.away !== away) return;
+      var box = document.getElementById('ia-llm-result');
+      if (box) box.innerHTML = '<div class="ia-llm-error">⚠️ Erreur analyse IA : ' + escHtml(err.message || 'inconnue') + '</div>';
+    });
+}
+
+// Met en forme la réponse texte du LLM (format 🎯📊🧮💰⚡🔒⚠️✅📌) en blocs HTML
+function formatIaAnalysis(text) {
+  if (!text || !text.trim()) return '<div class="ia-llm-empty">Aucune analyse disponible pour ce match.</div>';
+
+  var LABELS = {
+    '🎯': 'ia-llm-marche',
+    '📊': 'ia-llm-signal',
+    '🧮': 'ia-llm-proba',
+    '💰': 'ia-llm-cote',
+    '⚡': 'ia-llm-edge',
+    '🔒': 'ia-llm-confiance',
+    '⚠️': 'ia-llm-risque',
+    '⚠': 'ia-llm-risque',
+    '✅': 'ia-llm-reco',
+    '📌': 'ia-llm-mise'
+  };
+
+  var lines = text.split(/\r?\n/);
+  var html = '';
+  var inProno = false;
+
+  lines.forEach(function(line){
+    var trimmed = line.trim();
+    if (!trimmed) return;
+    if (/^[═─_-]{3,}$/.test(trimmed)) return; // séparateurs
+
+    var emoji = null;
+    Object.keys(LABELS).forEach(function(e){
+      if (!emoji && trimmed.indexOf(e) === 0) emoji = e;
+    });
+
+    if (emoji) {
+      if (emoji === '🎯') {
+        if (inProno) html += '</div>';
+        html += '<div class="ia-llm-prono">';
+        inProno = true;
+      }
+      var rest = trimmed.slice(emoji.length).trim();
+      var sepIdx = rest.indexOf(':');
+      var label = sepIdx >= 0 ? rest.slice(0, sepIdx).trim() : rest;
+      var value = sepIdx >= 0 ? rest.slice(sepIdx + 1).trim() : '';
+      html += '<div class="ia-llm-line ' + LABELS[emoji] + '">'
+            + '<span class="ia-llm-emoji">' + emoji + '</span>'
+            + '<span class="ia-llm-label">' + escHtml(label) + '</span>'
+            + (value ? '<span class="ia-llm-value">' + escHtml(value) + '</span>' : '')
+            + '</div>';
+    } else {
+      if (!inProno) { html += '<div class="ia-llm-prono">'; inProno = true; }
+      html += '<div class="ia-llm-text">' + escHtml(trimmed) + '</div>';
+    }
+  });
+
+  if (inProno) html += '</div>';
+  return html || ('<div class="ia-llm-text">' + escHtml(text) + '</div>');
 }
 
 /* ---- APERÇU TAB ---- */

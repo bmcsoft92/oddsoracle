@@ -66,8 +66,8 @@ const BankrollManager = (() => {
       total:    br,
       prematch: br * 0.70,
       live:     br * 0.30,
-      liveScenarios:    br * 0.30 * 0.20 / 0.30,   // 20% du total live
-      liveOpportunist:  br * 0.30 * 0.10 / 0.30,   // 10% du total live
+      liveScenarios:    br * 0.30 * 0.20,   // 20% du budget live
+      liveOpportunist:  br * 0.30 * 0.10,   // 10% du budget live
       stopLossDaily:    br * config.slDailyPct / 100,
       stopLossWeekly:   br * config.slWeeklyPct / 100,
       protectGains:     state.initial * (1 + config.protectGainsPct / 100),

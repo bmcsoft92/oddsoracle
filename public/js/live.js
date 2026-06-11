@@ -545,7 +545,7 @@ const LiveModule = (() => {
 
   // Calcule le delta pBase ajusté selon contexte
   function computeContextDelta(ctx, isA) {
-    const sv    = (document.getElementById('live-sport') || {}).value || '';
+    const sv    = (document.getElementById('live-sport-select') || {}).value || '';
     const grp   = getSportGroup(sv);
     const isTennis = (grp === 'tennis');
     const isWTA    = isTennis && (sv.indexOf('wta') >= 0 || sv.indexOf('womens') >= 0);

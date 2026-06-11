@@ -1045,6 +1045,26 @@ option,optgroup{background:var(--bg1)}
 .ia-qcard-label{ font-size:.7rem; color:var(--text-muted); margin-top:2px; }
 .ia-qcard-sub  { font-size:.68rem; color:var(--text-muted); opacity:.7; margin-top:1px; }
 
+/* ── Analyse IA avancée (Claude / OddsOracle) ── */
+.ia-llm-box { display:flex; flex-direction:column; gap:10px; }
+.ia-llm-loading { display:flex; align-items:center; gap:8px; padding:14px; font-size:.85rem; color:var(--text-muted); justify-content:center; }
+.ia-llm-spinner { width:16px; height:16px; border-width:2px; margin:0; flex:none; }
+.ia-llm-error { background:rgba(255,82,82,.08); border:1px solid rgba(255,82,82,.2); border-radius:8px; padding:12px; font-size:.85rem; color:#ff8a80; }
+.ia-llm-empty { font-size:.85rem; color:var(--text-muted); padding:10px; text-align:center; }
+
+.ia-llm-prono { background:var(--surface,#141824); border:1px solid var(--border,#2d3450); border-radius:10px; padding:12px 14px; display:flex; flex-direction:column; gap:6px; }
+.ia-llm-line { display:flex; align-items:flex-start; gap:8px; font-size:.85rem; line-height:1.4; }
+.ia-llm-emoji { flex:none; }
+.ia-llm-label { font-weight:700; color:var(--text-muted); white-space:nowrap; }
+.ia-llm-value { color:var(--text,#e8eaf0); }
+.ia-llm-text  { font-size:.85rem; color:var(--text,#e8eaf0); line-height:1.5; }
+
+.ia-llm-marche .ia-llm-label, .ia-llm-marche .ia-llm-value { font-size:1rem; font-weight:800; color:var(--accent,#4fc3f7); }
+.ia-llm-edge .ia-llm-value { color:#66bb6a; font-weight:700; }
+.ia-llm-confiance .ia-llm-value { color:var(--accent,#4fc3f7); font-weight:700; }
+.ia-llm-risque .ia-llm-value { color:#ffb74d; }
+.ia-llm-reco .ia-llm-value { font-weight:800; }
+
 /* Score display */
 .apercu-score { display:flex; align-items:center; justify-content:center; gap:16px; padding:14px 0; }
 .asc-h, .asc-a { font-size:2rem; font-weight:800; color:var(--text); }

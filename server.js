@@ -17,6 +17,266 @@ const PORT = process.env.PORT || 3000;
 const ODDS_API_KEY  = process.env.ODDS_API_KEY  || '';
 const ODDS_API_BASE = 'https://api.the-odds-api.com/v4';
 
+const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY || '';
+const ANTHROPIC_MODEL   = process.env.ANTHROPIC_MODEL   || 'claude-sonnet-4-6';
+const ANTHROPIC_API_URL = 'https://api.anthropic.com/v1/messages';
+
+// ═══════════════════════════════════════════════════════════════════════
+// PROMPT SYSTÈME — ANALYSE IA ODDSORACLE
+// ═══════════════════════════════════════════════════════════════════════
+const ODDSORACLE_SYSTEM_PROMPT = `Tu es OddsOracle, un système expert en prédiction sportive quantitative.
+Pour chaque match analysé, tu dois exploiter TOUTES les statistiques disponibles
+ci-dessous selon le sport concerné, pondérer chaque signal, et produire des
+pronos fiables avec niveau de confiance et valeur attendue (edge).
+
+══════════════════════════════════════════════
+⚽ FOOTBALL — STATISTIQUES À ANALYSER
+══════════════════════════════════════════════
+ATTAQUE / DÉFENSE :
+- Buts marqués/encaissés par match (domicile / extérieur séparément)
+- xG (expected goals) pour et contre — moyenne sur 5/10 derniers matchs
+- Tirs cadrés, tirs totaux, ratio tirs cadrés/total
+- Touches dans la surface adverse (indicateur pression offensive)
+- Big chances créées / gâchées
+- Possession moyenne (%)
+STANDARDS / PHASES ARRÊTÉES :
+- Corners : moyenne par match (pour/contre), % de corners en 1ère vs 2ème mi-temps
+- Corners dans les 10 premières minutes (indicateur pression initiale)
+- Coups francs dangereux par match
+- Buts sur corner / coups francs (efficacité phases arrêtées)
+DISCIPLINE / DUELS :
+- Cartons jaunes / rouges par match (équipe + joueurs à risque suspension)
+- Fautes commises / subies par match
+- Tacles réussis, interceptions
+- Duels aériens gagnés (%)
+TRANSITIONS / PRESSING :
+- PPDA (passes autorisées par action défensive) — intensité du pressing
+- Contre-attaques créées / subies
+- Récupérations hautes (pressing offensif)
+TOUCHES / JEUX DE TRANSITIONS :
+- Touches totales par match
+- Touches dans chaque tiers du terrain
+- Long balls réussies / ratées
+CORNERS DÉTAILLÉS (marché spécifique) :
+- Équipe qui tire le plus de corners à domicile / extérieur
+- Écart de corners moyen (A - B) sur les 10 derniers matchs
+- % de matchs avec +9, +10, +11 corners total
+- Corners en 1ère mi-temps vs 2ème mi-temps
+BUTS / TIMING :
+- % buts marqués par tranche horaire (0-15, 15-30, 30-45, 45-60, 60-75, 75-90+)
+- % matchs avec but avant 10 min / après 80 min
+- % matchs BTTS (les deux équipes marquent)
+- % matchs Over 1.5 / 2.5 / 3.5 buts
+- Buts en fin de match (85'+)
+CONTEXTE ÉQUIPE :
+- Classement actuel + tendance (montée / descente)
+- Forme sur 5 derniers matchs (W/D/L + buts)
+- Historique domicile/extérieur (saison en cours)
+- Fatigue : jours depuis dernier match, matchs en 30 jours
+- Absences : attaquant principal, gardien, défenseur central, milieu créateur
+- Motivation : maintien / titre / coupe / derby / match sans enjeu
+
+══════════════════════════════════════════════
+🎾 TENNIS — STATISTIQUES À ANALYSER
+══════════════════════════════════════════════
+SURFACE (CRUCIAL) :
+- Win rate sur terre battue / dur / gazon / indoor (toute carrière + 12 derniers mois)
+- Classement ATP/WTA sur surface spécifique
+- Stats de service ET retour ventilées PAR SURFACE
+SERVICE :
+- % 1ère balle (global + par surface)
+- % points gagnés sur 1ère balle / 2ème balle
+- Aces par match (par surface)
+- Double fautes par match
+- Vitesse moyenne 1ère balle (km/h)
+- % jeux de service remportés (hold %)
+RETOUR :
+- % points gagnés sur retour de 1ère / 2ème balle adverse
+- Break points convertis (%)
+- Break points sauvés (%)
+- % jeux de retour remportés (break %)
+TIE-BREAKS (marché spécifique !) :
+- % tie-breaks gagnés (carrière + surface + 12 mois)
+- Nombre de tie-breaks joués cette saison
+- Ratio tie-breaks gagnés/joués par surface
+- Historique tie-breaks en sets décisifs (3ème ou 5ème set)
+SETS & FORMATS :
+- % sets remportés par rapport aux sets joués
+- % matchs gagnés en 2 sets (format BO3)
+- % matchs allant au 3ème set et résultat
+- Capacité à renverser un set perdu (remontée mentale)
+POINTS DÉCISIFS :
+- Win % sur points importants (15-40, 30-40, deuce)
+- Win % sur points de break
+- Win % sous pression (score serré)
+ENDURANCE / FATIGUE :
+- Matchs joués dans les 7 / 14 derniers jours
+- Durée moyenne des matchs (minutes)
+- % matchs disputés sur 2h30+
+- Résultats après matchs longs (>2h30)
+FORME RÉCENTE :
+- Résultats sur 10 derniers matchs (W/L + surface)
+- Adversaires battus / perdus (niveau Elo)
+- Classement Elo actuel (global + surface)
+CONTEXTE :
+- Surface de prédilection vs surface du tournoi actuel
+- Niveau de confort indoor vs outdoor
+- Conditions météo (chaleur, vent, altitude)
+- Blessure active (zone + impact service/déplacement)
+- Historique H2H (global + surface + format)
+
+══════════════════════════════════════════════
+🏀 BASKETBALL — STATISTIQUES À ANALYSER
+══════════════════════════════════════════════
+SCORING / EFFICACITÉ :
+- Points par match (équipe + par joueur clé)
+- Points dans la raquette vs points extérieurs
+- % tirs à 2pts / 3pts / lancers francs
+- Offensive Rating (points pour 100 possessions)
+- Defensive Rating (points concédés pour 100 possessions)
+- Net Rating (offensive - defensive)
+- True Shooting % (efficacité globale)
+RYTHME / POSSESSIONS :
+- Pace (possessions par 48 min)
+- Turnovers par match (commis / forcés)
+- Rebonds offensifs / défensifs
+- Second chance points par match
+- Fast break points par match
+MARCHÉS SPÉCIFIQUES :
+- Total points : Over/Under — fiabilité selon pace de l'équipe
+- 1er quart-temps : scoring moyen Q1 pour/contre
+- Mi-temps : scoring moyen 1ère MT pour/contre
+- Spread : couverture du handicap (%) domicile/extérieur
+- Total points joueur : moyenne pts joueur + tendance 5 derniers matchs
+DÉFENSE / PRESSION :
+- Points concédés en 1ère mi-temps vs 2ème mi-temps
+- % matchs défensivement sous/au-dessus de leur moyenne
+- Steals / Blocks par match
+FATIGUE (CRUCIAL EN NBA) :
+- Back-to-back (2ème match en 2 jours) — impact ~4 pts
+- 3ème match en 4 jours
+- Rotation effectuée (minutes stars réduites ?)
+- Blessure star : impact scoring attendu
+
+══════════════════════════════════════════════
+🏒 HOCKEY SUR GLACE — STATISTIQUES À ANALYSER
+══════════════════════════════════════════════
+- Buts pour/contre par match
+- xG pour/contre (attendu)
+- Tirs cadrés pour/contre par match
+- % réussite power play (supériorité) / penalty kill (infériorité)
+- Situations power play créées / subies par match
+- PDO = save% + shooting% (indicateur chance / regression à venir)
+- Back-to-back impact
+- Gardien titulaire : save%, goals against average
+- Pénalités prises par match
+- Buts en 1ère, 2ème, 3ème période (timing)
+- % matchs Over 5.5 / 6.5 buts
+
+══════════════════════════════════════════════
+⚾ BASEBALL — STATISTIQUES À ANALYSER
+══════════════════════════════════════════════
+- ERA du lanceur partant (earned run average)
+- WHIP (walks + hits per inning)
+- Strikeouts / 9 innings
+- Batting average / OBP / SLG / OPS de l'équipe adverse vs lanceur droitier/gaucher
+- Runs par match (pour/contre)
+- Over/Under total runs — % de couverture sur 10 derniers matchs
+- Run line (handicap -1.5) couverture %
+- Bullpen ERA (importance en fin de match)
+- Park factor (certains stades favorisent plus de runs)
+- Vent (direction + vitesse) — impact home runs
+
+══════════════════════════════════════════════
+🥊 MMA / UFC — STATISTIQUES À ANALYSER
+══════════════════════════════════════════════
+- Win rate par méthode (KO/TKO, soumission, décision)
+- Frappes significatives atterries / tentées par minute
+- Précision frappe debout (%)
+- Takedowns atterris / tentés (% réussite)
+- Défense takedown (%)
+- Soumissions tentées / réussies
+- Résistance aux KO (historique KO reçus)
+- Coupe de poids : difficultés récentes (retard, problèmes médicaux)
+- Préparation : camp solide / coupure de camp
+- Style matchup : striker vs grappler, wrestler vs boxer
+
+══════════════════════════════════════════════
+🏈 NFL — STATISTIQUES À ANALYSER
+══════════════════════════════════════════════
+- Points pour/contre par match
+- Yards totaux offensifs / défensifs
+- Yards par tentative (passing + rushing)
+- Turnovers différentiels (fumbles + interceptions)
+- 3rd down conversion rate pour/contre
+- Red zone scoring % (touchdowns dans la zone des 20 yards)
+- Penalty yards par match
+- DVOA (Defense-adjusted Value Over Average)
+- Spread coverage % domicile/extérieur
+- Over/Under couverture % sur 10 derniers matchs
+- Météo : vent fort = pénalise passing game
+
+══════════════════════════════════════════════
+📐 MODÈLE DE SORTIE POUR CHAQUE PRONO
+══════════════════════════════════════════════
+Pour chaque recommandation, structure ta réponse EXACTEMENT ainsi :
+
+🎯 MARCHÉ : [ex: Total corners +9.5 | BTTS Oui | Over 2.5 buts | Tie-break set 1]
+📊 SIGNAL : [2-3 stats clés qui justifient le prono, chiffrées]
+🧮 PROBABILITÉ RÉELLE ESTIMÉE : [ex: 64%]
+💰 COTE MINIMUM POUR VALEUR : [ex: cote ≥ 1.65]
+⚡ EDGE ESTIMÉ : [ex: +7.2%]
+🔒 CONFIANCE : [Faible / Moyenne / Haute / Très haute]
+⚠️ RISQUES : [Facteurs pouvant invalider le prono]
+✅ RECOMMANDATION : [Jouer / À surveiller / Éviter]
+📌 MISE SUGGÉRÉE : [Kelly 1/4 = X% bankroll]
+
+══════════════════════════════════════════════
+🧠 RÈGLES DE PONDÉRATION IA
+══════════════════════════════════════════════
+DONNER PLUS DE POIDS À :
+1. Stats sur surface spécifique (tennis) ou domicile/extérieur (football/basket)
+2. Forme récente (5 derniers matchs > forme globale saison)
+3. H2H récent (< 2 ans) sur même surface/conditions
+4. Matchups tactiques défavorables (style vs style)
+5. Fatigue avérée (back-to-back, surcharge calendrier)
+6. Motivation réelle (enjeu classement / coupe / derby)
+7. Stats avancées (xG, Elo, PDO) > stats brutes (victoires/défaites)
+RÉDUIRE LE POIDS DE :
+- Stats sur échantillon < 5 matchs
+- H2H très ancien (> 3 ans)
+- Stats de joueurs en retour de blessure (< 3 matchs joués)
+- Conditions météo non confirmées
+SIGNAUX D'ALERTE (réduire confiance) :
+- Incertitude composition équipe
+- Blessure de dernière minute non confirmée
+- Mouvement de cote inexpliqué (steam move adverse)
+- Match sans enjeu clair en fin de saison
+
+══════════════════════════════════════════════
+💡 MARCHÉS LES PLUS FIABLES PAR SPORT
+══════════════════════════════════════════════
+⚽ FOOTBALL : Total corners | BTTS | Over/Under buts | Cartons | 1ère mi-temps
+🎾 TENNIS : Tie-break set 1 | Total jeux | Surface dominance | Break au 1er service
+🏀 BASKET : Total points Q1 | Handicap | Joueur total points | Over/Under
+🏒 HOCKEY : Total buts | Power play goals | 1ère période
+⚾ BASEBALL : Run line | 1ères manches | Total runs
+🥊 MMA : Méthode de victoire | Round de finish | Distance
+🏈 NFL : Total points mi-temps | Spread | Rushing yards
+
+══════════════════════════════════════════════
+📥 DONNÉES FOURNIES POUR CE MATCH
+══════════════════════════════════════════════
+Tu reçois ci-dessous UNIQUEMENT les statistiques réellement disponibles via les
+sources connectées (The Odds API, ESPN, TheSportsDB). Beaucoup de stats avancées
+listées ci-dessus (xG détaillé, PPDA, corners par tranche, Elo, PDO, DVOA...) ne
+sont PAS fournies — base ton analyse sur les données réelles transmises, et pour
+le reste utilise ton expertise générale du sport et des équipes/joueurs cités
+pour estimer qualitativement les facteurs manquants. Indique clairement quand une
+estimation repose sur ta connaissance générale plutôt que sur une donnée fournie.
+Réponds en français, de façon concise, avec 1 à 3 pronos maximum (les plus fiables),
+au format EXACT du modèle de sortie ci-dessus.`;
+
 const SPORTS = [
   // Tennis
   { key: 'tennis_atp',                   label: 'Tennis ATP',          icon: 'T', group: 'tennis' },
@@ -55,7 +315,7 @@ const BOOKMAKERS = ['betclic', 'unibet', 'pinnacle', 'winamax', 'bet365'];
 // ── Icône par groupe de sport ──────────────────────────────────────────────
 function mapGroupIcon(group) {
   const g = (group || '').toLowerCase();
-  if (g.includes('soccer') || g.includes('football') && !g.includes('american') && !g.includes('aussie')) return '⚽';
+  if (g.includes('soccer') || (g.includes('football') && !g.includes('american') && !g.includes('aussie'))) return '⚽';
   if (g.includes('tennis'))            return '🎾';
   if (g.includes('basketball'))        return '🏀';
   if (g.includes('baseball'))          return '⚾';
@@ -168,7 +428,7 @@ function oddsApiFetch(endpoint, params = {}) {
     const queryParams = new URLSearchParams({ apiKey: ODDS_API_KEY, ...params });
     const url = `${ODDS_API_BASE}${endpoint}?${queryParams}`;
     console.log('[API] GET ' + endpoint);
-    https.get(url, (res) => {
+    const req = https.get(url, (res) => {
       if (res.headers['x-requests-used']) {
         apiUsage.requestsUsed      = parseInt(res.headers['x-requests-used']);
         apiUsage.requestsRemaining = parseInt(res.headers['x-requests-remaining']);
@@ -183,6 +443,8 @@ function oddsApiFetch(endpoint, params = {}) {
         catch(e) { reject(new Error('Reponse API invalide (JSON mal forme)')); }
       });
     }).on('error', reject);
+    // Évite une requête bloquée indéfiniment si The Odds API ne répond pas
+    req.setTimeout(15000, () => req.destroy(new Error('Timeout The Odds API (15s)')));
   });
 }
 
@@ -808,16 +1070,19 @@ app.get('/api/scanner', async (req, res) => {
           oddsFormat: 'decimal',
           bookmakers: BOOKMAKERS.join(','),
         });
-        oddsData = (Array.isArray(raw) ? raw : [raw]).map(event => ({
-          id:           event.id,
-          sport:        event.sport_key,
-          homeTeam:     event.home_team,
-          awayTeam:     event.away_team,
-          commenceTime: event.commence_time,
-          bookmakers:   formatBookmakers(event.bookmakers || []),
-          bestOdds:     extractBestOdds(event.bookmakers || []),
-          _raw:         event.bookmakers || [],
-        }));
+        oddsData = (Array.isArray(raw) ? raw : [raw]).map(event => {
+          recordOddsSnapshot(event.id, event.home_team, event.away_team, event.bookmakers || []);
+          return {
+            id:           event.id,
+            sport:        event.sport_key,
+            homeTeam:     event.home_team,
+            awayTeam:     event.away_team,
+            commenceTime: event.commence_time,
+            bookmakers:   formatBookmakers(event.bookmakers || []),
+            bestOdds:     extractBestOdds(event.bookmakers || []),
+            _raw:         event.bookmakers || [],
+          };
+        });
         cache.set(oddsCacheKey, oddsData, 900);
         cache.set(oddsCacheKey + '_stale', oddsData, 7200);
       }
@@ -1062,7 +1327,10 @@ const ESPN_MAP = {
   soccer_argentina_primera_division: 'soccer/arg.1',
   soccer_portugal_primeira_liga: 'soccer/por.1',
   soccer_netherlands_eredivisie: 'soccer/ned.1',
+  soccer_colombia_primera_a: 'soccer/col.1',
   basketball_nba: 'basketball/nba', basketball_wnba: 'basketball/wnba',
+  basketball_nba_championship: 'basketball/nba',
+  basketball_ncaab: 'basketball/mens-college-basketball',
   basketball_euroleague: 'basketball/eur.1',
   baseball_mlb: 'baseball/mlb',
   icehockey_nhl: 'hockey/nhl',
@@ -1076,7 +1344,7 @@ const ESPN_MAP = {
 // (ex: "icehockey_nhl").
 const GENERIC_SPORT_ESPN_KEYS = {
   tennis: ['tennis_atp', 'tennis_wta'],
-  basketball: ['basketball_nba'],
+  basketball: ['basketball_nba', 'basketball_nba_championship', 'basketball_wnba', 'basketball_euroleague', 'basketball_ncaab'],
   baseball: ['baseball_mlb'],
   hockey: ['icehockey_nhl'],
   mma: ['mma_mixed_martial_arts'],
@@ -1084,7 +1352,9 @@ const GENERIC_SPORT_ESPN_KEYS = {
   football: [
     'soccer_epl', 'soccer_france_ligue1', 'soccer_spain_la_liga',
     'soccer_germany_bundesliga', 'soccer_italy_serie_a', 'soccer_usa_mls',
-    'soccer_brazil_campeonato', 'soccer_europe_champs'
+    'soccer_brazil_campeonato', 'soccer_europe_champs',
+    'soccer_argentina_primera_division', 'soccer_portugal_primeira_liga',
+    'soccer_netherlands_eredivisie', 'soccer_colombia_primera_a'
   ],
 };
 
@@ -1452,21 +1722,17 @@ async function fetchH2H(homeTeam, awayTeam) {
   } catch(err) { return null; }
 }
 
-app.get('/api/match-stats', async function(req, res) {
-  const home    = req.query.home    || '';
-  const away    = req.query.away    || '';
-  const sport   = req.query.sport   || '';
-  const matchId = req.query.matchId || '';
-
-  try {
+// ── Collecte des stats d'un match (forme, H2H, ESPN, mouvement de cote) ──
+// Réutilisée par /api/match-stats et /api/ia-analysis
+async function buildMatchStatsData(home, away, sport, matchId) {
   const cacheKey = 'mstats_' + normTeam(home) + '_' + normTeam(away);
   const cached = cache.get(cacheKey);
   if (cached) {
     const mvHome = matchId ? getOddsMovement(matchId, home) : null;
     const mvAway = matchId ? getOddsMovement(matchId, away) : null;
-    return res.json(Object.assign({}, cached, {
+    return Object.assign({}, cached, {
       oddsMovement: { homeTeam: mvHome, awayTeam: mvAway, drawTeam: null }
-    }));
+    });
   }
 
   // Run all in parallel
@@ -1544,10 +1810,156 @@ app.get('/api/match-stats', async function(req, res) {
   const toCache = Object.assign({}, result, { oddsMovement: null });
   cache.set(cacheKey, toCache, 600);
 
-  res.json(result);
+  return result;
+}
+
+app.get('/api/match-stats', async function(req, res) {
+  const home    = req.query.home    || '';
+  const away    = req.query.away    || '';
+  const sport   = req.query.sport   || '';
+  const matchId = req.query.matchId || '';
+
+  try {
+    const result = await buildMatchStatsData(home, away, sport, matchId);
+    res.json(result);
   } catch(err) {
     console.error('[match-stats]', err.message);
     res.status(500).json({ error: err.message, home, away });
+  }
+});
+
+// ═══════════════════════════════════════════════════════════════════════
+// ANALYSE IA  /api/ia-analysis  (Anthropic Claude + prompt OddsOracle)
+// ═══════════════════════════════════════════════════════════════════════
+
+// Construit le message utilisateur envoyé au LLM à partir des données réellement
+// disponibles (stats déjà collectées par buildMatchStatsData + contexte du modèle local)
+function buildIaUserMessage(params) {
+  const { home, away, sport, edge, prob, market, cote, stats } = params;
+  const sportInfo  = SPORTS.find(function(s){ return s.key === sport; }) || null;
+  const sportLabel = sportInfo ? sportInfo.label : (sport || 'Sport inconnu');
+  const sportGroup = sportInfo ? sportInfo.group : '';
+
+  const lines = [];
+  lines.push('MATCH : ' + home + ' vs ' + away);
+  lines.push('SPORT : ' + sportLabel + (sportGroup ? ' (groupe: ' + sportGroup + ')' : ''));
+  if (market) lines.push('MARCHÉ ANALYSÉ PAR LE MODÈLE LOCAL : ' + market);
+  if (cote !== undefined && cote !== null && cote !== '') lines.push('COTE PROPOSÉE : ' + cote);
+  if (prob !== undefined && prob !== null && prob !== '') lines.push('PROBABILITÉ ESTIMÉE PAR LE MODÈLE LOCAL : ' + prob + '%');
+  if (edge !== undefined && edge !== null && edge !== '') lines.push('EDGE ESTIMÉ PAR LE MODÈLE LOCAL (vs marché) : ' + edge + '%');
+
+  const fh = (stats && stats.formHome) || null;
+  const fa = (stats && stats.formAway) || null;
+  if (fh) lines.push('FORME RÉCENTE ' + home + ' (5 derniers matchs) : ' + (fh.form || '?') + (fh.formPct != null ? ' — ' + fh.formPct + '% de points pris' : '') + (fh.streak ? ', série en cours ' + fh.streak : ''));
+  if (fa) lines.push('FORME RÉCENTE ' + away + ' (5 derniers matchs) : ' + (fa.form || '?') + (fa.formPct != null ? ' — ' + fa.formPct + '% de points pris' : '') + (fa.streak ? ', série en cours ' + fa.streak : ''));
+
+  const h2h = (stats && stats.h2h) || null;
+  if (h2h && h2h.total) {
+    lines.push('CONFRONTATIONS DIRECTES (H2H, ' + h2h.total + ' matchs) : ' + h2h.homeWins + 'V ' + home + ' / ' + (h2h.draws || 0) + 'N / ' + h2h.awayWins + 'V ' + away);
+  }
+
+  const om  = (stats && stats.oddsMovement) || {};
+  const mvH = om.homeTeam, mvA = om.awayTeam;
+  if (mvH && mvH.pctChange != null) lines.push('Mouvement de cote ' + home + ' : ' + (mvH.pctChange > 0 ? '+' : '') + mvH.pctChange.toFixed(1) + '%' + (mvH.steam ? ' (steam move détecté)' : ''));
+  if (mvA && mvA.pctChange != null) lines.push('Mouvement de cote ' + away + ' : ' + (mvA.pctChange > 0 ? '+' : '') + mvA.pctChange.toFixed(1) + '%' + (mvA.steam ? ' (steam move détecté)' : ''));
+
+  const espn = (stats && stats.espnStats) || null;
+  if (espn && espn.found) {
+    lines.push('MATCH EN COURS — Score actuel : ' + espn.score.home + ' - ' + espn.score.away + ' (période ' + espn.period + ', ' + espn.clock + ')');
+    function fmtStats(label, s) {
+      if (!s) return null;
+      const parts = [];
+      Object.keys(s).forEach(function(k) {
+        if (s[k] !== null && s[k] !== undefined && s[k] !== '') parts.push(k + '=' + s[k]);
+      });
+      return parts.length ? (label + ' : ' + parts.join(', ')) : null;
+    }
+    const sA = fmtStats('Stats live ' + home, espn.statsA);
+    const sB = fmtStats('Stats live ' + away, espn.statsB);
+    if (sA) lines.push(sA);
+    if (sB) lines.push(sB);
+    if (espn.venue) lines.push('Stade : ' + espn.venue.name + (espn.venue.city ? ' (' + espn.venue.city + ')' : ''));
+    if (espn.referee) lines.push('Arbitre : ' + espn.referee.name);
+    if (espn.incidents && espn.incidents.length) {
+      lines.push('Incidents : ' + espn.incidents.map(function(i) {
+        return i.clock + ' ' + i.type + (i.athletes && i.athletes.length ? ' (' + i.athletes.join(', ') + ')' : '') + ' [' + i.side + ']';
+      }).join(' | '));
+    }
+  } else {
+    lines.push('Match à venir (pas de données live disponibles pour le moment).');
+  }
+
+  lines.push('');
+  lines.push('Analyse ce match selon le sport "' + sportLabel + '" et propose 1 à 3 pronos au format demandé.');
+
+  return lines.join('\n');
+}
+
+app.get('/api/ia-analysis', async function(req, res) {
+  const home    = (req.query.home    || '').trim();
+  const away    = (req.query.away    || '').trim();
+  const sport   = (req.query.sport   || '').trim();
+  const matchId = (req.query.matchId || '').trim();
+  const edge    = req.query.edge;
+  const prob    = req.query.prob;
+  const market  = (req.query.market  || '').trim();
+  const cote    = req.query.cote;
+
+  if (!home || !away) {
+    return res.status(400).json({ error: 'Paramètres home et away requis' });
+  }
+  if (!ANTHROPIC_API_KEY) {
+    return res.status(503).json({ error: 'ANTHROPIC_API_KEY non configurée sur le serveur. Voir .env.example' });
+  }
+
+  const cacheKey = 'ia_' + normTeam(home) + '_' + normTeam(away) + '_' + sport;
+  const cached = cache.get(cacheKey);
+  if (cached) return res.json(cached);
+
+  try {
+    const stats = await buildMatchStatsData(home, away, sport, matchId);
+    const userMessage = buildIaUserMessage({ home, away, sport, edge, prob, market, cote, stats });
+
+    const ctrl = new AbortController();
+    const timer = setTimeout(function(){ ctrl.abort(); }, 30000);
+    let r;
+    try {
+      r = await fetch(ANTHROPIC_API_URL, {
+        method: 'POST',
+        headers: {
+          'x-api-key': ANTHROPIC_API_KEY,
+          'anthropic-version': '2023-06-01',
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: ANTHROPIC_MODEL,
+          max_tokens: 1500,
+          system: ODDSORACLE_SYSTEM_PROMPT,
+          messages: [{ role: 'user', content: userMessage }],
+        }),
+        signal: ctrl.signal,
+      });
+    } finally {
+      clearTimeout(timer);
+    }
+
+    if (!r.ok) {
+      const errText = await r.text().catch(function(){ return ''; });
+      console.error('[ia-analysis] Anthropic ' + r.status + ': ' + errText);
+      return res.status(502).json({ error: 'Erreur API Anthropic (' + r.status + ')' });
+    }
+
+    const data  = await r.json();
+    const block = (data.content || []).find(function(c){ return c.type === 'text'; });
+    const text  = block ? block.text : '';
+
+    const result = { analysis: text, model: ANTHROPIC_MODEL, generatedAt: Date.now() };
+    cache.set(cacheKey, result, 600); // 10 min — limite le coût d'appels répétés
+    res.json(result);
+  } catch(err) {
+    console.error('[ia-analysis]', err.message);
+    const msg = err.name === 'AbortError' ? 'Timeout lors de l\'analyse IA' : err.message;
+    res.status(500).json({ error: msg, home, away });
   }
 });
 

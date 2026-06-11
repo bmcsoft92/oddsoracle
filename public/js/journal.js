@@ -71,15 +71,15 @@ const JournalModule = (() => {
     } else {
       tbody.innerHTML = list.map(bet => {
         const pnl = calcPnl(bet);
-        const sportIcon = { tennis:'🎾', football:'⚽', basketball:'🏀' }[bet.sport] || '🎾';
+        const sportIcon = { tennis:'🎾', football:'⚽', basketball:'🏀', hockey:'🏒', baseball:'⚾', mma:'🥊', american_football:'🏈', rugby:'🏉', cricket:'🏏', aussie_rules:'🏉' }[bet.sport] || '🎾';
         return `
           <tr>
             <td>${bet.date}</td>
             <td>${sportIcon}</td>
-            <td style="font-weight:500;color:var(--text-primary)">${bet.match}</td>
+            <td style="font-weight:500;color:var(--text-primary)">${escHtml(bet.match)}</td>
             <td><span class="type-badge type-${bet.type}">${bet.type === 'live' ? 'LIVE' : 'PRÉ'}</span></td>
-            <td>${bet.market}</td>
-            <td>${bet.selection}</td>
+            <td>${escHtml(bet.market)}</td>
+            <td>${escHtml(bet.selection)}</td>
             <td class="mono">${parseFloat(bet.cote).toFixed(2)}</td>
             <td class="mono">${parseFloat(bet.stake).toFixed(0)} €</td>
             <td class="mono ${bet.edge > 9 ? 'text-green' : bet.edge > 4 ? 'text-cyan' : 'text-muted'}">${bet.edge ? '+' + bet.edge + '%' : '—'}</td>
@@ -117,15 +117,18 @@ const JournalModule = (() => {
   }
 
   function markResult(id, result) {
+    const bet = bets.find(b => b.id === id);
+    if (!bet) return;
+    // Évite un double impact bankroll si le pari est déjà résolu
+    // (ex: appel concurrent avec autoCheckPendingBets)
+    if (bet.result !== 'pending') { renderTable(); return; }
+
     updateBetResult(id, result);
 
-    // Mettre à jour la bankroll si résultat défini
-    const bet = bets.find(b => b.id === id);
-    if (bet) {
-      const pnl = calcPnl({ ...bet, result });
-      if (pnl > 0) BankrollManager.recordWin(pnl, bet.type === 'live');
-      else if (pnl < 0) BankrollManager.recordLoss(-pnl, bet.type === 'live');
-    }
+    // Mettre à jour la bankroll
+    const pnl = calcPnl({ ...bet, result });
+    if (pnl > 0) BankrollManager.recordWin(pnl, bet.type === 'live');
+    else if (pnl < 0) BankrollManager.recordLoss(-pnl, bet.type === 'live');
 
     renderTable();
     DashboardModule.refresh();
@@ -239,6 +242,11 @@ const JournalModule = (() => {
         const data = await r.json();
 
         if (data.result === 'win' || data.result === 'loss') {
+          // Re-vérifie que le pari est toujours en attente (évite double impact
+          // bankroll si l'utilisateur l'a déjà résolu manuellement entre-temps)
+          const current = bets.find(b => b.id === bet.id);
+          if (!current || current.result !== 'pending') continue;
+
           updateBetResult(bet.id, data.result);
           // Impact bankroll
           const pnl = calcPnl({ ...bet, result: data.result });
@@ -261,23 +269,29 @@ const JournalModule = (() => {
   // RE-VÉRIFICATION MANUELLE : recalcule le résultat réel d'un pari déjà
   // marqué Gagné/Perdu (correction d'une erreur de résolution antérieure)
   // -----------------------------------------------------------------------
+  const _recheckingIds = new Set();
+
   async function recheckBet(id) {
     const bet = bets.find(b => b.id === id);
     if (!bet || !bet.match || !bet.selection) return;
-
-    const parts = bet.match.split(/\s+vs\s+/i);
-    if (parts.length < 2) { alert('⚠️ Format du match invalide.'); return; }
-    const home = parts[0].trim();
-    const away = parts[1].trim();
-
-    const params = new URLSearchParams({
-      home, away,
-      date: bet.date || '',
-      selection: bet.selection || '',
-      sport: bet.sportKey || bet.sport || ''
-    });
+    // Empêche un double-clic / double appel concurrent sur le même pari
+    // (éviterait une double annulation/réapplication de l'impact bankroll)
+    if (_recheckingIds.has(id)) return;
+    _recheckingIds.add(id);
 
     try {
+      const parts = bet.match.split(/\s+vs\s+/i);
+      if (parts.length < 2) { alert('⚠️ Format du match invalide.'); return; }
+      const home = parts[0].trim();
+      const away = parts[1].trim();
+
+      const params = new URLSearchParams({
+        home, away,
+        date: bet.date || '',
+        selection: bet.selection || '',
+        sport: bet.sportKey || bet.sport || ''
+      });
+
       const r = await fetch('/api/check-result?' + params);
       if (!r.ok) { alert('⚠️ Impossible de vérifier le résultat pour le moment.'); return; }
       const data = await r.json();
@@ -309,6 +323,8 @@ const JournalModule = (() => {
       alert('🔄 Résultat corrigé : ' + resultLabel(data.result) + (data.score ? ' (' + data.score + ')' : ''));
     } catch(e) {
       alert('⚠️ Erreur lors de la vérification.');
+    } finally {
+      _recheckingIds.delete(id);
     }
   }
 
