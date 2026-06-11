@@ -1441,6 +1441,9 @@ function iaQuickCard(label, val, sub) {
 
 /* ---- ANALYSE IA AVANCÉE (Claude / OddsOracle) ---- */
 function loadIaAnalysis(home, away, sport, edge, prob) {
+  var loadingBox = document.getElementById('ia-llm-result');
+  if (loadingBox) loadingBox.innerHTML = '<div class="ia-llm-loading"><span class="stats-spinner ia-llm-spinner"></span>Analyse IA en cours…</div>';
+
   var url = '/api/ia-analysis?home=' + encodeURIComponent(home)
           + '&away=' + encodeURIComponent(away)
           + '&sport=' + encodeURIComponent(sport || '')
@@ -1458,7 +1461,9 @@ function loadIaAnalysis(home, away, sport, edge, prob) {
       var box = document.getElementById('ia-llm-result');
       if (!box) return;
       if (!res.ok) {
-        box.innerHTML = '<div class="ia-llm-error">⚠️ ' + escHtml((res.data && res.data.error) || 'Analyse IA indisponible') + '</div>';
+        var errMsg = (res.data && res.data.error) || 'Analyse IA indisponible';
+        box.innerHTML = iaErrorBox(errMsg);
+        bindIaRetry(box, home, away, sport, edge, prob);
         return;
       }
       box.innerHTML = formatIaAnalysis((res.data && res.data.analysis) || '');
@@ -1467,8 +1472,22 @@ function loadIaAnalysis(home, away, sport, edge, prob) {
       var meta = window._statsModalMeta || {};
       if (meta.home !== home || meta.away !== away) return;
       var box = document.getElementById('ia-llm-result');
-      if (box) box.innerHTML = '<div class="ia-llm-error">⚠️ Erreur analyse IA : ' + escHtml(err.message || 'inconnue') + '</div>';
+      if (!box) return;
+      box.innerHTML = iaErrorBox('Erreur analyse IA : ' + (err.message || 'inconnue'));
+      bindIaRetry(box, home, away, sport, edge, prob);
     });
+}
+
+// Bloc d'erreur IA avec bouton "Réessayer"
+function iaErrorBox(msg) {
+  return '<div class="ia-llm-error">⚠️ ' + escHtml(msg) + '</div>'
+       + '<button type="button" class="ia-llm-retry-btn">🔄 Réessayer</button>';
+}
+
+// Branche le bouton "Réessayer" sur un nouvel appel à loadIaAnalysis
+function bindIaRetry(box, home, away, sport, edge, prob) {
+  var btn = box.querySelector('.ia-llm-retry-btn');
+  if (btn) btn.addEventListener('click', function(){ loadIaAnalysis(home, away, sport, edge, prob); });
 }
 
 // Met en forme la réponse texte du LLM (format 🎯📊🧮💰⚡🔒⚠️✅📌) en blocs HTML

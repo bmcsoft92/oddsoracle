@@ -1051,6 +1051,8 @@ option,optgroup{background:var(--bg1)}
 .ia-llm-loading { display:flex; align-items:center; gap:8px; padding:14px; font-size:.85rem; color:var(--text-muted); justify-content:center; }
 .ia-llm-spinner { width:16px; height:16px; border-width:2px; margin:0; flex:none; }
 .ia-llm-error { background:rgba(255,82,82,.08); border:1px solid rgba(255,82,82,.2); border-radius:8px; padding:12px; font-size:.85rem; color:#ff8a80; }
+.ia-llm-retry-btn { margin-top:8px; padding:6px 14px; font-size:.8rem; font-weight:600; color:#ff8a80; background:rgba(255,82,82,.08); border:1px solid rgba(255,82,82,.25); border-radius:8px; cursor:pointer; transition:background .15s; }
+.ia-llm-retry-btn:hover { background:rgba(255,82,82,.18); }
 .ia-llm-empty { font-size:.85rem; color:var(--text-muted); padding:10px; text-align:center; }
 
 .ia-llm-prono { background:var(--surface,#141824); border:1px solid var(--border,#2d3450); border-radius:10px; padding:12px 14px; display:flex; flex-direction:column; gap:6px; }

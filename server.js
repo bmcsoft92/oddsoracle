@@ -17,9 +17,11 @@ const PORT = process.env.PORT || 3000;
 const ODDS_API_KEY  = process.env.ODDS_API_KEY  || '';
 const ODDS_API_BASE = 'https://api.the-odds-api.com/v4';
 
-const GEMINI_API_KEY = process.env.GEMINI_API_KEY || '';
-const GEMINI_MODEL   = process.env.GEMINI_MODEL   || 'gemini-2.5-flash';
+const GEMINI_API_KEY      = process.env.GEMINI_API_KEY || '';
+const GEMINI_MODEL        = process.env.GEMINI_MODEL          || 'gemini-2.5-flash';
+const GEMINI_MODEL_FALLBACK = process.env.GEMINI_MODEL_FALLBACK || 'gemini-2.5-flash-lite';
 const GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/';
+const GEMINI_RETRYABLE_STATUSES = [429, 503]; // surcharge / quota — on retente puis on bascule de modèle
 
 // ═══════════════════════════════════════════════════════════════════════
 // PROMPT SYSTÈME — ANALYSE IA ODDSORACLE
@@ -2044,6 +2046,30 @@ function buildIaUserMessage(params) {
   return lines.join('\n');
 }
 
+// Appelle Gemini une fois pour un modèle donné. Ne lève jamais — renvoie un descripteur de résultat.
+async function callGeminiOnce(model, payload) {
+  const ctrl = new AbortController();
+  const timer = setTimeout(function(){ ctrl.abort(); }, 30000);
+  try {
+    const r = await fetch(GEMINI_API_URL + model + ':generateContent?key=' + GEMINI_API_KEY, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(payload),
+      signal: ctrl.signal,
+    });
+    if (!r.ok) {
+      const errText = await r.text().catch(function(){ return ''; });
+      return { ok: false, status: r.status, errText, model };
+    }
+    const data = await r.json();
+    return { ok: true, status: r.status, data, model };
+  } catch (err) {
+    return { ok: false, status: 0, errText: err.name === 'AbortError' ? 'timeout' : err.message, model };
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 app.get('/api/ia-analysis', async function(req, res) {
   const home    = (req.query.home    || '').trim();
   const away    = (req.query.away    || '').trim();
@@ -2069,36 +2095,51 @@ app.get('/api/ia-analysis', async function(req, res) {
     const stats = await buildMatchStatsData(home, away, sport, matchId);
     const userMessage = buildIaUserMessage({ home, away, sport, edge, prob, market, cote, stats });
 
-    const ctrl = new AbortController();
-    const timer = setTimeout(function(){ ctrl.abort(); }, 30000);
-    let r;
-    try {
-      r = await fetch(GEMINI_API_URL + GEMINI_MODEL + ':generateContent?key=' + GEMINI_API_KEY, {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({
-          systemInstruction: { parts: [{ text: ODDSORACLE_SYSTEM_PROMPT }] },
-          contents: [{ role: 'user', parts: [{ text: userMessage }] }],
-          generationConfig: { maxOutputTokens: 1500 },
-        }),
-        signal: ctrl.signal,
+    const payload = {
+      systemInstruction: { parts: [{ text: ODDSORACLE_SYSTEM_PROMPT }] },
+      contents: [{ role: 'user', parts: [{ text: userMessage }] }],
+      generationConfig: { maxOutputTokens: 1500 },
+    };
+
+    // Modèles à essayer dans l'ordre (principal puis secours), sans doublon
+    const modelsToTry = [GEMINI_MODEL, GEMINI_MODEL_FALLBACK].filter(function(m, i, arr) {
+      return m && arr.indexOf(m) === i;
+    });
+
+    let resp = null;
+    outer:
+    for (let m = 0; m < modelsToTry.length; m++) {
+      const model = modelsToTry[m];
+      for (let attempt = 0; attempt < 2; attempt++) {
+        resp = await callGeminiOnce(model, payload);
+        if (resp.ok) break outer;
+        if (!GEMINI_RETRYABLE_STATUSES.includes(resp.status)) break outer;
+        if (attempt === 0) await new Promise(function(r){ setTimeout(r, 1200); }); // backoff avant retry
+      }
+      // Si toujours en échec après les tentatives sur ce modèle, on passe au modèle suivant (si surcharge/quota)
+    }
+
+    if (!resp || !resp.ok) {
+      console.error('[ia-analysis] Gemini ' + (resp ? resp.status : '?') + ' (modele ' + (resp ? resp.model : '?') + '): ' + (resp ? resp.errText : ''));
+      if (resp && resp.status === 0) {
+        const msg = resp.errText === 'timeout' ? 'Timeout lors de l\'analyse IA' : resp.errText;
+        return res.status(500).json({ error: msg, home, away });
+      }
+      const overloaded = resp && GEMINI_RETRYABLE_STATUSES.includes(resp.status);
+      return res.status(502).json({
+        error: overloaded
+          ? 'Service IA temporairement surchargé, réessaie dans quelques instants.'
+          : 'Erreur API Gemini (' + (resp ? resp.status : '?') + ')',
+        retryable: !!overloaded,
       });
-    } finally {
-      clearTimeout(timer);
     }
 
-    if (!r.ok) {
-      const errText = await r.text().catch(function(){ return ''; });
-      console.error('[ia-analysis] Gemini ' + r.status + ': ' + errText);
-      return res.status(502).json({ error: 'Erreur API Gemini (' + r.status + ')' });
-    }
-
-    const data  = await r.json();
+    const data  = resp.data;
     const cand  = (data.candidates || [])[0] || {};
     const parts = (cand.content && cand.content.parts) || [];
     const text  = parts.map(function(p){ return p.text || ''; }).join('');
 
-    const result = { analysis: text, model: GEMINI_MODEL, generatedAt: Date.now() };
+    const result = { analysis: text, model: resp.model, generatedAt: Date.now() };
     cache.set(cacheKey, result, 600); // 10 min — limite le nombre d'appels (quota gratuit)
     res.json(result);
   } catch(err) {
