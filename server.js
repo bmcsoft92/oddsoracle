@@ -17,9 +17,9 @@ const PORT = process.env.PORT || 3000;
 const ODDS_API_KEY  = process.env.ODDS_API_KEY  || '';
 const ODDS_API_BASE = 'https://api.the-odds-api.com/v4';
 
-const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY || '';
-const ANTHROPIC_MODEL   = process.env.ANTHROPIC_MODEL   || 'claude-sonnet-4-6';
-const ANTHROPIC_API_URL = 'https://api.anthropic.com/v1/messages';
+const GEMINI_API_KEY = process.env.GEMINI_API_KEY || '';
+const GEMINI_MODEL   = process.env.GEMINI_MODEL   || 'gemini-2.5-pro';
+const GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/';
 
 // ═══════════════════════════════════════════════════════════════════════
 // PROMPT SYSTÈME — ANALYSE IA ODDSORACLE
@@ -1908,8 +1908,8 @@ app.get('/api/ia-analysis', async function(req, res) {
   if (!home || !away) {
     return res.status(400).json({ error: 'Paramètres home et away requis' });
   }
-  if (!ANTHROPIC_API_KEY) {
-    return res.status(503).json({ error: 'ANTHROPIC_API_KEY non configurée sur le serveur. Voir .env.example' });
+  if (!GEMINI_API_KEY) {
+    return res.status(503).json({ error: 'GEMINI_API_KEY non configurée sur le serveur. Voir .env.example' });
   }
 
   const cacheKey = 'ia_' + normTeam(home) + '_' + normTeam(away) + '_' + sport;
@@ -1924,18 +1924,13 @@ app.get('/api/ia-analysis', async function(req, res) {
     const timer = setTimeout(function(){ ctrl.abort(); }, 30000);
     let r;
     try {
-      r = await fetch(ANTHROPIC_API_URL, {
+      r = await fetch(GEMINI_API_URL + GEMINI_MODEL + ':generateContent?key=' + GEMINI_API_KEY, {
         method: 'POST',
-        headers: {
-          'x-api-key': ANTHROPIC_API_KEY,
-          'anthropic-version': '2023-06-01',
-          'content-type': 'application/json',
-        },
+        headers: { 'content-type': 'application/json' },
         body: JSON.stringify({
-          model: ANTHROPIC_MODEL,
-          max_tokens: 1500,
-          system: ODDSORACLE_SYSTEM_PROMPT,
-          messages: [{ role: 'user', content: userMessage }],
+          systemInstruction: { parts: [{ text: ODDSORACLE_SYSTEM_PROMPT }] },
+          contents: [{ role: 'user', parts: [{ text: userMessage }] }],
+          generationConfig: { maxOutputTokens: 1500 },
         }),
         signal: ctrl.signal,
       });
@@ -1945,16 +1940,17 @@ app.get('/api/ia-analysis', async function(req, res) {
 
     if (!r.ok) {
       const errText = await r.text().catch(function(){ return ''; });
-      console.error('[ia-analysis] Anthropic ' + r.status + ': ' + errText);
-      return res.status(502).json({ error: 'Erreur API Anthropic (' + r.status + ')' });
+      console.error('[ia-analysis] Gemini ' + r.status + ': ' + errText);
+      return res.status(502).json({ error: 'Erreur API Gemini (' + r.status + ')' });
     }
 
     const data  = await r.json();
-    const block = (data.content || []).find(function(c){ return c.type === 'text'; });
-    const text  = block ? block.text : '';
+    const cand  = (data.candidates || [])[0] || {};
+    const parts = (cand.content && cand.content.parts) || [];
+    const text  = parts.map(function(p){ return p.text || ''; }).join('');
 
-    const result = { analysis: text, model: ANTHROPIC_MODEL, generatedAt: Date.now() };
-    cache.set(cacheKey, result, 600); // 10 min — limite le coût d'appels répétés
+    const result = { analysis: text, model: GEMINI_MODEL, generatedAt: Date.now() };
+    cache.set(cacheKey, result, 600); // 10 min — limite le nombre d'appels (quota gratuit)
     res.json(result);
   } catch(err) {
     console.error('[ia-analysis]', err.message);
