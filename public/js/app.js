@@ -945,12 +945,16 @@ function renderMatchCard(match, isLive) {
   }
 
   // Odds columns
+  // NB: pour un match déjà commencé (started), les cotes/edge proviennent
+  // d'un snapshot pré-match (l'API de cotes ne fournit pas d'in-play ici) et
+  // ne reflètent plus la situation réelle -> on n'affiche pas de surbrillance
+  // "value" ni de % d'edge par sélection sur les cartes live.
   var oddsHtml = sels.map(function(s,i){
     var n    = sels.length;
     var lbl  = n===2 ? (i===0?'1':'2') : (i===0?'1': i===1?'X':'2');
-    var best = bestSel && s===bestSel && (s.edge||0)>0;
+    var best = !started && bestSel && s===bestSel && (s.edge||0)>0;
     var ec   = (s.edge||0)>0 ? 'mc-ep' : 'mc-en';
-    var et   = s.edge!=null ? ((s.edge>0?'+':'')+s.edge.toFixed(1)+'%') : '';
+    var et   = (!started && s.edge!=null) ? ((s.edge>0?'+':'')+s.edge.toFixed(1)+'%') : '';
     var pw   = Math.min(100,Math.max(0,s.trueProb||0));
     return '<div class="mc-odd'+(best?' mc-best':'')+'">'
       +'<div class="mc-ol">'+lbl+'</div>'
@@ -961,14 +965,14 @@ function renderMatchCard(match, isLive) {
       +'</div>';
   }).join('');
 
-  // Prediction badge
-  var predHtml = bestSel && bestSel.predLabel
+  // Prediction badge (basé sur l'edge pré-match -> masqué une fois le match commencé)
+  var predHtml = (!started && bestSel && bestSel.predLabel)
     ? '<span class="mc-pred feed-pred feed-pred-'+bestSel.predLabel.toLowerCase()+'">'+bestSel.predLabel+'</span>'
     : '';
 
-  // Kelly
+  // Kelly (idem : basé sur l'edge pré-match)
   var kellyHtml = '';
-  if (bestSel && (bestSel.edge||0)>0 && bestSel.trueProb) {
+  if (!started && bestSel && (bestSel.edge||0)>0 && bestSel.trueProb) {
     var p = bestSel.trueProb/100;
     var b = (bestSel.bestPrice||2)-1;
     var k = Math.max(0,(p*b-(1-p))/b);
@@ -981,7 +985,12 @@ function renderMatchCard(match, isLive) {
     : '';
 
   // Footer
-  var foot = bestSel ? '<div class="mc-footer">'
+  // Match déjà commencé : prob/edge/Kelly viennent d'un snapshot pré-match,
+  // on affiche une note neutre à la place pour ne pas induire en erreur.
+  var foot = started ? '<div class="mc-footer">'
+    +'<span class="mc-prematch-note">Cotes pré-match (réf.)</span>'
+    +watchHtml+'<button class="mc-stats-btn" onclick="event.stopPropagation();openMatchStats(this)">&#x1F4CA; Stats</button></div>'
+    : bestSel ? '<div class="mc-footer">'
     +'<span class="mc-prob">Prob <strong>'+(bestSel.trueProb||0)+'%</strong></span>'
     +((bestSel.edge||0)>0?'<span class="mc-ep mc-ev">edge +'+bestSel.edge.toFixed(1)+'%</span>':'')
     +kellyHtml+watchHtml+'<button class="mc-stats-btn" onclick="event.stopPropagation();openMatchStats(this)">&#x1F4CA; Stats</button></div>' : watchHtml ? '<div class="mc-footer">'+watchHtml+'<button class="mc-stats-btn" onclick="event.stopPropagation();openMatchStats(this)">&#x1F4CA; Stats</button></div>' : '<div class="mc-footer"><button class="mc-stats-btn" onclick="event.stopPropagation();openMatchStats(this)">&#x1F4CA; Stats</button></div>';
@@ -1243,13 +1252,20 @@ const PronosDuJourModule = (() => {
       timeBadge = '<span class="mc-time-badge'+urgCls+'">'+tl+'</span>';
     }
 
-    var predHtml = p.predLabel
+    // predLabel/edge/score viennent des cotes pré-match du scanner : si le
+    // match est déjà en cours, ces valeurs sont obsolètes (cf. renderMatchCard)
+    var predHtml = (!p.isLive && p.predLabel)
       ? '<span class="mc-pred feed-pred feed-pred-'+p.predLabel.toLowerCase()+'">'+p.predLabel+'</span>'
       : '';
 
     var verdictHtml = safeVerdict
       ? '<div class="prono-verdict">'+safeVerdict+'</div>'
       : '';
+
+    var pickMetaHtml = p.isLive
+      ? ' <span class="mc-prematch-note">(cotes pré-match, réf.)</span>'
+      : (p.edge!=null ? ' <span class="mc-ep mc-ev">edge +'+p.edge.toFixed(1)+'%</span>' : '')
+      + (p.adjustedScore!=null ? ' <span class="prono-score">'+p.adjustedScore+'/100</span>' : '');
 
     return '<div class="match-card prono-card">'
       + '<div class="mc-head">'
@@ -1265,8 +1281,7 @@ const PronosDuJourModule = (() => {
       + '<div class="prono-pick">Pari conseill&eacute; : <strong>'+safeSel+'</strong>'
       + ' @ '+(p.bestPrice ? p.bestPrice.toFixed(2) : '—')
       + (p.bestBook ? ' ('+p.bestBook+')' : '')
-      + (p.edge!=null ? ' <span class="mc-ep mc-ev">edge +'+p.edge.toFixed(1)+'%</span>' : '')
-      + (p.adjustedScore!=null ? ' <span class="prono-score">'+p.adjustedScore+'/100</span>' : '')
+      + pickMetaHtml
       + '</div>'
       + verdictHtml
       + '</div>';
@@ -2076,6 +2091,16 @@ function escHtml(s) {
 /* ===== AUTO-ANALYSE CARTES ===== */
 
 function buildInlinePred(edge, prob, teamName, isLive) {
+  // Match déjà commencé : edge/prob viennent d'un snapshot pré-match (non
+  // représentatif de la situation actuelle) -> pas de reco "BET" basée sur
+  // cet edge. Les signaux live (renderSignalBadges) restent affichés à côté.
+  if (isLive) {
+    return '<div class="card-pred-bar pred-neutral">'
+         + '<span class="cpb-icon">&#9201;</span>'
+         + '<span class="cpb-label">Cotes pré-match - analyse live en cours</span>'
+         + '<span class="cpb-live-tag">LIVE</span>'
+         + '</div>';
+  }
   // Prédiction basée sur edge et probabilité, sans appel API
   var strength, icon, cls, advice;
   if (edge >= 5) {

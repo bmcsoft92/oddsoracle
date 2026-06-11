@@ -639,6 +639,7 @@ option,optgroup{background:var(--bg1)}
 .mc-prob strong{color:var(--text0)}
 .mc-ev{font-size:.65rem;font-family:var(--mono)}
 .mc-kelly{font-size:.62rem;font-family:var(--mono);color:var(--yellow);margin-left:auto}
+.mc-prematch-note{font-size:.65rem;color:var(--text2);font-style:italic}
 
 /* Feed meta bar */
 .feed-meta-bar{
