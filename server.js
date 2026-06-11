@@ -1342,8 +1342,8 @@ app.get('/api/scanner', async (req, res) => {
   await Promise.allSettled(topPicks.map(async function(opp) {
     try {
       const [formHomeRes, formAwayRes, h2hRes] = await Promise.allSettled([
-        fetchTeamRecentForm(opp.homeTeam),
-        fetchTeamRecentForm(opp.awayTeam),
+        fetchTeamRecentForm(opp.homeTeam, opp.sport),
+        fetchTeamRecentForm(opp.awayTeam, opp.sport),
         fetchH2H(opp.homeTeam, opp.awayTeam),
       ]);
       const formHome = formHomeRes.status === 'fulfilled' ? formHomeRes.value : null;
@@ -1780,49 +1780,46 @@ app.get('/api/player-form', async function(req, res) {
 // Inspiré Flashscore / bookmakers
 // ═══════════════════════════════════════════════════════════════════════
 
-// Récupère les derniers résultats d'une équipe/joueur (TheSportsDB)
-async function fetchTeamRecentForm(name) {
-  if (!name) return null;
-  const cacheKey = 'form_' + normTeam(name);
-  const cached = cache.get(cacheKey);
-  if (cached) return cached;
+// Recherche de forme via "équipe" (TheSportsDB searchteams + eventslast)
+async function fetchTeamFormByTeamSearch(name) {
+  try {
+    const ctrl2 = new AbortController();
+    setTimeout(function(){ ctrl2.abort(); }, 5000);
+    const r2 = await fetch('https://www.thesportsdb.com/api/v1/json/3/searchteams.php?t=' + encodeURIComponent(name), { signal: ctrl2.signal });
+    const d2 = await r2.json();
+    const teams = d2.teams || [];
+    if (!teams.length) return null;
+    const team = teams[0];
+    const ctrl3 = new AbortController();
+    setTimeout(function(){ ctrl3.abort(); }, 5000);
+    const r3 = await fetch('https://www.thesportsdb.com/api/v1/json/3/eventslast.php?id=' + team.idTeam, { signal: ctrl3.signal });
+    const d3 = await r3.json();
+    const events = (d3.results || []).slice(0, 7);
+    const form = events.map(function(ev) {
+      const isHome = teamMatch(ev.strHomeTeam || '', name);
+      const hs = parseInt(ev.intHomeScore) || 0, as = parseInt(ev.intAwayScore) || 0;
+      let result = 'D';
+      if (hs !== as) result = (isHome ? hs > as : as > hs) ? 'W' : 'L';
+      return { date: ev.dateEvent, home: ev.strHomeTeam, away: ev.strAwayTeam, homeScore: hs, awayScore: as, result, venue: ev.strVenue || '' };
+    });
+    const wins = form.filter(function(f){ return f.result === 'W'; }).length;
+    const homeFormArr = form.filter(function(f){ return teamMatch(f.home, name); });
+    const awayFormArr = form.filter(function(f){ return !teamMatch(f.home, name); });
+    const homeWinsH = homeFormArr.filter(function(f){ return f.result==='W'; }).length;
+    const awayWinsA = awayFormArr.filter(function(f){ return f.result==='W'; }).length;
+    return { name: team.strTeam, badge: team.strTeamBadge || null, form, homeForm: homeFormArr, awayForm: awayFormArr, homeFormPct: homeFormArr.length ? Math.round(homeWinsH/homeFormArr.length*100) : null, awayFormPct: awayFormArr.length ? Math.round(awayWinsA/awayFormArr.length*100) : null, formPct: form.length ? Math.round(wins/form.length*100) : null, streak: calcStreak(form.map(function(f){ return f.result; })), goalsScored: form.reduce(function(acc,f){ const isH = teamMatch(f.home,name); return acc + (isH ? f.homeScore : f.awayScore); },0), goalsConceded: form.reduce(function(acc,f){ const isH = teamMatch(f.home,name); return acc + (isH ? f.awayScore : f.homeScore); },0) };
+  } catch(err) { return null; }
+}
+
+// Recherche de forme via "joueur" (TheSportsDB searchplayers + eventslast)
+async function fetchTeamFormByPlayerSearch(name) {
   try {
     const ctrl = new AbortController();
     setTimeout(function(){ ctrl.abort(); }, 5000);
     const r = await fetch('https://www.thesportsdb.com/api/v1/json/3/searchplayers.php?p=' + encodeURIComponent(name), { signal: ctrl.signal });
     const d = await r.json();
     const players = d.player || [];
-    if (!players.length) {
-      // Try team search
-      const ctrl2 = new AbortController();
-      setTimeout(function(){ ctrl2.abort(); }, 5000);
-      const r2 = await fetch('https://www.thesportsdb.com/api/v1/json/3/searchteams.php?t=' + encodeURIComponent(name), { signal: ctrl2.signal });
-      const d2 = await r2.json();
-      const teams = d2.teams || [];
-      if (!teams.length) return null;
-      const team = teams[0];
-      const ctrl3 = new AbortController();
-      setTimeout(function(){ ctrl3.abort(); }, 5000);
-      const r3 = await fetch('https://www.thesportsdb.com/api/v1/json/3/eventslast.php?id=' + team.idTeam, { signal: ctrl3.signal });
-      const d3 = await r3.json();
-      const events = (d3.results || []).slice(0, 7);
-      const form = events.map(function(ev) {
-        const isHome = teamMatch(ev.strHomeTeam || '', name);
-        const hs = parseInt(ev.intHomeScore) || 0, as = parseInt(ev.intAwayScore) || 0;
-        let result = 'D';
-        if (hs !== as) result = (isHome ? hs > as : as > hs) ? 'W' : 'L';
-        return { date: ev.dateEvent, home: ev.strHomeTeam, away: ev.strAwayTeam, homeScore: hs, awayScore: as, result, venue: ev.strVenue || '' };
-      });
-      const wins = form.filter(function(f){ return f.result === 'W'; }).length;
-      const homeFormArr = form.filter(function(f){ return teamMatch(f.home, name); });
-      const awayFormArr = form.filter(function(f){ return !teamMatch(f.home, name); });
-      const homeWinsH = homeFormArr.filter(function(f){ return f.result==='W'; }).length;
-      const awayWinsA = awayFormArr.filter(function(f){ return f.result==='W'; }).length;
-      const result = { name: team.strTeam, badge: team.strTeamBadge || null, form, homeForm: homeFormArr, awayForm: awayFormArr, homeFormPct: homeFormArr.length ? Math.round(homeWinsH/homeFormArr.length*100) : null, awayFormPct: awayFormArr.length ? Math.round(awayWinsA/awayFormArr.length*100) : null, formPct: form.length ? Math.round(wins/form.length*100) : null, streak: calcStreak(form.map(function(f){ return f.result; })), goalsScored: form.reduce(function(acc,f){ const isH = teamMatch(f.home,name); return acc + (isH ? f.homeScore : f.awayScore); },0), goalsConceded: form.reduce(function(acc,f){ const isH = teamMatch(f.home,name); return acc + (isH ? f.awayScore : f.homeScore); },0) };
-      cache.set(cacheKey, result, 1800);
-      return result;
-    }
-    // Player form
+    if (!players.length) return null;
     const player = players[0];
     const ctrl4 = new AbortController();
     setTimeout(function(){ ctrl4.abort(); }, 5000);
@@ -1837,7 +1834,26 @@ async function fetchTeamRecentForm(name) {
       return { date: ev.dateEvent, home: ev.strHomeTeam, away: ev.strAwayTeam, homeScore: hs, awayScore: as, result };
     });
     const wins = form.filter(function(f){ return f.result === 'W'; }).length;
-    const result = { name: player.strPlayer, nationality: player.strNationality, thumb: player.strThumb || null, form, formPct: form.length ? Math.round(wins/form.length*100) : null, streak: calcStreak(form.map(function(f){ return f.result; })) };
+    return { name: player.strPlayer, nationality: player.strNationality, thumb: player.strThumb || null, form, formPct: form.length ? Math.round(wins/form.length*100) : null, streak: calcStreak(form.map(function(f){ return f.result; })) };
+  } catch(err) { return null; }
+}
+
+// Récupère les derniers résultats d'une équipe/joueur (TheSportsDB)
+// sport: clé sport (ex. 'soccer_epl', 'tennis_atp') -- détermine l'ordre de recherche :
+// équipe d'abord pour les sports collectifs, joueur d'abord pour les sports individuels
+// (tennis/MMA/boxe), avec repli sur l'autre méthode si la première ne renvoie rien.
+async function fetchTeamRecentForm(name, sport) {
+  if (!name) return null;
+  const isIndividual = !!sport && (sport.indexOf('tennis_') === 0 || sport === 'mma_mixed_martial_arts' || sport === 'boxing_boxing');
+  const cacheKey = 'form_' + (isIndividual ? 'p' : 't') + '_' + normTeam(name);
+  const cached = cache.get(cacheKey);
+  if (cached) return cached;
+  try {
+    const primary  = isIndividual ? fetchTeamFormByPlayerSearch : fetchTeamFormByTeamSearch;
+    const fallback = isIndividual ? fetchTeamFormByTeamSearch : fetchTeamFormByPlayerSearch;
+    let result = await primary(name);
+    if (!result) result = await fallback(name);
+    if (!result) return null;
     cache.set(cacheKey, result, 1800);
     return result;
   } catch(err) { return null; }
@@ -1888,8 +1904,8 @@ async function buildMatchStatsData(home, away, sport, matchId) {
 
   // Run all in parallel
   const [formHomeRes, formAwayRes, h2hRes, espnRes] = await Promise.allSettled([
-    fetchTeamRecentForm(home),
-    fetchTeamRecentForm(away),
+    fetchTeamRecentForm(home, sport),
+    fetchTeamRecentForm(away, sport),
     fetchH2H(home, away),
     (async function() {
       if (!sport) return null;
