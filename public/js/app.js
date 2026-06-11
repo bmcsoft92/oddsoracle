@@ -1129,7 +1129,7 @@ const LiveFeedModule = (() => {
 
   function startAutoRefresh() {
     stopAutoRefresh();
-    _refreshTimer = setInterval(load, 60000);
+    _refreshTimer = setInterval(load, 180000); // 3 min — economise le quota Odds API
   }
 
   function stopAutoRefresh() {
@@ -1170,7 +1170,7 @@ const PrematchFeedModule = (() => {
     }
     el.innerHTML = '<div class="feed-meta-bar">'
       + '<span>&#9671; '+data.count+' match'+(data.count>1?'s':'')+' &agrave; venir (24h)</span>'
-      + '<span class="fmb-right">auto-refresh 10min</span>'
+      + '<span class="fmb-right">auto-refresh 30min</span>'
       + '</div>'
       + '<div class="match-list">' + data.matches.map(function(m){ return renderMatchCard(m, false); }).join('') + '</div>';
     attachCardClicks(el);
@@ -1195,7 +1195,7 @@ const PrematchFeedModule = (() => {
 
   function startAutoRefresh() {
     stopAutoRefresh();
-    _refreshTimer = setInterval(load, 600000);
+    _refreshTimer = setInterval(load, 1800000); // 30 min — aligne sur le cache serveur upcoming_all
   }
 
   function stopAutoRefresh() {

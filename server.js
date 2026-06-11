@@ -581,8 +581,8 @@ function quotaOk() {
 // tournants, pour étaler la consommation de quota dans le temps.
 let _scanRotationIndex = 0;
 const SCAN_ROTATION_BATCH      = 5;    // nb de sports secondaires scannés par cycle
-const SCAN_ODDS_TTL_PRIORITY   = 1800; // 30 min — sports prioritaires
-const SCAN_ODDS_TTL_SECONDARY  = 3600; // 60 min — sports secondaires (rotation)
+const SCAN_ODDS_TTL_PRIORITY   = 3600; // 60 min — sports prioritaires
+const SCAN_ODDS_TTL_SECONDARY  = 7200; // 120 min — sports secondaires (rotation)
 
 // -- CHARGEMENT SÉRIALISÉ avec vérification quota entre chaque sport --
 // Remplace Promise.allSettled pour éviter 36 appels simultanés au démarrage
@@ -793,10 +793,10 @@ async function loadOddsForSport(sport) {
   // 1. Cache mémoire (priorité)
   let data = cache.get(cacheKey);
   if (data) return data;
-  // 2. Cache disque (survit aux redémarrages — TTL 6h)
-  const disk = diskCacheLoad('odds_' + sport.key, 6 * 3600 * 1000);
+  // 2. Cache disque (survit aux redémarrages — TTL 12h)
+  const disk = diskCacheLoad('odds_' + sport.key, 12 * 3600 * 1000);
   if (disk) {
-    cache.set(cacheKey, disk, 21600);
+    cache.set(cacheKey, disk, 43200);
     console.log('[cache] disk hit pour ' + sport.key);
     return disk;
   }
@@ -826,7 +826,7 @@ async function loadOddsForSport(sport) {
       _raw:         event.bookmakers || [],
     };
   });
-  cache.set(cacheKey, data, 21600);         // 6h mémoire
+  cache.set(cacheKey, data, 43200);         // 12h mémoire
   cache.set(cacheKey + '_stale', data, 604800); // 7j stale
   diskCacheSave('odds_' + sport.key, data); // persist disque
   return data;
@@ -1085,8 +1085,8 @@ app.get('/api/live/all', async (req, res) => {
       });
     }
 
-    // PARTIE 2 : matchs à venir (24h) — sports découverts dynamiquement (sérialisé)
-    const activeSports2 = await getActiveSports();
+    // PARTIE 2 : matchs à venir (24h) — limité aux sports prioritaires (quota Odds API)
+    const activeSports2 = (await getActiveSports()).filter(function(s){ return SPORTS_PRIORITY.has(s.key); });
     const upcomingResults = await loadSportsSafely(activeSports2);
     activeSports2.forEach(function(sport, i) {
       if (!upcomingResults[i] || upcomingResults[i].status !== 'fulfilled') return;
@@ -1138,7 +1138,8 @@ app.get('/api/upcoming', async (req, res) => {
   if (cached) return res.json({ data: cached, cached: true, fetchedAt: cached._fetchedAt, apiUsage });
 
   const now          = Date.now();
-  const activeSports = await getActiveSports(); // sports découverts dynamiquement
+  // Limité aux sports prioritaires (quota Odds API) — voir SPORTS_PRIORITY
+  const activeSports = (await getActiveSports()).filter(function(s){ return SPORTS_PRIORITY.has(s.key); });
   const h24 = now + 24 * 3600 * 1000;
   const upcoming = [];
 
