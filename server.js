@@ -2098,7 +2098,10 @@ app.get('/api/ia-analysis', async function(req, res) {
     const payload = {
       systemInstruction: { parts: [{ text: ODDSORACLE_SYSTEM_PROMPT }] },
       contents: [{ role: 'user', parts: [{ text: userMessage }] }],
-      generationConfig: { maxOutputTokens: 1500 },
+      // thinkingBudget:0 -> les modeles gemini-2.5-* (flash/flash-lite) consacrent tout
+      // le budget de tokens a la reponse visible (sinon une partie est utilisee pour
+      // le "raisonnement interne" et le texte final peut etre coupe en plein milieu)
+      generationConfig: { maxOutputTokens: 2048, thinkingConfig: { thinkingBudget: 0 } },
     };
 
     // Modèles à essayer dans l'ordre (principal puis secours), sans doublon
