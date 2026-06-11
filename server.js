@@ -1438,7 +1438,16 @@ app.get('/api/pronos-du-jour', async (req, res) => {
   const scan = await getScannerData();
   if (scan.error) return res.status(503).json({ error: scan.error, apiUsage });
 
-  const top = (scan.data.opportunities || []).slice(0, 3);
+  // Dédoublonnage par match : le scanner peut générer plusieurs opportunités
+  // (une par sélection) pour le même match ; on ne garde que la mieux notée par match
+  // (la liste est déjà triée par adjustedScore/edge décroissants).
+  const seenMatchIds = new Set();
+  const deduped = (scan.data.opportunities || []).filter(function(o) {
+    if (seenMatchIds.has(o.matchId)) return false;
+    seenMatchIds.add(o.matchId);
+    return true;
+  });
+  const top = deduped.slice(0, 3);
   if (!top.length) {
     const empty = { picks: [], generatedAt: new Date().toISOString() };
     cache.set(cacheKey, empty, 600);

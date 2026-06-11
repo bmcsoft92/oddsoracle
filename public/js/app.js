@@ -998,7 +998,7 @@ function renderMatchCard(match, isLive) {
 
   return '<div class="match-card feed-card-clickable"'
     +' data-home="'+safeH+'" data-away="'+safeA+'"'
-    +' data-sport="'+(match.sportKey||'')+'"'
+    +' data-sport="'+(match.sportKey||match.sport||'')+'"'
     +' data-cotea="'+cotA+'" data-coteb="'+cotB+'"'
     +' data-match-id="'+(match.id||'')+'"'
     +' data-edge="'+cardEdge.toFixed(2)+'"'
