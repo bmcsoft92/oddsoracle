@@ -307,10 +307,12 @@ Réponds en français, de façon concise, avec 1 à 3 pronos maximum (les plus f
 au format EXACT du modèle de sortie ci-dessus.`;
 
 const SPORTS = [
-  // Tennis
-  { key: 'tennis_atp',                   label: 'Tennis ATP',          icon: 'T', group: 'tennis' },
-  { key: 'tennis_wta',                   label: 'Tennis WTA',          icon: 'T', group: 'tennis' },
   // Tennis -- Grands Chelems
+  // NB: The Odds API ne fournit PAS de cle generique 'tennis_atp'/'tennis_wta'
+  // (ces cles n'existent pas et ne renvoient jamais rien) -- la couverture se
+  // fait uniquement tournoi par tournoi (Grands Chelems + Masters 1000/500).
+  // Les tournois ATP 250 (ex: s-Hertogenbosch, Stuttgart ATP) ne sont couverts
+  // par aucune cle, quelle que soit la configuration.
   { key: 'tennis_atp_aus_open_singles',  label: 'Open Australie (ATP)',icon: 'T', group: 'tennis' },
   { key: 'tennis_atp_french_open',       label: 'Roland-Garros (ATP)', icon: 'T', group: 'tennis' },
   { key: 'tennis_atp_wimbledon',         label: 'Wimbledon (ATP)',     icon: 'T', group: 'tennis' },
@@ -319,6 +321,37 @@ const SPORTS = [
   { key: 'tennis_wta_french_open',       label: 'Roland-Garros (WTA)', icon: 'T', group: 'tennis' },
   { key: 'tennis_wta_wimbledon',         label: 'Wimbledon (WTA)',     icon: 'T', group: 'tennis' },
   { key: 'tennis_wta_us_open',           label: 'US Open (WTA)',       icon: 'T', group: 'tennis' },
+  // Tennis -- Masters 1000 / Premier (ATP)
+  { key: 'tennis_atp_indian_wells',      label: 'Indian Wells (ATP)',  icon: 'T', group: 'tennis' },
+  { key: 'tennis_atp_miami_open',        label: 'Miami (ATP)',         icon: 'T', group: 'tennis' },
+  { key: 'tennis_atp_monte_carlo_masters', label: 'Monte-Carlo (ATP)', icon: 'T', group: 'tennis' },
+  { key: 'tennis_atp_madrid_open',       label: 'Madrid (ATP)',        icon: 'T', group: 'tennis' },
+  { key: 'tennis_atp_italian_open',      label: 'Rome (ATP)',          icon: 'T', group: 'tennis' },
+  { key: 'tennis_atp_canadian_open',     label: 'Canada (ATP)',        icon: 'T', group: 'tennis' },
+  { key: 'tennis_atp_cincinnati_open',   label: 'Cincinnati (ATP)',    icon: 'T', group: 'tennis' },
+  { key: 'tennis_atp_shanghai_masters',  label: 'Shanghai (ATP)',      icon: 'T', group: 'tennis' },
+  { key: 'tennis_atp_paris_masters',     label: 'Paris-Bercy (ATP)',   icon: 'T', group: 'tennis' },
+  { key: 'tennis_atp_barcelona_open',    label: 'Barcelone (ATP)',     icon: 'T', group: 'tennis' },
+  { key: 'tennis_atp_munich',            label: 'Munich (ATP)',        icon: 'T', group: 'tennis' },
+  { key: 'tennis_atp_hamburg_open',      label: 'Hambourg (ATP)',      icon: 'T', group: 'tennis' },
+  { key: 'tennis_atp_dubai',             label: 'Dubai (ATP)',         icon: 'T', group: 'tennis' },
+  { key: 'tennis_atp_qatar_open',        label: 'Qatar (ATP)',         icon: 'T', group: 'tennis' },
+  { key: 'tennis_atp_china_open',        label: 'Chine (ATP)',         icon: 'T', group: 'tennis' },
+  // Tennis -- WTA 1000 / 500
+  { key: 'tennis_wta_indian_wells',      label: 'Indian Wells (WTA)',  icon: 'T', group: 'tennis' },
+  { key: 'tennis_wta_miami_open',        label: 'Miami (WTA)',         icon: 'T', group: 'tennis' },
+  { key: 'tennis_wta_madrid_open',       label: 'Madrid (WTA)',        icon: 'T', group: 'tennis' },
+  { key: 'tennis_wta_italian_open',      label: 'Rome (WTA)',          icon: 'T', group: 'tennis' },
+  { key: 'tennis_wta_canadian_open',     label: 'Canada (WTA)',        icon: 'T', group: 'tennis' },
+  { key: 'tennis_wta_cincinnati_open',   label: 'Cincinnati (WTA)',    icon: 'T', group: 'tennis' },
+  { key: 'tennis_wta_wuhan_open',        label: 'Wuhan (WTA)',         icon: 'T', group: 'tennis' },
+  { key: 'tennis_wta_china_open',        label: 'Chine (WTA)',         icon: 'T', group: 'tennis' },
+  { key: 'tennis_wta_dubai',             label: 'Dubai (WTA)',         icon: 'T', group: 'tennis' },
+  { key: 'tennis_wta_qatar_open',        label: 'Qatar (WTA)',         icon: 'T', group: 'tennis' },
+  { key: 'tennis_wta_charleston_open',   label: 'Charleston (WTA)',    icon: 'T', group: 'tennis' },
+  { key: 'tennis_wta_strasbourg',        label: 'Strasbourg (WTA)',    icon: 'T', group: 'tennis' },
+  { key: 'tennis_wta_stuttgart_open',    label: 'Stuttgart (WTA)',     icon: 'T', group: 'tennis' },
+  { key: 'tennis_wta_queens_club_champ', label: "Queen's Club (WTA)",  icon: 'T', group: 'tennis' },
   // Football -- Europe (ligues majeures)
   { key: 'soccer_france_ligue1',         label: 'Ligue 1',             icon: 'F', group: 'football' },
   { key: 'soccer_france_ligue_two',      label: 'Ligue 2',             icon: 'F', group: 'football' },
@@ -436,9 +469,17 @@ const SPORTS = [
 
 // ── Sports prioritaires pour le Scanner IA (toujours scannés en priorité) ──
 const SPORTS_PRIORITY = new Set([
-  'tennis_atp', 'tennis_wta',
+  // Grands Chelems (toujours prioritaires quand actifs)
   'tennis_atp_aus_open_singles', 'tennis_atp_french_open', 'tennis_atp_wimbledon', 'tennis_atp_us_open',
   'tennis_wta_aus_open_singles', 'tennis_wta_french_open', 'tennis_wta_wimbledon', 'tennis_wta_us_open',
+  // Masters 1000 ATP (gros volume de paris quand actifs)
+  'tennis_atp_indian_wells', 'tennis_atp_miami_open', 'tennis_atp_monte_carlo_masters',
+  'tennis_atp_madrid_open', 'tennis_atp_italian_open', 'tennis_atp_canadian_open',
+  'tennis_atp_cincinnati_open', 'tennis_atp_shanghai_masters', 'tennis_atp_paris_masters',
+  // WTA 1000 + tournoi actuellement en cours (Queen's Club, 13/06/2026)
+  'tennis_wta_indian_wells', 'tennis_wta_miami_open', 'tennis_wta_madrid_open',
+  'tennis_wta_italian_open', 'tennis_wta_canadian_open', 'tennis_wta_cincinnati_open',
+  'tennis_wta_wuhan_open', 'tennis_wta_queens_club_champ',
   'soccer_france_ligue1', 'soccer_epl', 'soccer_europe_champs', 'soccer_uefa_champs_league',
   'soccer_spain_la_liga', 'soccer_italy_serie_a', 'soccer_germany_bundesliga',
   'soccer_uefa_europa_league', 'soccer_fifa_world_cup', 'soccer_uefa_european_championship',
@@ -648,6 +689,26 @@ function diskCacheLoad(key, maxAgeMs) {
   } catch(e) { return null; }
 }
 
+// -- JOURNAL DES PARIS (persisté sur disque, survit aux redémarrages du process) --
+// NB: sur Render (plan gratuit), /tmp peut être réinitialisé lors d'un redéploiement
+// ou d'une longue mise en veille de l'instance -- ce n'est donc pas un stockage
+// durable au sens "base de données", mais ça permet de partager le journal entre
+// le navigateur et une tâche planifiée côté serveur (ce que ne permettait pas
+// l'ancien stockage localStorage, propre à chaque navigateur).
+const JOURNAL_FILE = DISK_CACHE_DIR + '/oo_journal.json';
+function loadJournalBets() {
+  try {
+    if (!fs.existsSync(JOURNAL_FILE)) return [];
+    const raw = JSON.parse(fs.readFileSync(JOURNAL_FILE, 'utf8'));
+    return Array.isArray(raw) ? raw : [];
+  } catch(e) { console.warn('[journal] load: ' + e.message); return []; }
+}
+function saveJournalBets(bets) {
+  try {
+    fs.writeFileSync(JOURNAL_FILE, JSON.stringify(bets, null, 2));
+  } catch(e) { console.warn('[journal] save: ' + e.message); }
+}
+
 // -- HELPERS --
 function formatBookmakers(bookmakers) {
   return bookmakers
@@ -696,6 +757,41 @@ app.get('/api/sports', async (req, res) => {
   if (cached) return res.json({ data: cached, cached: true });
   cache.set(cacheKey, SPORTS, 86400);
   res.json({ data: SPORTS, cached: false });
+});
+
+// -- JOURNAL DES PARIS --
+// Stockage côté serveur (voir loadJournalBets/saveJournalBets) : remplace
+// l'ancien stockage localStorage pour que le journal soit partagé entre le
+// navigateur et les tâches planifiées (ex: log automatique des pronos FORTE).
+app.get('/api/journal', (req, res) => {
+  res.json({ data: loadJournalBets() });
+});
+
+app.post('/api/journal', (req, res) => {
+  const bets = loadJournalBets();
+  const bet  = Object.assign({}, req.body || {});
+  bet.id = Date.now();
+  bets.unshift(bet); // plus récent en premier
+  saveJournalBets(bets);
+  res.json({ data: bet });
+});
+
+app.patch('/api/journal/:id', (req, res) => {
+  const id   = Number(req.params.id);
+  const bets = loadJournalBets();
+  const bet  = bets.find(b => b.id === id);
+  if (!bet) return res.status(404).json({ error: 'Pari introuvable' });
+  Object.assign(bet, req.body || {});
+  saveJournalBets(bets);
+  res.json({ data: bet });
+});
+
+app.delete('/api/journal/:id', (req, res) => {
+  const id = Number(req.params.id);
+  const bets = loadJournalBets();
+  const filtered = bets.filter(b => b.id !== id);
+  saveJournalBets(filtered);
+  res.json({ ok: true });
 });
 
 // Retourne TOUS les sports actifs sur la cle API (pour dropdown dynamique)

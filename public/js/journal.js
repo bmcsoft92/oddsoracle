@@ -5,35 +5,57 @@
 
 const JournalModule = (() => {
 
-  const KEY = 'odds_journal';
+  // Journal persisté côté serveur (voir /api/journal dans server.js) : permet
+  // de partager le journal entre le navigateur et les tâches planifiées
+  // (ex: log automatique des pronos FORTE), au lieu de l'ancien localStorage
+  // propre à chaque navigateur.
   let bets = [];
   let filters = { sport: 'all', type: 'all', result: 'all' };
 
-  function load() {
+  async function load() {
     try {
-      const d = localStorage.getItem(KEY);
-      bets = d ? JSON.parse(d) : [];
-    } catch(e) { bets = []; }
+      const r = await fetch('/api/journal');
+      const data = await r.json();
+      bets = Array.isArray(data.data) ? data.data : [];
+    } catch(e) {
+      console.warn('[journal] load:', e.message);
+      bets = [];
+    }
   }
 
-  function save() {
-    try { localStorage.setItem(KEY, JSON.stringify(bets)); } catch(e) {}
+  async function addBet(bet) {
+    try {
+      const r = await fetch('/api/journal', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(bet)
+      });
+      const data = await r.json();
+      bets.unshift(data.data); // plus récent en premier
+    } catch(e) {
+      console.warn('[journal] addBet:', e.message);
+      bet.id = Date.now();
+      bets.unshift(bet);
+    }
   }
 
-  function addBet(bet) {
-    bet.id = Date.now();
-    bets.unshift(bet); // plus récent en premier
-    save();
-  }
-
-  function updateBetResult(id, result) {
+  async function updateBetResult(id, result) {
     const b = bets.find(b => b.id === id);
-    if (b) { b.result = result; save(); }
+    if (b) b.result = result;
+    try {
+      await fetch('/api/journal/' + id, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ result })
+      });
+    } catch(e) { console.warn('[journal] updateBetResult:', e.message); }
   }
 
-  function deleteBet(id) {
+  async function deleteBet(id) {
     bets = bets.filter(b => b.id !== id);
-    save();
+    try {
+      await fetch('/api/journal/' + id, { method: 'DELETE' });
+    } catch(e) { console.warn('[journal] deleteBet:', e.message); }
   }
 
   function calcPnl(bet) {
@@ -116,14 +138,14 @@ const JournalModule = (() => {
     return { win: '✅ Gagné', loss: '❌ Perdu', pending: '⏳ Attente', void: '↩️ Annulé' }[r] || r;
   }
 
-  function markResult(id, result) {
+  async function markResult(id, result) {
     const bet = bets.find(b => b.id === id);
     if (!bet) return;
     // Évite un double impact bankroll si le pari est déjà résolu
     // (ex: appel concurrent avec autoCheckPendingBets)
     if (bet.result !== 'pending') { renderTable(); return; }
 
-    updateBetResult(id, result);
+    await updateBetResult(id, result);
 
     // Mettre à jour la bankroll
     const pnl = calcPnl({ ...bet, result });
@@ -134,16 +156,17 @@ const JournalModule = (() => {
     DashboardModule.refresh();
   }
 
-  function removeBet(id) {
-    deleteBet(id);
+  async function removeBet(id) {
+    await deleteBet(id);
     renderTable();
     DashboardModule.refresh();
   }
 
   function getAllBets() { return [...bets]; }
 
-  function init() {
-    load();
+  async function init() {
+    await load();
+    renderTable();
 
     // Formulaire ajout pari
     document.getElementById('btn-add-bet').addEventListener('click', () => {
@@ -157,7 +180,7 @@ const JournalModule = (() => {
       document.getElementById('add-bet-form').style.display = 'none';
     });
 
-    document.getElementById('btn-save-bet').addEventListener('click', () => {
+    document.getElementById('btn-save-bet').addEventListener('click', async () => {
       const bet = {
         date:      document.getElementById('j-date').value,
         sport:     document.getElementById('j-sport').value,
@@ -177,7 +200,7 @@ const JournalModule = (() => {
         return;
       }
 
-      addBet(bet);
+      await addBet(bet);
 
       // Impact bankroll si déjà résolu
       if (bet.result !== 'pending' && bet.result !== 'void') {
@@ -201,7 +224,6 @@ const JournalModule = (() => {
       });
     });
 
-    renderTable();
     // Vérifie automatiquement les paris en attente au démarrage
     setTimeout(autoCheckPendingBets, 2000);
     // Puis re-vérifie périodiquement (utile pour les paris LIVE en cours)
@@ -247,7 +269,7 @@ const JournalModule = (() => {
           const current = bets.find(b => b.id === bet.id);
           if (!current || current.result !== 'pending') continue;
 
-          updateBetResult(bet.id, data.result);
+          await updateBetResult(bet.id, data.result);
           // Impact bankroll
           const pnl = calcPnl({ ...bet, result: data.result });
           if (pnl > 0) BankrollManager.recordWin(pnl, bet.type === 'live');
@@ -312,8 +334,7 @@ const JournalModule = (() => {
       else if (oldPnl < 0) BankrollManager.recordWin(-oldPnl, bet.type === 'live');
 
       // Applique le résultat réel
-      bet.result = data.result;
-      save();
+      await updateBetResult(id, data.result);
       const newPnl = calcPnl(bet);
       if (newPnl > 0) BankrollManager.recordWin(newPnl, bet.type === 'live');
       else if (newPnl < 0) BankrollManager.recordLoss(-newPnl, bet.type === 'live');

@@ -903,8 +903,8 @@ function updateDatetime() {
 // -----------------------------------------------------------------------
 function renderMatchCard(match, isLive) {
   var sels  = match.selections || [];
-  var safeH = (match.homeTeam || '').replace(/["\'<>]/g, '');
-  var safeA = (match.awayTeam || '').replace(/["\'<>]/g, '');
+  var safeH = escHtml(match.homeTeam || '');
+  var safeA = escHtml(match.awayTeam || '');
   var cotA  = sels[0] ? sels[0].bestPrice.toFixed(2) : '';
   var cotB  = sels[sels.length-1] ? sels[sels.length-1].bestPrice.toFixed(2) : '';
 
@@ -1230,10 +1230,10 @@ const PrematchFeedModule = (() => {
 const PronosDuJourModule = (() => {
 
   function renderPick(p, idx) {
-    var safeH = (p.homeTeam || '').replace(/["\'<>]/g, '');
-    var safeA = (p.awayTeam || '').replace(/["\'<>]/g, '');
-    var safeSel = (p.selection || '').replace(/["\'<>]/g, '');
-    var safeVerdict = (p.verdict || '').replace(/["\'<>]/g, '');
+    var safeH = escHtml(p.homeTeam || '');
+    var safeA = escHtml(p.awayTeam || '');
+    var safeSel = escHtml(p.selection || '');
+    var safeVerdict = escHtml(p.verdict || '');
 
     // Badge horaire (meme logique que renderMatchCard)
     var dt  = new Date(p.commenceTime);
