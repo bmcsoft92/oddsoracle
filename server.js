@@ -709,6 +709,81 @@ function saveJournalBets(bets) {
   } catch(e) { console.warn('[journal] save: ' + e.message); }
 }
 
+// Reduit une cle sport (ex: "soccer_epl", "tennis_atp_us_open") a une categorie
+// du Journal (memes valeurs que le select #j-sport du frontend).
+function mapSportKeyToJournalCategory(key) {
+  if (!key) return 'football';
+  if (key.startsWith('tennis')) return 'tennis';
+  if (key.startsWith('soccer')) return 'football';
+  if (key.startsWith('basketball')) return 'basketball';
+  if (key.startsWith('baseball')) return 'baseball';
+  if (key.startsWith('icehockey')) return 'hockey';
+  if (key.startsWith('mma') || key.startsWith('boxing')) return 'mma';
+  if (key.startsWith('americanfootball')) return 'american_football';
+  if (key.startsWith('rugby')) return 'rugby';
+  if (key.startsWith('cricket')) return 'cricket';
+  if (key.startsWith('aussierules')) return 'aussie_rules';
+  return key.split('_')[0];
+}
+
+// -- AUTO-LOG QUOTIDIEN DES PICKS FORTE --
+// Recupere les opportunites du scanner (memes donnees que /api/pronos-du-jour),
+// dedupliquees par match, et logge automatiquement au Journal (mise fixe 100EUR)
+// celles notees "FORTE" (edge >= 10) qui n'y figurent pas deja pour aujourd'hui.
+// Marquage via autoForte:true + date + matchId pour eviter tout doublon -- la
+// fonction peut donc etre rappelee periodiquement sans risque.
+async function autoLogFortePicks() {
+  try {
+    const today = new Date().toISOString().split('T')[0];
+    const bets  = loadJournalBets();
+    const alreadyToday = new Set(
+      bets.filter(function(b) { return b.autoForte && b.date === today; })
+          .map(function(b) { return b.matchId; })
+    );
+
+    const scan = await getScannerData();
+    if (scan.error) { console.warn('[auto-forte] ' + scan.error); return; }
+
+    const seenMatchIds = new Set();
+    const deduped = (scan.data.opportunities || []).filter(function(o) {
+      if (seenMatchIds.has(o.matchId)) return false;
+      seenMatchIds.add(o.matchId);
+      return true;
+    });
+
+    const fortePicks = deduped.filter(function(o) {
+      return o.predLabel === 'FORTE' && !alreadyToday.has(o.matchId);
+    });
+    if (!fortePicks.length) return;
+
+    const baseId = Date.now();
+    fortePicks.forEach(function(o, i) {
+      bets.unshift({
+        id:        baseId + i,
+        date:      today,
+        sport:     mapSportKeyToJournalCategory(o.sport),
+        sportKey:  o.sport,
+        match:     o.homeTeam + ' vs ' + o.awayTeam,
+        type:      o.isLive ? 'live' : 'prematch',
+        market:    'Vainqueur match',
+        selection: o.selection,
+        cote:      o.bestPrice,
+        stake:     100,
+        edge:      o.edge,
+        result:    'pending',
+        reason:    '[AUTO-FORTE] Score ajuste ' + o.adjustedScore + '/100 -- Edge +' + o.edge + '% -- ' + o.bestBook,
+        matchId:   o.matchId,
+        autoForte: true,
+      });
+    });
+
+    saveJournalBets(bets);
+    console.log('[auto-forte] ' + fortePicks.length + ' pari(s) FORTE loggue(s) automatiquement (' + today + ')');
+  } catch(e) {
+    console.warn('[auto-forte] erreur: ' + e.message);
+  }
+}
+
 // -- HELPERS --
 function formatBookmakers(bookmakers) {
   return bookmakers
@@ -1686,6 +1761,13 @@ async function broadcastScores() {
 
 setInterval(broadcastScores, 600000); // 10 min (était 2 min)
 
+// -- AUTO-LOG QUOTIDIEN DES PICKS FORTE (Journal, 100EUR) --
+// Premiere passe 2 min apres le demarrage (laisse le scanner s'initialiser),
+// puis toutes les 20 min -- s'appuie sur le cache scanner_results (15 min)
+// donc ne consomme pas de quota Odds API supplementaire dans la plupart des cas.
+setTimeout(autoLogFortePicks, 2 * 60 * 1000);
+setInterval(autoLogFortePicks, 20 * 60 * 1000);
+
 // -- KEEP-ALIVE (Render free tier) --
 if (process.env.NODE_ENV === 'production' && process.env.RENDER_EXTERNAL_URL) {
   const selfUrl = process.env.RENDER_EXTERNAL_URL;
@@ -2585,3 +2667,4 @@ app.get('/api/check-result', async (req, res) => {
 app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
+
