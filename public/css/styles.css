@@ -5,31 +5,44 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
 
 :root {
-  --bg0:      #07090f;
-  --bg1:      #0d1117;
-  --bg2:      #161b24;
-  --bg3:      #1c2333;
-  --border0:  #1e2736;
-  --border1:  #2a3547;
-  --text0:    #e6edf3;
-  --text1:    #8b949e;
-  --text2:    #484f58;
-  --green:    #3fb950;
-  --green-d:  rgba(63,185,80,.12);
-  --red:      #f85149;
-  --red-d:    rgba(248,81,73,.12);
-  --blue:     #58a6ff;
-  --blue-d:   rgba(88,166,255,.12);
-  --yellow:   #d29922;
-  --yellow-d: rgba(210,153,34,.12);
+  --bg0:      #0a0d12;
+  --bg1:      #12161f;
+  --bg2:      #1b212c;
+  --bg3:      #242b3a;
+  --border0:  #232a38;
+  --border1:  #36405a;
+  --text0:    #f5f7fa;
+  --text1:    #9aa4b8;
+  --text2:    #5b6478;
+  --green:    #5fd84a;
+  --green-d:  rgba(95,216,74,.14);
+  --red:      #ff4d5e;
+  --red-d:    rgba(255,77,94,.14);
+  --blue:     #4fa8ff;
+  --blue-d:   rgba(79,168,255,.12);
+  --yellow:   #ffb800;
+  --yellow-d: rgba(255,184,0,.14);
   --purple:   #bc8cff;
   --cyan:     #39d0d8;
   --cyan-d:   rgba(57,208,216,.12);
-  --r:  6px;
-  --r2: 10px;
+  --accent:   var(--green);
+  --accent-d: var(--green-d);
+  --r:  8px;
+  --r2: 14px;
   --font: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
   --mono: 'JetBrains Mono','Fira Code','Cascadia Code',monospace;
-  --shadow: 0 4px 16px rgba(0,0,0,.5);
+  --shadow: 0 6px 20px rgba(0,0,0,.55);
+
+  /* Alias variables (unify legacy fallbacks used across the app
+     into the same theme palette, so every section stays consistent) */
+  --text-muted:    var(--text1);
+  --text-primary:  var(--text0);
+  --bg-card:       var(--bg1);
+  --bg-secondary:  var(--bg2);
+  --card-bg:       var(--bg1);
+  --surface:       var(--bg2);
+  --border:        var(--border0);
+  --font-mono:     var(--mono);
 }
 
 /* RESET */
@@ -55,7 +68,7 @@ a:hover{text-decoration:underline}
 .logo{display:flex;align-items:center;gap:0.4rem;margin-right:1.5rem;flex-shrink:0;text-decoration:none}
 .logo-icon{font-size:.95rem}
 .logo-text{font-family:var(--mono);font-size:.82rem;font-weight:700;color:var(--text0);letter-spacing:.06em}
-.logo-tag{font-family:var(--mono);font-size:.56rem;padding:.08rem .3rem;border-radius:3px;background:var(--blue-d);color:var(--blue);font-weight:700;letter-spacing:.04em}
+.logo-tag{font-family:var(--mono);font-size:.56rem;padding:.08rem .3rem;border-radius:3px;background:var(--green-d);color:var(--green);font-weight:700;letter-spacing:.04em}
 
 .nav-item{
   height:50px;padding:0 .85rem;
@@ -66,7 +79,7 @@ a:hover{text-decoration:underline}
   white-space:nowrap;font-family:var(--font);flex-shrink:0;
 }
 .nav-item:hover{color:var(--text0)}
-.nav-item.active{color:var(--text0);border-bottom-color:var(--blue)}
+.nav-item.active{color:var(--text0);border-bottom-color:var(--green)}
 .nav-icon{font-size:.82rem}
 .nav-badge{
   background:var(--red);color:#fff;font-size:.58rem;font-weight:700;
@@ -139,8 +152,8 @@ a:hover{text-decoration:underline}
 }
 .btn:hover{background:var(--bg3);border-color:var(--border1);text-decoration:none}
 .btn:active{transform:scale(.98)}
-.btn-primary{background:#1f6feb;border-color:#1f6feb;color:#fff}
-.btn-primary:hover{background:#388bfd;border-color:#388bfd}
+.btn-primary{background:var(--green);border-color:var(--green);color:#08230d;font-weight:700}
+.btn-primary:hover{background:#7ce868;border-color:#7ce868}
 .btn-secondary{background:var(--bg3);border-color:var(--border0);color:var(--text1)}
 .btn-secondary:hover{color:var(--text0)}
 .btn-success{background:var(--green);border-color:var(--green);color:var(--bg0)}
@@ -197,7 +210,7 @@ a:hover{text-decoration:underline}
 .feed-card-live{border-left:3px solid var(--red)}
 .feed-card-upcoming{border-left:3px solid var(--blue)}
 .feed-card-clickable{cursor:pointer}
-.feed-card-clickable:hover{border-color:var(--blue);transform:translateY(-2px);box-shadow:0 4px 16px rgba(0,0,0,.5)}
+.feed-card-clickable:hover{border-color:var(--green);transform:translateY(-2px);box-shadow:var(--shadow)}
 .feed-card-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:.3rem;gap:.38rem}
 .feed-sport-badge{font-size:.62rem;color:var(--text2);font-family:var(--mono);text-transform:uppercase;letter-spacing:.03em}
 .feed-live-dot{font-size:.58rem;font-weight:700;color:var(--red);font-family:var(--mono);animation:blink 1.5s infinite}
@@ -347,8 +360,8 @@ option,optgroup{background:var(--bg1)}
 
 /* ===== SCANNER CARDS v2 ===== */
 .scanner-grid{display:flex;flex-direction:column;gap:.65rem;padding:.75rem}
-.sc2-card{background:var(--bg1);border:1px solid var(--border0);border-radius:10px;overflow:hidden;transition:border-color .15s,box-shadow .15s}
-.sc2-card:hover{border-color:var(--blue);box-shadow:0 0 0 1px var(--blue) inset}
+.sc2-card{background:var(--bg1);border:1px solid var(--border0);border-radius:var(--r2);overflow:hidden;transition:border-color .15s,box-shadow .15s}
+.sc2-card:hover{border-color:var(--green);box-shadow:0 0 0 1px var(--green) inset}
 .sc2-card--live{border-left:3px solid var(--green)}
 .sc2-card--forte{border-left:3px solid #f59e0b}
 /* Head */
@@ -582,16 +595,16 @@ option,optgroup{background:var(--bg1)}
 .match-list{display:flex;flex-direction:column;gap:.6rem}
 
 .match-card{
-  background:var(--bg2);border:1px solid var(--border0);border-radius:8px;
-  padding:.9rem 1rem;cursor:pointer;transition:border-color .15s,transform .1s;
+  background:var(--bg2);border:1px solid var(--border0);border-radius:var(--r2);
+  padding:.9rem 1rem;cursor:pointer;transition:border-color .15s,transform .1s,box-shadow .15s;
   position:relative;overflow:hidden;
 }
 .match-card::before{
   content:'';position:absolute;top:0;left:0;width:3px;height:100%;
   background:var(--border1);transition:background .15s;
 }
-.match-card:hover{border-color:var(--border1);transform:translateY(-1px)}
-.match-card:hover::before{background:var(--blue)}
+.match-card:hover{border-color:var(--green);transform:translateY(-1px);box-shadow:var(--shadow)}
+.match-card:hover::before{background:var(--green)}
 .match-card.mc-urgent::before{background:var(--yellow)}
 
 /* Header row */
@@ -619,10 +632,10 @@ option,optgroup{background:var(--bg1)}
 /* Odds grid */
 .mc-odds{display:flex;gap:.5rem;margin-bottom:.6rem}
 .mc-odd{
-  flex:1;background:var(--bg3);border:1px solid var(--border0);border-radius:6px;
-  padding:.5rem .4rem;text-align:center;min-width:0;transition:border-color .15s;
+  flex:1;background:var(--bg3);border:1px solid var(--border0);border-radius:var(--r);
+  padding:.5rem .4rem;text-align:center;min-width:0;transition:border-color .15s,background .15s;
 }
-.mc-odd.mc-best{border-color:var(--green);background:rgba(63,185,80,.08)}
+.mc-odd.mc-best{border-color:var(--green);background:var(--green-d)}
 .mc-ol{font-size:.6rem;color:var(--text2);font-family:var(--mono);margin-bottom:2px;text-transform:uppercase}
 .mc-op{font-size:1.05rem;font-weight:700;color:var(--text0);font-family:var(--mono);letter-spacing:.01em}
 .mc-odd.mc-best .mc-op{color:var(--green)}
