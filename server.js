@@ -1096,6 +1096,121 @@ function enrichEvent(event, sport) {
   };
 }
 
+// -----------------------------------------------------------------------
+// MARCHES SUPPLEMENTAIRES (Over/Under, Handicap) -- top picks Scanner
+// -----------------------------------------------------------------------
+// Calcule, pour un marche donne (totals/spreads), la probabilite reelle et
+// la meilleure cote de chaque issue -- meme logique que enrichEvent (h2h)
+// mais generalisee a un marche a 2 issues (Plus/Moins, ou Equipe A/Equipe B
+// avec un "point" de handicap).
+function computeMarketSelections(rawBk, marketKey) {
+  const pinnacle = rawBk.find(function(b) { return b.key === 'pinnacle'; });
+  const sharpBk  = pinnacle || rawBk[0];
+  const sharpMkt = sharpBk && sharpBk.markets && sharpBk.markets.find(function(m) { return m.key === marketKey; });
+  if (!sharpMkt || !sharpMkt.outcomes || !sharpMkt.outcomes.length) return [];
+
+  const outcomes  = sharpMkt.outcomes;
+  const overround = outcomes.reduce(function(s, o) { return s + 1 / o.price; }, 0);
+  if (!overround) return [];
+
+  return outcomes.map(function(o) {
+    const trueProb = (1 / o.price) / overround;
+    let bestPrice = 1.0, bestBook = '';
+    const allBooks = [];
+    rawBk.forEach(function(bk) {
+      const mkt = bk.markets && bk.markets.find(function(m) { return m.key === marketKey; });
+      const out = mkt && mkt.outcomes && mkt.outcomes.find(function(x) { return x.name === o.name && x.point === o.point; });
+      if (out && out.price > 1) {
+        allBooks.push({ name: bk.title || bk.key, price: out.price });
+        if (out.price > bestPrice) { bestPrice = out.price; bestBook = bk.title || bk.key; }
+      }
+    });
+    allBooks.sort(function(a, b) { return b.price - a.price; });
+    const edge = (trueProb * bestPrice - 1) * 100;
+    const predLabel = passesValueFilter(trueProb, bestPrice)
+      ? (edge >= 10 ? 'FORTE' : edge >= 6 ? 'BONNE' : edge >= 2 ? 'CORRECTE' : null)
+      : null;
+    return {
+      market:        marketKey,
+      name:          o.name,
+      point:         o.point,
+      sharpPrice:    o.price,
+      bestPrice,
+      bestBook,
+      allBookmakers: allBooks,
+      trueProb:      Math.round(trueProb * 1000) / 10,
+      edge:          Math.round(edge * 10) / 10,
+      predLabel,
+    };
+  });
+}
+
+// Construit un libelle FR lisible pour un pick Over/Under ou Handicap.
+function marketPickLabel(s) {
+  if (s.market === 'totals') {
+    const dir = s.name === 'Over' ? 'Plus' : 'Moins';
+    return { marketName: 'Total (Plus/Moins)', label: dir + ' de ' + s.point };
+  }
+  if (s.market === 'spreads') {
+    const sign = s.point > 0 ? ('+' + s.point) : String(s.point);
+    return { marketName: 'Handicap', label: s.name + ' ' + sign };
+  }
+  return { marketName: s.market, label: s.name };
+}
+
+// Recupere et met en cache (1h) les marches O/U + Handicap d'un evenement.
+// Reserve aux meilleurs picks du Scanner (TOP_N_EXTRA_MARKETS, voir
+// getScannerData) pour limiter la consommation de quota The Odds API : un
+// seuil plus eleve (EXTRA_MARKETS_QUOTA_MIN) que quotaOk() laisse une marge
+// de securite pour le scan principal (h2h sur tous les sports).
+const EXTRA_MARKETS_QUOTA_MIN = 40;
+
+async function fetchEventExtraMarkets(sportKey, eventId) {
+  const cacheKey = 'extramkt_' + eventId;
+  const cached = cache.get(cacheKey);
+  if (cached) return cached;
+
+  if (apiUsage.requestsRemaining !== null && apiUsage.requestsRemaining <= EXTRA_MARKETS_QUOTA_MIN) {
+    return null;
+  }
+  if (!quotaOk()) return null;
+
+  try {
+    const raw = await oddsApiFetch('/sports/' + sportKey + '/events/' + eventId + '/odds', {
+      regions: 'eu', markets: 'totals,spreads', oddsFormat: 'decimal',
+      bookmakers: BOOKMAKERS.join(','),
+    });
+    const rawBk = (raw && raw.bookmakers) || [];
+    const totals  = computeMarketSelections(rawBk, 'totals');
+    const spreads = computeMarketSelections(rawBk, 'spreads');
+
+    const picks = totals.concat(spreads)
+      .filter(function(s) { return s.predLabel && s.edge >= 2; })
+      .sort(function(a, b) { return b.edge - a.edge; })
+      .slice(0, 2)
+      .map(function(s) {
+        const lbl = marketPickLabel(s);
+        return {
+          market:     s.market,
+          marketName: lbl.marketName,
+          label:      lbl.label,
+          point:      s.point,
+          trueProb:   s.trueProb,
+          bestPrice:  s.bestPrice,
+          bestBook:   s.bestBook,
+          edge:       s.edge,
+          predLabel:  s.predLabel,
+        };
+      });
+
+    cache.set(cacheKey, picks, 3600); // 1h
+    return picks;
+  } catch (e) {
+    console.warn('[extramkt] ' + eventId + ': ' + e.message);
+    return null;
+  }
+}
+
 // -- LIVE ALL: tous les matchs en cours sur tous les sports --
 
 // -----------------------------------------------------------------------
@@ -1584,6 +1699,19 @@ async function getScannerData() {
     if (a.isLive !== b.isLive) return a.isLive ? -1 : 1;
     return (b.adjustedScore - a.adjustedScore) || (b.edge - a.edge);
   });
+
+  // -- Marches O/U + Handicap pour les meilleurs picks (limite quota) --
+  // Inspire des pronostics sportplus.live (marches varies : 1X2, O/U,
+  // Handicap) -- on n'enrichit que le top N pour proteger le quota Odds API
+  // (cf. fetchEventExtraMarkets : 1 appel par evenement, mis en cache 1h).
+  const TOP_N_EXTRA_MARKETS = 5;
+  const extraMarketTargets = opportunities.slice(0, TOP_N_EXTRA_MARKETS);
+  await Promise.allSettled(extraMarketTargets.map(async function(opp) {
+    try {
+      const extra = await fetchEventExtraMarkets(opp.sport, opp.matchId);
+      if (extra && extra.length) opp.extraMarkets = extra;
+    } catch (e) { /* best-effort, ne bloque pas le scan */ }
+  }));
 
   const result = {
     opportunities: opportunities.slice(0, 25),
@@ -2685,4 +2813,5 @@ app.get('/api/check-result', async (req, res) => {
 app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
+
 

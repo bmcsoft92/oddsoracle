@@ -498,6 +498,23 @@ const ScannerModule = (() => {
         }).join('')
       : '';
 
+    // Marches O/U + Handicap (top picks uniquement, voir getScannerData)
+    const extraMarketsHtml = (opp.extraMarkets && opp.extraMarkets.length)
+      ? '<div class="sc2-extra-section"><div class="sc2-extra-title">Autres marches value</div>'
+        + opp.extraMarkets.map(function(em, idx) {
+            const ecls = em.edge >= 10 ? 'ev-forte' : em.edge >= 6 ? 'ev-bonne' : 'ev-ok';
+            return '<div class="sc2-extra-row">'
+              + '<span class="sc2-extra-mkt">' + em.marketName + '</span>'
+              + '<span class="sc2-extra-sel">' + em.label + '</span>'
+              + '<span class="sc2-extra-odd">' + em.bestPrice.toFixed(2) + '</span>'
+              + '<span class="sc2-extra-bk">' + (em.bestBook || '') + '</span>'
+              + '<span class="sc2-extra-edge ' + ecls + '">+' + em.edge + '%</span>'
+              + '<button class="sc2-btn sc2-btn-extra" onclick="ScannerModule.addExtraToJournal(' + rank + ',' + idx + ')">+ Journal</button>'
+              + '</div>';
+          }).join('')
+        + '</div>'
+      : '';
+
     return `
     <div class="sc2-card${opp.isLive ? ' sc2-card--live' : ''}${opp.edge >= 10 ? ' sc2-card--forte' : ''}">
 
@@ -564,6 +581,8 @@ const ScannerModule = (() => {
           <span class="sc2-kelly-loss">${kelly.pnlLoss} EUR</span>
         </div>
       </div>` : ''}
+
+      ${extraMarketsHtml}
 
       <div class="sc2-footer">
         <button class="sc2-btn sc2-btn-journal${isLogged ? ' sc2-btn-logged' : ''}"
@@ -782,6 +801,38 @@ const ScannerModule = (() => {
   }
 
   // -----------------------------------------------------------------
+  // AJOUTER AU JOURNAL -- marche supplementaire (O/U, Handicap)
+  // -----------------------------------------------------------------
+  function addExtraToJournal(rank, idx) {
+    if (!_displayedOpps) return;
+    const opp = _displayedOpps[rank];
+    if (!opp || !opp.extraMarkets) return;
+    const em = opp.extraMarkets[idx];
+    if (!em) return;
+
+    const tab = document.querySelector('[data-tab="journal"]');
+    if (tab) tab.click();
+
+    setTimeout(function() {
+      const addBtn = document.getElementById('btn-add-bet');
+      if (addBtn) addBtn.click();
+
+      setTimeout(function() {
+        const setVal = function(id, v) { const el = document.getElementById(id); if(el) el.value = v; };
+        setVal('j-date',      new Date().toISOString().split('T')[0]);
+        setVal('j-sport',     SPORT_MAP[opp.sport] || 'tennis');
+        setVal('j-match',     opp.homeTeam + ' vs ' + opp.awayTeam);
+        setVal('j-type',      opp.isLive ? 'live' : 'prematch');
+        setVal('j-market',    em.marketName);
+        setVal('j-selection', em.label);
+        setVal('j-cote',      em.bestPrice);
+        setVal('j-edge',      em.edge);
+        setVal('j-reason',    'Scanner IA -- ' + em.marketName + ' ' + em.label + ' -- Edge ' + em.edge + '% -- Prob ' + em.trueProb + '% -- ' + (em.bestBook || ''));
+      }, 200);
+    }, 300);
+  }
+
+  // -----------------------------------------------------------------
   // AUTO-REFRESH
   // -----------------------------------------------------------------
   function startAutoRefresh() {
@@ -853,5 +904,6 @@ const ScannerModule = (() => {
     }
   }
 
-  return { init, runScan, addToJournal, applyFilters, focusSport, watchMatch, openStats };
+  return { init, runScan, addToJournal, addExtraToJournal, applyFilters, focusSport, watchMatch, openStats };
 })();
+

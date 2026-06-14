@@ -428,6 +428,16 @@ option,optgroup{background:var(--bg1)}
 .sc2-kelly-win{color:var(--green);font-weight:700}
 .sc2-kelly-sep{color:var(--text2)}
 .sc2-kelly-loss{color:var(--red)}
+/* Marches supplementaires (O/U, Handicap) */
+.sc2-extra-section{padding:.45rem .8rem;border-bottom:1px solid var(--border0)}
+.sc2-extra-title{font-size:.6rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text2);margin-bottom:.35rem}
+.sc2-extra-row{display:flex;align-items:center;gap:.4rem;padding:.18rem 0;flex-wrap:wrap}
+.sc2-extra-mkt{font-size:.62rem;color:var(--text2);width:90px;flex-shrink:0}
+.sc2-extra-sel{font-size:.72rem;font-weight:700;color:var(--text0);flex:1;min-width:60px}
+.sc2-extra-odd{font-family:var(--mono);font-size:.72rem;font-weight:700;color:var(--text0)}
+.sc2-extra-bk{font-size:.6rem;color:var(--text2);width:60px;flex-shrink:0}
+.sc2-extra-edge{font-family:var(--mono);font-size:.7rem;font-weight:700}
+.sc2-btn-extra{background:rgba(59,130,246,.12);color:var(--blue);padding:.15rem .45rem;font-size:.62rem}
 /* Footer */
 .sc2-footer{display:flex;align-items:center;justify-content:space-between;padding:.45rem .8rem}
 .sc2-footer-right{display:flex;gap:.3rem}
@@ -1235,39 +1245,4 @@ option,optgroup{background:var(--bg1)}
   font-size: .8rem;
   background: rgba(255,255,255,.03);
   border-left: 3px solid transparent;
-  transition: background .15s;
-}
-.incident-item:hover { background: rgba(255,255,255,.07); }
-.inc-clock {
-  font-size: .72rem;
-  font-weight: 700;
-  color: var(--text-muted, #64748b);
-  min-width: 36px;
-  text-align: right;
-}
-.inc-icon {
-  font-size: 1rem;
-  min-width: 22px;
-  text-align: center;
-}
-.inc-info {
-  font-size: .78rem;
-  color: var(--text-secondary, #94a3b8);
-  flex: 1;
-}
-.inc-info strong {
-  color: var(--text-primary, #e2e8f0);
-}
-/* Goal */
-.inc-goal { border-left-color: #22c55e; }
-/* Yellow card */
-.inc-yellow { border-left-color: #eab308; }
-/* Red card */
-.inc-red { border-left-color: #ef4444; }
-/* Sub */
-.inc-sub { border-left-color: #38bdf8; }
-/* Other event */
-.inc-event { border-left-color: #6b7280; }
-/* Home side slightly brighter */
-.inc-side-home .inc-info strong { color: #38bdf8; }
-.inc-side-away .inc-info strong { color: #fb923c; }
+  tr
