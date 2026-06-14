@@ -2881,11 +2881,14 @@ app.get('/api/check-result', async (req, res) => {
     try {
       const ctrl = new AbortController();
       setTimeout(function(){ ctrl.abort(); }, 7000);
-      // Essaie la date fournie + hier + avant-hier (décalage timezone)
+      // Essaie d'abord la date exacte du pari, puis ±1 jour en repli
+      // (décalage timezone uniquement). Important : si on testait ±1 jour
+      // avant la date exacte, une série de matchs consécutifs entre les
+      // mêmes équipes (ex: MLB) ferait remonter le résultat du mauvais match.
       const dates = [];
       if (date) {
         const d = new Date(date);
-        for (let i = -1; i <= 1; i++) {
+        for (const i of [0, -1, 1]) {
           const dd = new Date(d); dd.setDate(dd.getDate() + i);
           dates.push(dd.toISOString().slice(0,10).replace(/-/g,''));
         }
