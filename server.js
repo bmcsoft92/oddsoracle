@@ -1713,6 +1713,63 @@ async function getScannerData() {
     } catch (e) { /* best-effort, ne bloque pas le scan */ }
   }));
 
+  // -- Verdicts IA (Gemini) pour les top picks + marches O/U/Handicap --
+  // Un seul appel groupe (menage le quota gratuit, resultat mis en cache
+  // avec le reste du scanner pendant 15 min). Inspire du format multi-IA de
+  // sportplus.tv : un court verdict par pick. Best-effort -- si Gemini est
+  // indisponible/non configure/en erreur, les picks restent simplement sans
+  // verdict (le frontend masque la section correspondante).
+  if (GEMINI_API_KEY) {
+    const verdictItems = [];
+    extraMarketTargets.forEach(function(opp) {
+      verdictItems.push({ opp: opp, kind: 'h2h' });
+      (opp.extraMarkets || []).forEach(function(em, idx) {
+        verdictItems.push({ opp: opp, kind: 'extra', extraIdx: idx });
+      });
+    });
+    if (verdictItems.length) {
+      try {
+        const prompt = buildScannerVerdictsPrompt(verdictItems);
+        const payload = {
+          systemInstruction: { parts: [{ text: ODDSORACLE_SYSTEM_PROMPT }] },
+          contents: [{ role: 'user', parts: [{ text: prompt }] }],
+          generationConfig: { maxOutputTokens: 1536, thinkingConfig: { thinkingBudget: 0 } },
+        };
+        const modelsToTry = [GEMINI_MODEL, GEMINI_MODEL_FALLBACK].filter(function(m, i, arr) {
+          return m && arr.indexOf(m) === i;
+        });
+        let resp = null;
+        outerScanVerdicts:
+        for (let m = 0; m < modelsToTry.length; m++) {
+          const model = modelsToTry[m];
+          for (let attempt = 0; attempt < 2; attempt++) {
+            resp = await callGeminiOnce(model, payload);
+            if (resp.ok) break outerScanVerdicts;
+            if (!GEMINI_RETRYABLE_STATUSES.includes(resp.status)) break outerScanVerdicts;
+            if (attempt === 0) await new Promise(function(r){ setTimeout(r, 1200); });
+          }
+        }
+        if (resp && resp.ok) {
+          const data  = resp.data;
+          const cand  = (data.candidates || [])[0] || {};
+          const parts = (cand.content && cand.content.parts) || [];
+          const text  = parts.map(function(p){ return p.text || ''; }).join('');
+          const verdicts = parseScannerVerdicts(text, verdictItems.length);
+          verdicts.forEach(function(v, i) {
+            if (!v) return;
+            const it = verdictItems[i];
+            if (it.kind === 'h2h') it.opp.verdict = v;
+            else if (it.opp.extraMarkets && it.opp.extraMarkets[it.extraIdx]) it.opp.extraMarkets[it.extraIdx].verdict = v;
+          });
+        } else if (resp) {
+          console.warn('[scanner-verdicts] Gemini ' + resp.status + ' (' + resp.model + '): ' + resp.errText);
+        }
+      } catch (err) {
+        console.warn('[scanner-verdicts] ' + err.message);
+      }
+    }
+  }
+
   const result = {
     opportunities: opportunities.slice(0, 25),
     meta: {
@@ -1762,6 +1819,50 @@ function buildPronosDuJourPrompt(picks) {
 function parsePronosVerdicts(text, count) {
   const out = new Array(count).fill(null);
   const re = /MATCH\s*(\d+)\s*[:\-]\s*(.+)/gi;
+  let m;
+  while ((m = re.exec(text || ''))) {
+    const idx = parseInt(m[1], 10) - 1;
+    if (idx >= 0 && idx < count && m[2].trim()) out[idx] = m[2].trim();
+  }
+  return out;
+}
+
+// -----------------------------------------------------------------------
+// VERDICTS IA (Gemini) -- top picks Scanner + marches O/U/Handicap
+// -----------------------------------------------------------------------
+// Construit le prompt Gemini groupe pour les verdicts du Scanner : un verdict
+// court par pick (selection h2h + marches O/U/Handicap des top picks),
+// inspire du format multi-IA de sportplus.tv (justification courte par pari).
+function buildScannerVerdictsPrompt(items) {
+  const lines = [
+    'Voici ' + items.length + ' pronostics issus du scanner de value bets (cote bookmaker vs probabilite reelle calculee a partir des cotes sharp).',
+    'Pour CHAQUE pronostic, redige un verdict court (2 phrases maximum, en francais, sans markdown, ton expert et incisif) expliquant pourquoi ce pari ressort.',
+    'Reponds STRICTEMENT selon ce format, une seule ligne par pronostic :',
+    'PICK 1: <verdict>',
+    'PICK 2: <verdict>',
+    '',
+  ];
+  items.forEach(function(it, i) {
+    const opp = it.opp;
+    lines.push('PICK ' + (i + 1) + ' -- ' + opp.homeTeam + ' vs ' + opp.awayTeam + ' (' + opp.sportLabel + ')');
+    if (it.kind === 'h2h') {
+      lines.push('Selection : ' + opp.selection + ' @ ' + opp.bestPrice + ' (' + opp.bestBook + ')');
+      lines.push('Edge marche : +' + opp.edge + '% -- Probabilite reelle estimee : ' + opp.trueProb + '%');
+      if (opp.formNote) lines.push('Forme/H2H : ' + opp.formNote);
+    } else {
+      const em = opp.extraMarkets[it.extraIdx];
+      lines.push('Marche : ' + em.marketName + ' -- Selection : ' + em.label + ' @ ' + em.bestPrice + ' (' + (em.bestBook || '') + ')');
+      lines.push('Edge marche : +' + em.edge + '% -- Probabilite reelle estimee : ' + em.trueProb + '%');
+    }
+    lines.push('');
+  });
+  return lines.join('\n');
+}
+
+// Extrait les verdicts "PICK n: ..." du texte renvoye par Gemini.
+function parseScannerVerdicts(text, count) {
+  const out = new Array(count).fill(null);
+  const re = /PICK\s*(\d+)\s*[:\-]\s*(.+)/gi;
   let m;
   while ((m = re.exec(text || ''))) {
     const idx = parseInt(m[1], 10) - 1;
@@ -2813,5 +2914,6 @@ app.get('/api/check-result', async (req, res) => {
 app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
+
 
 

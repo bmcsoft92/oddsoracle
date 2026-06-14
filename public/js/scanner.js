@@ -503,16 +503,24 @@ const ScannerModule = (() => {
       ? '<div class="sc2-extra-section"><div class="sc2-extra-title">Autres marches value</div>'
         + opp.extraMarkets.map(function(em, idx) {
             const ecls = em.edge >= 10 ? 'ev-forte' : em.edge >= 6 ? 'ev-bonne' : 'ev-ok';
-            return '<div class="sc2-extra-row">'
+            return '<div class="sc2-extra-item">'
+              + '<div class="sc2-extra-row">'
               + '<span class="sc2-extra-mkt">' + em.marketName + '</span>'
               + '<span class="sc2-extra-sel">' + em.label + '</span>'
               + '<span class="sc2-extra-odd">' + em.bestPrice.toFixed(2) + '</span>'
               + '<span class="sc2-extra-bk">' + (em.bestBook || '') + '</span>'
               + '<span class="sc2-extra-edge ' + ecls + '">+' + em.edge + '%</span>'
               + '<button class="sc2-btn sc2-btn-extra" onclick="ScannerModule.addExtraToJournal(' + rank + ',' + idx + ')">+ Journal</button>'
+              + '</div>'
+              + (em.verdict ? '<p class="sc2-extra-verdict">' + em.verdict + '</p>' : '')
               + '</div>';
           }).join('')
         + '</div>'
+      : '';
+
+    // Verdict IA (Gemini) sur le pick principal -- style sportplus.tv
+    const verdictHtml = opp.verdict
+      ? '<div class="sc2-verdict"><span class="sc2-verdict-icon">🤖</span><p class="sc2-verdict-text">' + opp.verdict + '</p></div>'
       : '';
 
     return `
@@ -568,6 +576,8 @@ const ScannerModule = (() => {
         </div>
         <span class="sc2-ai-note">${opp.formNote || (opp.confidence === 'low' ? '<span class="sc2-low-conf">⚠ confiance faible (cotes peu convergentes)</span>' : 'Pas de donnée forme/H2H')}</span>
       </div>` : ''}
+
+      ${verdictHtml}
 
       ${kelly ? `
       <div class="sc2-kelly">
@@ -906,4 +916,5 @@ const ScannerModule = (() => {
 
   return { init, runScan, addToJournal, addExtraToJournal, applyFilters, focusSport, watchMatch, openStats };
 })();
+
 

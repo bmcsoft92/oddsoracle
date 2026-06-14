@@ -438,6 +438,12 @@ option,optgroup{background:var(--bg1)}
 .sc2-extra-bk{font-size:.6rem;color:var(--text2);width:60px;flex-shrink:0}
 .sc2-extra-edge{font-family:var(--mono);font-size:.7rem;font-weight:700}
 .sc2-btn-extra{background:rgba(59,130,246,.12);color:var(--blue);padding:.15rem .45rem;font-size:.62rem}
+.sc2-extra-item{padding-bottom:.25rem}
+.sc2-extra-verdict{font-size:.62rem;font-style:italic;color:var(--text2);margin:.1rem 0 0;line-height:1.35}
+/* Verdict IA (Gemini) -- justification courte par pick, style sportplus.tv */
+.sc2-verdict{display:flex;gap:.5rem;align-items:flex-start;padding:.55rem .8rem;margin:0;border-bottom:1px solid var(--border0);background:rgba(139,92,246,.04)}
+.sc2-verdict-icon{font-size:.85rem;line-height:1.4;flex-shrink:0}
+.sc2-verdict-text{font-size:.7rem;font-style:italic;color:var(--text1);line-height:1.4;margin:0}
 /* Footer */
 .sc2-footer{display:flex;align-items:center;justify-content:space-between;padding:.45rem .8rem}
 .sc2-footer-right{display:flex;gap:.3rem}
@@ -1228,21 +1234,4 @@ option,optgroup{background:var(--bg1)}
 }
 
 /* ═══════════════════════════════════════════════════════════════════════
-   TIMELINE INCIDENTS (style Flashscore)
-   ═══════════════════════════════════════════════════════════════════════ */
-.incident-timeline {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  margin-top: 8px;
-}
-.incident-item {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 5px 10px;
-  border-radius: 6px;
-  font-size: .8rem;
-  background: rgba(255,255,255,.03);
-  border-left: 3px solid transparent;
-  tr
+   TIMELINE INCIDEN
