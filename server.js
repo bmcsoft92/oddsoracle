@@ -1030,6 +1030,17 @@ async function loadOddsForSport(sport) {
   return data;
 }
 
+// -- FILTRE VALUE : exclut les picks a cote extreme / faible probabilite --
+// Une cote tres elevee (ex: 26.00, 51.00) avec une probabilite reelle tres
+// faible (2-4%) peut avoir un "edge" mathematique eleve mais ne "passe"
+// presque jamais individuellement -- on exclut ces cas du predLabel/Scanner,
+// inspire des pronostics sportplus.live (cotes ~1.7-2.1, prob >= ~30%).
+const MAX_VALUE_PRICE = 4.0;  // cote max pour qu'un pick soit retenu comme "value"
+const MIN_TRUE_PROB   = 0.22; // probabilite reelle minimale (22%)
+function passesValueFilter(trueProb, bestPrice) {
+  return bestPrice <= MAX_VALUE_PRICE && trueProb >= MIN_TRUE_PROB;
+}
+
 // Enrichit un evenement avec cotes completes par selection
 function enrichEvent(event, sport) {
   const rawBk = event._raw || [];
@@ -1055,7 +1066,9 @@ function enrichEvent(event, sport) {
     });
     allBooks.sort(function(a, b) { return b.price - a.price; });
     const edge     = (trueProb * bestPrice - 1) * 100;
-    const predLabel = edge >= 10 ? 'FORTE' : edge >= 6 ? 'BONNE' : edge >= 2 ? 'CORRECTE' : null;
+    const predLabel = passesValueFilter(trueProb, bestPrice)
+      ? (edge >= 10 ? 'FORTE' : edge >= 6 ? 'BONNE' : edge >= 2 ? 'CORRECTE' : null)
+      : null;
     return {
       name:          o.name,
       sharpPrice:    o.price,
@@ -1484,6 +1497,11 @@ async function getScannerData() {
 
           const edge = (trueProb * bestPrice - 1) * 100;
           if (edge < 2) continue;
+
+          // Cote trop extreme / probabilite reelle trop faible : edge eleve
+          // sur le papier mais le pick ne "passe" presque jamais (ex: 26.00,
+          // 51.00 a 2-4% de prob) -- inspire des picks sportplus.live.
+          if (!passesValueFilter(trueProb, bestPrice)) continue;
 
           // Cote très isolée par rapport au reste du marché (>25%) :
           // probablement une ligne périmée/erronée, pas une vraie value.
