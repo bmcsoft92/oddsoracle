@@ -12,7 +12,7 @@ const ScannerModule = (() => {
   let _dedupedOpps      = null;
   let _displayedOpps    = null; // sous-ensemble actuellement affiche (apres filtres) -- source pour openStats/addToJournal
   let _bankroll         = 1000;
-  const REFRESH_INTERVAL = 10 * 60 * 1000; // 10 min
+  const REFRESH_INTERVAL = 30 * 60 * 1000; // 30 min — economie quota Odds API
 
   // IDs des opportunités deja notifiees/loggees (evite doublons sur refresh)
   const _seenIds    = new Set();

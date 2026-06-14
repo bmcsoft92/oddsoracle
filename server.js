@@ -640,7 +640,7 @@ function quotaOk() {
   }
   // Reset compteur une fois qu'on connaît le solde
   _apiCallsMadeUnknown = 0;
-  return apiUsage.requestsRemaining > 20;
+  return apiUsage.requestsRemaining > 60;
 }
 
 // ── ROTATION SCANNER : ne pas scanner TOUS les sports actifs à chaque cycle ──
@@ -649,8 +649,8 @@ function quotaOk() {
 // tournants, pour étaler la consommation de quota dans le temps.
 let _scanRotationIndex = 0;
 const SCAN_ROTATION_BATCH      = 5;    // nb de sports secondaires scannés par cycle
-const SCAN_ODDS_TTL_PRIORITY   = 3600; // 60 min — sports prioritaires
-const SCAN_ODDS_TTL_SECONDARY  = 7200; // 120 min — sports secondaires (rotation)
+const SCAN_ODDS_TTL_PRIORITY   = 14400; // 4h — sports prioritaires (economie quota)
+const SCAN_ODDS_TTL_SECONDARY  = 21600; // 6h — sports secondaires (rotation)
 
 // -- CHARGEMENT SÉRIALISÉ avec vérification quota entre chaque sport --
 // Remplace Promise.allSettled pour éviter 36 appels simultanés au démarrage
@@ -1226,7 +1226,7 @@ async function fetchEventExtraMarkets(sportKey, eventId) {
         };
       });
 
-    cache.set(cacheKey, picks, 3600); // 1h
+    cache.set(cacheKey, picks, 14400); // 4h — economie quota
     return picks;
   } catch (e) {
     console.warn('[extramkt] ' + eventId + ': ' + e.message);
@@ -1756,7 +1756,7 @@ async function getScannerData() {
   // Inspire des pronostics sportplus.live (marches varies : 1X2, O/U,
   // Handicap) -- on n'enrichit que le top N pour proteger le quota Odds API
   // (cf. fetchEventExtraMarkets : 1 appel par evenement, mis en cache 1h).
-  const TOP_N_EXTRA_MARKETS = 5;
+  const TOP_N_EXTRA_MARKETS = 2; // reduit de 5 a 2 (economie quota)
   const extraMarketTargets = opportunities.slice(0, TOP_N_EXTRA_MARKETS);
   await Promise.allSettled(extraMarketTargets.map(async function(opp) {
     try {
@@ -1834,7 +1834,7 @@ async function getScannerData() {
     _scannedAt: new Date().toISOString(),
   };
 
-  cache.set(cacheKey, result, 900);
+  cache.set(cacheKey, result, 3600); // 1h — economie quota Odds API
   return { data: result, cached: false, scannedAt: result._scannedAt };
 }
 
