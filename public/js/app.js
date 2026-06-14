@@ -2010,7 +2010,7 @@ function renderTabLive(data, home, away) {
       html += '<tr>'
             + '<td class="stat-cell"><span class="stat-num' + (hNum>aNum?' stat-winner':'') + '">' + hv + '</span>'
             + '<div class="stat-bar-track"><div class="stat-bar-fill stat-bar-h" style="width:' + hPct + '%"></div></div></td>'
-            + '<td class="stat-label">' + s.label + '</td>'
+            + '<td class="stat-row-label">' + s.label + '</td>'
             + '<td class="stat-cell"><div class="stat-bar-track stat-bar-track-r"><div class="stat-bar-fill stat-bar-a" style="width:' + aPct + '%"></div></div>'
             + '<span class="stat-num' + (aNum>hNum?' stat-winner':'') + '">' + av + '</span></td>'
             + '</tr>';
