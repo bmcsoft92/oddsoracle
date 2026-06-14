@@ -905,8 +905,13 @@ function renderMatchCard(match, isLive) {
   var sels  = match.selections || [];
   var safeH = escHtml(match.homeTeam || '');
   var safeA = escHtml(match.awayTeam || '');
-  var cotA  = sels[0] ? sels[0].bestPrice.toFixed(2) : '';
-  var cotB  = sels[sels.length-1] ? sels[sels.length-1].bestPrice.toFixed(2) : '';
+  // Cotes domicile/exterieur : on matche par nom de selection (et non par
+  // position dans le tableau), l'ordre renvoye par les bookmakers n'etant
+  // pas garanti -- meme correction que pour les labels 1/X/2 ci-dessous.
+  var selHome = sels.find(function(s){ return s.name === match.homeTeam; });
+  var selAway = sels.find(function(s){ return s.name === match.awayTeam; });
+  var cotA  = selHome ? selHome.bestPrice.toFixed(2) : (sels[0] ? sels[0].bestPrice.toFixed(2) : '');
+  var cotB  = selAway ? selAway.bestPrice.toFixed(2) : (sels[sels.length-1] ? sels[sels.length-1].bestPrice.toFixed(2) : '');
 
   // Statut réel du match (passé le commence_time = en cours)
   var started = match.isLive || (match.isImminent === false && !!isLive);
@@ -951,7 +956,16 @@ function renderMatchCard(match, isLive) {
   // "value" ni de % d'edge par sélection sur les cartes live.
   var oddsHtml = sels.map(function(s,i){
     var n    = sels.length;
-    var lbl  = n===2 ? (i===0?'1':'2') : (i===0?'1': i===1?'X':'2');
+    // Label 1/X/2 base sur le nom reel de la selection (et non sa position
+    // dans le tableau) -- l'ordre des outcomes renvoye par les bookmakers
+    // (Pinnacle, etc.) n'est pas garanti "domicile, nul, exterieur" et variait
+    // selon les matchs, ce qui faisait afficher la cote du nul sous "1"/"2"
+    // (ex: Allemagne-Curaçao) -- on matche desormais s.name vs home/away.
+    var lbl;
+    if (s.name === match.homeTeam) lbl = '1';
+    else if (s.name === match.awayTeam) lbl = '2';
+    else if (n === 2) lbl = (i===0?'1':'2'); // 2 issues sans nom exploitable -> repli positionnel
+    else lbl = 'X'; // nul ("Draw") ou tout autre nom -> colonne centrale
     var best = !started && bestSel && s===bestSel && (s.edge||0)>0;
     var ec   = (s.edge||0)>0 ? 'mc-ep' : 'mc-en';
     var et   = (!started && s.edge!=null) ? ((s.edge>0?'+':'')+s.edge.toFixed(1)+'%') : '';
