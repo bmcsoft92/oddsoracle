@@ -966,6 +966,14 @@ function renderMatchCard(match, isLive) {
     else if (s.name === match.awayTeam) lbl = '2';
     else if (n === 2) lbl = (i===0?'1':'2'); // 2 issues sans nom exploitable -> repli positionnel
     else lbl = 'X'; // nul ("Draw") ou tout autre nom -> colonne centrale
+    return { s: s, lbl: lbl };
+  }).sort(function(a,b){
+    // Affichage toujours dans l'ordre 1, X, 2 de gauche a droite, quel que
+    // soit l'ordre renvoye par l'API (qui ne garantit pas domicile/nul/exterieur).
+    var order = { '1': 0, 'X': 1, '2': 2 };
+    return order[a.lbl] - order[b.lbl];
+  }).map(function(item){
+    var s = item.s, lbl = item.lbl;
     var best = !started && bestSel && s===bestSel && (s.edge||0)>0;
     var ec   = (s.edge||0)>0 ? 'mc-ep' : 'mc-en';
     var et   = (!started && s.edge!=null) ? ((s.edge>0?'+':'')+s.edge.toFixed(1)+'%') : '';
