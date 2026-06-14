@@ -1041,6 +1041,29 @@ function passesValueFilter(trueProb, bestPrice) {
   return bestPrice <= MAX_VALUE_PRICE && trueProb >= MIN_TRUE_PROB;
 }
 
+// -- CLASSIFICATION CENTRALISEE DES PICKS (predLabel) --
+// Criteres resserres pour que les picks affiches "FORTE"/"BONNE" soient plus
+// susceptibles de "passer" : un edge eleve seul ne suffit plus.
+// - FORTE exige en plus : probabilite reelle >= MIN_TRUE_PROB_FORTE (28%),
+//   confidence 'high' (cote sharp Pinnacle disponible) et un consensus marche
+//   non "thin" (>=3 bookmakers en accord) -- sinon retrograde en BONNE.
+// - Une cote isolee par rapport au reste du marche (lowAgreement) retrograde
+//   systematiquement le label d'un niveau (FORTE->BONNE, BONNE->CORRECTE,
+//   CORRECTE->aucun label).
+const MIN_TRUE_PROB_FORTE = 0.28;
+function classifyPick(trueProb, bestPrice, edge, confidence, consensus) {
+  if (!passesValueFilter(trueProb, bestPrice)) return null;
+  let label = edge >= 10 ? 'FORTE' : edge >= 6 ? 'BONNE' : edge >= 2 ? 'CORRECTE' : null;
+  if (!label) return null;
+  if (label === 'FORTE' && (trueProb < MIN_TRUE_PROB_FORTE || confidence !== 'high' || (consensus && consensus.consensus === 'thin'))) {
+    label = 'BONNE';
+  }
+  if (consensus && consensus.lowAgreement) {
+    label = label === 'FORTE' ? 'BONNE' : label === 'BONNE' ? 'CORRECTE' : null;
+  }
+  return label;
+}
+
 // Enrichit un evenement avec cotes completes par selection
 function enrichEvent(event, sport) {
   const rawBk = event._raw || [];
@@ -1065,10 +1088,10 @@ function enrichEvent(event, sport) {
       }
     });
     allBooks.sort(function(a, b) { return b.price - a.price; });
-    const edge     = (trueProb * bestPrice - 1) * 100;
-    const predLabel = passesValueFilter(trueProb, bestPrice)
-      ? (edge >= 10 ? 'FORTE' : edge >= 6 ? 'BONNE' : edge >= 2 ? 'CORRECTE' : null)
-      : null;
+    const edge       = (trueProb * bestPrice - 1) * 100;
+    const consensus  = analyzeConsensus(allBooks, bestPrice);
+    const confidence = pinnacle ? 'high' : allBooks.length >= 3 ? 'medium' : 'low';
+    const predLabel  = consensus.isOutlier ? null : classifyPick(trueProb, bestPrice, edge, confidence, consensus);
     return {
       name:          o.name,
       sharpPrice:    o.price,
@@ -1126,10 +1149,10 @@ function computeMarketSelections(rawBk, marketKey) {
       }
     });
     allBooks.sort(function(a, b) { return b.price - a.price; });
-    const edge = (trueProb * bestPrice - 1) * 100;
-    const predLabel = passesValueFilter(trueProb, bestPrice)
-      ? (edge >= 10 ? 'FORTE' : edge >= 6 ? 'BONNE' : edge >= 2 ? 'CORRECTE' : null)
-      : null;
+    const edge       = (trueProb * bestPrice - 1) * 100;
+    const consensus  = analyzeConsensus(allBooks, bestPrice);
+    const confidence = pinnacle ? 'high' : allBooks.length >= 3 ? 'medium' : 'low';
+    const predLabel  = consensus.isOutlier ? null : classifyPick(trueProb, bestPrice, edge, confidence, consensus);
     return {
       market:        marketKey,
       name:          o.name,
@@ -1308,13 +1331,13 @@ function computeFormAdjustment(opp, formHome, formAway, h2h) {
   const oppForm = isHomeSel ? formAway : formHome;
   if (selForm && oppForm && selForm.formPct != null && oppForm.formPct != null) {
     const diff = selForm.formPct - oppForm.formPct;
-    adj += diff / 25; // ±4 pts max pour 100% d'écart de forme
+    adj += diff / 20; // ±5 pts max pour 100% d'écart de forme
     notes.push('Forme 5 derniers: ' + selForm.formPct + '% vs ' + oppForm.formPct + '%');
   }
   if (h2h && h2h.total >= 3) {
     const selWins = isHomeSel ? h2h.homeWins : h2h.awayWins;
     const h2hPct = (selWins / h2h.total) * 100;
-    adj += (h2hPct - 50) / 33; // ±1.5 pts max
+    adj += (h2hPct - 50) / 25; // ±2 pts max
     notes.push('H2H: ' + selWins + '/' + h2h.total + ' victoires');
   }
   return { adj: Math.round(adj * 10) / 10, notes };
@@ -1659,8 +1682,7 @@ async function getScannerData() {
           const urgency    = isLive ? 'live' : hoursLeft < 2 ? 'soon' : hoursLeft < 6 ? 'today' : 'upcoming';
 
           const predScore  = Math.min(99, Math.round(trueProb * (1 + edge / 100)));
-          let predLabel  = edge >= 10 ? 'FORTE' : edge >= 6 ? 'BONNE' : 'CORRECTE';
-          if (confidence === 'low' && predLabel === 'FORTE') predLabel = 'BONNE';
+          const predLabel  = classifyPick(trueProb, bestPrice, edge, confidence, consensus);
 
           opportunities.push({
             sport:          sport.key,
@@ -1911,7 +1933,14 @@ const PRONOS_STAKE_BY_LABEL = { FORTE: 100, BONNE: 60, CORRECTE: 30 };
 // passent" : on privilegie les picks FORTE/BONNE ou un score affine
 // suffisant (cf. PRONOS_MIN_RELIABLE_SCORE) avant de completer la liste.
 const PRONOS_DU_JOUR_COUNT = 6;
-const PRONOS_MIN_RELIABLE_SCORE = 45;
+const PRONOS_MIN_RELIABLE_SCORE = 55;
+// Libelle de fiabilite affiche sur les cartes (transparence) -- base sur la
+// confiance dans la cote sharp (Pinnacle) et l'accord entre bookmakers.
+function reliabilityLabel(o) {
+  if (o.confidence === 'high' && o.marketConsensus !== 'thin') return 'Élevée';
+  if (o.confidence === 'low') return 'Faible';
+  return 'Moyenne';
+}
 app.get('/api/pronos-du-jour', async (req, res) => {
   const cacheKey = 'pronos_du_jour';
   const cached = cache.get(cacheKey);
@@ -1934,6 +1963,7 @@ app.get('/api/pronos-du-jour', async (req, res) => {
   // score affine >= PRONOS_MIN_RELIABLE_SCORE ; on complete avec le reste
   // (deja trie) seulement si necessaire pour atteindre PRONOS_DU_JOUR_COUNT.
   const reliable = deduped.filter(function(o) {
+    if (o.confidence === 'low') return false;
     return o.predLabel === 'FORTE' || o.predLabel === 'BONNE' || (o.adjustedScore || 0) >= PRONOS_MIN_RELIABLE_SCORE;
   });
   const rest = deduped.filter(function(o) { return reliable.indexOf(o) === -1; });
@@ -1951,6 +1981,7 @@ app.get('/api/pronos-du-jour', async (req, res) => {
       isLive: o.isLive, selection: o.selection, edge: o.edge, bestPrice: o.bestPrice,
       bestBook: o.bestBook, adjustedScore: o.adjustedScore, predLabel: o.predLabel,
       stake: PRONOS_STAKE_BY_LABEL[o.predLabel] || PRONOS_STAKE_BY_LABEL.CORRECTE,
+      reliability: reliabilityLabel(o),
       verdict: o.formNote || null, // fallback gratuit, remplace par le verdict IA si dispo
     };
   });

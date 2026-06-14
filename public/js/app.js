@@ -1331,8 +1331,14 @@ const PronosDuJourModule = (() => {
       : (p.edge!=null ? ' <span class="mc-ep mc-ev">edge +'+p.edge.toFixed(1)+'%</span>' : '')
       + (p.adjustedScore!=null ? ' <span class="prono-score">'+p.adjustedScore+'/100</span>' : '');
 
+    var reliabMap = { 'Élevée':'high', 'Moyenne':'medium', 'Faible':'low' };
+    var reliabCls = reliabMap[p.reliability] || 'medium';
+    var reliabHtml = p.reliability
+      ? ' &middot; <span class="prono-reliability prono-reliability-'+reliabCls+'">Fiabilité '+p.reliability+'</span>'
+      : '';
+
     var stakeHtml = p.stake
-      ? '<div class="prono-stake">Mise conseillée : <strong>'+p.stake+' &euro;</strong></div>'
+      ? '<div class="prono-stake">Mise conseillée : <strong>'+p.stake+' &euro;</strong>'+reliabHtml+'</div>'
       : '';
 
     return '<div class="match-card prono-card">'

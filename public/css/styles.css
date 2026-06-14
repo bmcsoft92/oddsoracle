@@ -720,6 +720,10 @@ option,optgroup{background:var(--bg1)}
   font-size:.7rem;color:var(--text2);font-family:var(--mono);margin-bottom:.4rem;
 }
 .prono-stake strong{color:var(--green)}
+.prono-reliability{font-weight:700}
+.prono-reliability-high{color:var(--green)}
+.prono-reliability-medium{color:var(--yellow)}
+.prono-reliability-low{color:var(--red)}
 
 /* Responsive match cards */
 @media(max-width:480px){
