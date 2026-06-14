@@ -689,12 +689,12 @@ function diskCacheLoad(key, maxAgeMs) {
   } catch(e) { return null; }
 }
 
-// -- JOURNAL DES PARIS (persisté sur disque, survit aux redémarrages du process) --
-// NB: sur Render (plan gratuit), /tmp peut être réinitialisé lors d'un redéploiement
-// ou d'une longue mise en veille de l'instance -- ce n'est donc pas un stockage
-// durable au sens "base de données", mais ça permet de partager le journal entre
-// le navigateur et une tâche planifiée côté serveur (ce que ne permettait pas
-// l'ancien stockage localStorage, propre à chaque navigateur).
+// -- JOURNAL DES PARIS (persisté sur disque + GitHub, survit aux redéploiements) --
+// NB: sur Render (plan gratuit), /tmp est réinitialisé à chaque redéploiement
+// ou longue mise en veille de l'instance. /tmp reste un cache rapide pour le
+// process en cours, mais la source de vérité durable est le fichier
+// data/journal.json du repo GitHub (commité via l'API GitHub à chaque
+// modification, et relu au démarrage pour repeupler /tmp).
 const JOURNAL_FILE = DISK_CACHE_DIR + '/oo_journal.json';
 function loadJournalBets() {
   try {
@@ -707,7 +707,86 @@ function saveJournalBets(bets) {
   try {
     fs.writeFileSync(JOURNAL_FILE, JSON.stringify(bets, null, 2));
   } catch(e) { console.warn('[journal] save: ' + e.message); }
+  githubPushJournal(bets);
 }
+
+// -- SYNCHRO GITHUB DU JOURNAL --
+const GITHUB_TOKEN        = process.env.GITHUB_TOKEN || '';
+const GITHUB_REPO         = process.env.GITHUB_REPO  || 'bmcsoft92/oddsoracle';
+const GITHUB_BRANCH       = process.env.GITHUB_BRANCH || 'main';
+const GITHUB_JOURNAL_PATH = 'data/journal.json';
+const GITHUB_API_HEADERS  = {
+  Authorization: 'token ' + GITHUB_TOKEN,
+  'User-Agent': 'oddsoracle-journal-sync',
+  Accept: 'application/vnd.github+json',
+};
+let githubJournalSha = null; // sha courant du fichier sur GitHub (requis pour committer une mise a jour)
+
+// Recupere data/journal.json depuis GitHub. Retourne un tableau (vide si le
+// fichier n'existe pas encore), ou null en cas d'erreur reseau (on garde
+// alors /tmp tel quel plutot que de risquer d'effacer le journal local).
+async function githubFetchJournal() {
+  if (!GITHUB_TOKEN) return null;
+  try {
+    const r = await fetch(
+      `https://api.github.com/repos/${GITHUB_REPO}/contents/${GITHUB_JOURNAL_PATH}?ref=${GITHUB_BRANCH}`,
+      { headers: GITHUB_API_HEADERS }
+    );
+    if (r.status === 404) { githubJournalSha = null; return []; }
+    if (!r.ok) { console.warn('[journal] github fetch: HTTP ' + r.status); return null; }
+    const json = await r.json();
+    githubJournalSha = json.sha;
+    const content = Buffer.from(json.content, 'base64').toString('utf8');
+    const data = JSON.parse(content);
+    return Array.isArray(data) ? data : [];
+  } catch(e) { console.warn('[journal] github fetch: ' + e.message); return null; }
+}
+
+// Committe le journal sur GitHub. Les appels sont mis en file (un commit a la
+// fois) pour eviter les conflits de sha si plusieurs modifications arrivent
+// rapidement. En cas de conflit (409, sha obsolete), on re-recupere le sha et
+// on retente une fois.
+let _githubPushQueue = Promise.resolve();
+function githubPushJournal(bets, _retry) {
+  if (!GITHUB_TOKEN) return;
+  _githubPushQueue = _githubPushQueue.then(async () => {
+    try {
+      const body = {
+        message: '[journal] sync auto (' + bets.length + ' pari(s))',
+        content: Buffer.from(JSON.stringify(bets, null, 2)).toString('base64'),
+        branch:  GITHUB_BRANCH,
+      };
+      if (githubJournalSha) body.sha = githubJournalSha;
+      const r = await fetch(
+        `https://api.github.com/repos/${GITHUB_REPO}/contents/${GITHUB_JOURNAL_PATH}`,
+        { method: 'PUT', headers: Object.assign({ 'Content-Type': 'application/json' }, GITHUB_API_HEADERS), body: JSON.stringify(body) }
+      );
+      const json = await r.json();
+      if (!r.ok) {
+        if (r.status === 409 && !_retry) {
+          await githubFetchJournal(); // recupere le sha a jour
+          return githubPushJournal(bets, true);
+        }
+        console.warn('[journal] github push: HTTP ' + r.status + ' ' + (json && json.message));
+        return;
+      }
+      githubJournalSha = json.content && json.content.sha;
+    } catch(e) { console.warn('[journal] github push: ' + e.message); }
+  });
+}
+
+// Au demarrage : si /tmp est vide (nouveau conteneur apres redeploiement),
+// restaure le journal depuis GitHub. Sinon, recupere quand meme le sha
+// courant pour permettre les futurs commits.
+(async function bootstrapJournalFromGithub() {
+  if (!GITHUB_TOKEN) return;
+  const remote = await githubFetchJournal();
+  if (remote === null) return; // erreur reseau : on garde /tmp tel quel
+  if (!fs.existsSync(JOURNAL_FILE)) {
+    try { fs.writeFileSync(JOURNAL_FILE, JSON.stringify(remote, null, 2)); } catch(e) {}
+    if (remote.length) console.log('[journal] ' + remote.length + ' pari(s) restaure(s) depuis GitHub');
+  }
+})();
 
 // Reduit une cle sport (ex: "soccer_epl", "tennis_atp_us_open") a une categorie
 // du Journal (memes valeurs que le select #j-sport du frontend).
