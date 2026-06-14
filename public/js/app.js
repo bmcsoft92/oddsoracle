@@ -123,6 +123,48 @@ const DashboardModule = (() => {
       }
     });
 
+    // Bilan IA -- pronos FORTE auto-loggés (autoForte:true)
+    const iaBets = bets.filter(b => b.autoForte === true);
+    const iaStats = JournalModule.calcStats(iaBets);
+    const iaResolved = iaBets.filter(b => b.result === 'win' || b.result === 'loss');
+    const iaWins = iaResolved.filter(b => b.result === 'win').length;
+    const iaLosses = iaResolved.filter(b => b.result === 'loss').length;
+    const iaWinrate = (iaWins + iaLosses) > 0 ? (iaWins / (iaWins + iaLosses) * 100).toFixed(0) : 0;
+
+    document.getElementById('dash-ia-winrate').textContent = iaWinrate + '%';
+    document.getElementById('dash-ia-record').textContent = `${iaWins}V / ${iaLosses}D`;
+    document.getElementById('dash-ia-count').textContent = iaBets.length + ' picks';
+
+    const iaRoiEl = document.getElementById('dash-ia-roi');
+    iaRoiEl.textContent = (iaStats.roi >= 0 ? '+' : '') + iaStats.roi.toFixed(1) + '%';
+    iaRoiEl.style.color = iaStats.roi >= 0 ? 'var(--green)' : 'var(--red)';
+
+    const iaBalEl = document.getElementById('dash-ia-balance');
+    iaBalEl.textContent = (iaStats.pnl >= 0 ? '+' : '') + iaStats.pnl.toFixed(0) + ' €';
+    iaBalEl.style.color = iaStats.pnl >= 0 ? 'var(--green)' : 'var(--red)';
+
+    const iaRecentEl = document.getElementById('ia-recent-picks');
+    const iaRecent = iaBets.slice(0, 5);
+    if (iaRecent.length === 0) {
+      iaRecentEl.innerHTML = '<div class="empty-state">Aucun prono FORTE auto-loggé</div>';
+    } else {
+      iaRecentEl.innerHTML = iaRecent.map(b => {
+        const pnl = JournalModule.calcStats([b]).pnl;
+        const pnlClass = b.result === 'win' ? 'win' : b.result === 'loss' ? 'loss' : 'pending';
+        const pnlTxt = b.result === 'win' ? `+${pnl.toFixed(0)} €` :
+                       b.result === 'loss' ? `${pnl.toFixed(0)} €` : '⏳';
+        return `
+          <div class="bet-item">
+            <div>
+              <div class="bet-item-match">${b.match}</div>
+              <div class="bet-item-detail">${b.date} · ${b.selection} @${parseFloat(b.cote).toFixed(2)}</div>
+            </div>
+            <div class="bet-item-pnl ${pnlClass}">${pnlTxt}</div>
+          </div>
+        `;
+      }).join('');
+    }
+
     updateCharts(bets, alloc);
   }
 
@@ -1289,6 +1331,10 @@ const PronosDuJourModule = (() => {
       : (p.edge!=null ? ' <span class="mc-ep mc-ev">edge +'+p.edge.toFixed(1)+'%</span>' : '')
       + (p.adjustedScore!=null ? ' <span class="prono-score">'+p.adjustedScore+'/100</span>' : '');
 
+    var stakeHtml = p.stake
+      ? '<div class="prono-stake">Mise conseillée : <strong>'+p.stake+' &euro;</strong></div>'
+      : '';
+
     return '<div class="match-card prono-card">'
       + '<div class="mc-head">'
       + '<span class="prono-rank">#'+(idx+1)+'</span>'
@@ -1305,6 +1351,7 @@ const PronosDuJourModule = (() => {
       + (p.bestBook ? ' ('+p.bestBook+')' : '')
       + pickMetaHtml
       + '</div>'
+      + stakeHtml
       + verdictHtml
       + '</div>';
   }

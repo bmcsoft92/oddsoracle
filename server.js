@@ -1246,6 +1246,30 @@ function teamMatch(a, b) {
   return na === nb || na.includes(nb) || nb.includes(na);
 }
 
+// Statuts "terminé" connus de TheSportsDB / ESPN -- partagé entre le
+// recheck du Journal (/api/journal) et le filtre du flux live (/api/live/all).
+const FINISHED_STATUSES = /^(match finished|ft|aet|aot|finished|ended|final|full time)$/i;
+
+// Durée maximale plausible d'un match "en cours" par groupe de sport --
+// au-delà, un match marqué isLive uniquement via son heure de début (sans
+// score temps réel, cas des matchs Odds API "PARTIE 2" de /api/live/all)
+// est très probablement déjà terminé et ne doit plus être affiché en live.
+const MAX_LIVE_DURATION_MS = {
+  football:           165 * 60000, // ~2h45 (90min + pauses + prolongations/TAB eventuels)
+  basketball:         165 * 60000, // ~2h45 (NBA avec prolongations)
+  hockey:             150 * 60000, // ~2h30
+  handball:           120 * 60000, // ~2h
+  rugby:              130 * 60000, // ~2h10
+  american_football:  220 * 60000, // ~3h40
+  baseball:           240 * 60000, // ~4h (prolongations possibles)
+  aussie_rules:       150 * 60000, // ~2h30
+  lacrosse:           150 * 60000, // ~2h30
+  mma:                240 * 60000, // ~4h (carte complete)
+  cricket:            240 * 60000, // ~4h (estimation prudente, formats courts)
+  tennis:             240 * 60000, // ~4h (best of 5 sets / matchs longs)
+};
+const DEFAULT_MAX_LIVE_DURATION_MS = 3 * 3600000;
+
 // Analyse la cohérence des cotes entre bookmakers pour une sélection donnée.
 // Une "edge" élevée n'est une vraie value que si le marché est globalement
 // d'accord avec la cote sharp (Pinnacle) : si la meilleure cote est très
@@ -1378,6 +1402,10 @@ app.get('/api/live/all', async (req, res) => {
     for (const sdbEv of sdbEvents) {
       const sportName = sdbEv.strSport || '';
       if (!sdbEv.strHomeTeam || !sdbEv.strAwayTeam) continue;
+      // Ignore les matchs déjà terminés que TheSportsDB renvoie encore dans
+      // eventslive.php (statut stale, ex: "Match Finished" pendant un moment
+      // après la fin réelle de la rencontre).
+      if (FINISHED_STATUSES.test((sdbEv.strStatus || '').trim())) continue;
       const meta     = SPORTSDB_META[sportName] || { icon: '⚡', label: sportName };
       const sportKs  = SPORTSDB_MAP[sportName]  || [];
       const mk = normTeam(sdbEv.strHomeTeam)+'|'+normTeam(sdbEv.strAwayTeam);
@@ -1419,9 +1447,11 @@ app.get('/api/live/all', async (req, res) => {
       for (const event of upcomingResults[i].value) {
         const t = new Date(event.commenceTime).getTime();
         const msAgo = now - t;
-        // Skip if too far in future, or started more than 3h ago (probably finished)
+        // Skip if too far in future, ou si le match a probablement déjà fini
+        // (durée max plausible selon le groupe de sport, cf MAX_LIVE_DURATION_MS)
         if (t > cutoffFutur) continue;
-        if (msAgo > 3 * 3600000) continue;
+        const maxLiveMs = MAX_LIVE_DURATION_MS[sport.group] || DEFAULT_MAX_LIVE_DURATION_MS;
+        if (msAgo > maxLiveMs) continue;
         const enriched = enrichEvent(event, sport);
         if (!enriched) continue;
         const mk2 = normTeam(enriched.homeTeam)+'|'+normTeam(enriched.awayTeam);
@@ -1800,11 +1830,9 @@ function buildPronosDuJourPrompt(picks) {
     'Voici les ' + picks.length + ' meilleures opportunites de paris detectees aujourd\'hui (edge marche + forme/H2H).',
     'Pour CHAQUE match, redige un verdict court (2 phrases maximum, en francais, sans markdown) expliquant pourquoi ce pari ressort.',
     'Reponds STRICTEMENT selon ce format, une seule ligne par match :',
-    'MATCH 1: <verdict>',
-    'MATCH 2: <verdict>',
-    'MATCH 3: <verdict>',
-    '',
   ];
+  for (let i = 1; i <= picks.length; i++) lines.push('MATCH ' + i + ': <verdict>');
+  lines.push('');
   picks.forEach(function(p, i) {
     lines.push('MATCH ' + (i + 1) + ' -- ' + p.homeTeam + ' vs ' + p.awayTeam + ' (' + p.sportLabel + ')');
     lines.push('Selection : ' + p.selection + ' @ ' + p.bestPrice + ' (' + p.bestBook + ')');
@@ -1871,10 +1899,19 @@ function parseScannerVerdicts(text, count) {
   return out;
 }
 
-// Top 3 opportunites du scanner (edge + forme/H2H affines), avec un court
+// Top N opportunites du scanner (edge + forme/H2H affines), avec un court
 // verdict IA genere en UN SEUL appel Gemini groupe (menage le quota gratuit).
 // Si Gemini est indisponible/non configure, on retombe sur formNote (gratuit,
 // deja calcule via TheSportsDB). Resultat mis en cache 30 min.
+//
+// Mise virtuelle suggeree par pick selon le niveau de confiance (predLabel) --
+// alignee sur l'auto-log FORTE (100 EUR) du Journal, style "stake" sportplus.live.
+const PRONOS_STAKE_BY_LABEL = { FORTE: 100, BONNE: 60, CORRECTE: 30 };
+// Nombre de pronos affiches (vs. 3 auparavant) -- "des pronos fiables qui
+// passent" : on privilegie les picks FORTE/BONNE ou un score affine
+// suffisant (cf. PRONOS_MIN_RELIABLE_SCORE) avant de completer la liste.
+const PRONOS_DU_JOUR_COUNT = 6;
+const PRONOS_MIN_RELIABLE_SCORE = 45;
 app.get('/api/pronos-du-jour', async (req, res) => {
   const cacheKey = 'pronos_du_jour';
   const cached = cache.get(cacheKey);
@@ -1892,7 +1929,15 @@ app.get('/api/pronos-du-jour', async (req, res) => {
     seenMatchIds.add(o.matchId);
     return true;
   });
-  const top = deduped.slice(0, 3);
+
+  // Pronos "fiables qui passent" : on privilegie les picks FORTE/BONNE ou un
+  // score affine >= PRONOS_MIN_RELIABLE_SCORE ; on complete avec le reste
+  // (deja trie) seulement si necessaire pour atteindre PRONOS_DU_JOUR_COUNT.
+  const reliable = deduped.filter(function(o) {
+    return o.predLabel === 'FORTE' || o.predLabel === 'BONNE' || (o.adjustedScore || 0) >= PRONOS_MIN_RELIABLE_SCORE;
+  });
+  const rest = deduped.filter(function(o) { return reliable.indexOf(o) === -1; });
+  const top = reliable.concat(rest).slice(0, PRONOS_DU_JOUR_COUNT);
   if (!top.length) {
     const empty = { picks: [], generatedAt: new Date().toISOString() };
     cache.set(cacheKey, empty, 600);
@@ -1905,6 +1950,7 @@ app.get('/api/pronos-du-jour', async (req, res) => {
       homeTeam: o.homeTeam, awayTeam: o.awayTeam, commenceTime: o.commenceTime,
       isLive: o.isLive, selection: o.selection, edge: o.edge, bestPrice: o.bestPrice,
       bestBook: o.bestBook, adjustedScore: o.adjustedScore, predLabel: o.predLabel,
+      stake: PRONOS_STAKE_BY_LABEL[o.predLabel] || PRONOS_STAKE_BY_LABEL.CORRECTE,
       verdict: o.formNote || null, // fallback gratuit, remplace par le verdict IA si dispo
     };
   });
@@ -1915,7 +1961,7 @@ app.get('/api/pronos-du-jour', async (req, res) => {
       const payload = {
         systemInstruction: { parts: [{ text: ODDSORACLE_SYSTEM_PROMPT }] },
         contents: [{ role: 'user', parts: [{ text: prompt }] }],
-        generationConfig: { maxOutputTokens: 1024, thinkingConfig: { thinkingBudget: 0 } },
+        generationConfig: { maxOutputTokens: 2048, thinkingConfig: { thinkingBudget: 0 } },
       };
       const modelsToTry = [GEMINI_MODEL, GEMINI_MODEL_FALLBACK].filter(function(m, i, arr) {
         return m && arr.indexOf(m) === i;
@@ -2885,7 +2931,7 @@ app.get('/api/check-result', async (req, res) => {
       // Statuts "terminé" connus de TheSportsDB. On NE se base PAS sur la
       // présence d'un score (intHomeScore), car les matchs LIVE ont déjà
       // un score renseigné -> ça marquait des matchs en cours comme finis.
-      const FINISHED_STATUSES = /^(match finished|ft|aet|aot|finished|ended|final|full time)$/i;
+      // (FINISHED_STATUSES est défini en haut du fichier, partagé avec /api/live/all)
       const finished = FINISHED_STATUSES.test((ev.strStatus || '').trim());
       if (!finished) return res.json({ result: 'pending', status: ev.strStatus });
       const hs = parseInt(ev.intHomeScore || 0);

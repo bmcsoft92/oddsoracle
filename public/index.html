@@ -1210,6 +1210,27 @@
     </div>
 
     <div class="dashboard-grid">
+      <div class="card ia-bilan-card">
+        <div class="card-header"><h2>🤖 Bilan IA -- Pronos FORTE</h2></div>
+        <div class="ia-bilan-stats">
+          <div class="ia-stat">
+            <div class="ia-stat-label">Taux de réussite</div>
+            <div class="ia-stat-value" id="dash-ia-winrate">0%</div>
+            <div class="ia-stat-sub" id="dash-ia-record">0V / 0D</div>
+          </div>
+          <div class="ia-stat">
+            <div class="ia-stat-label">ROI</div>
+            <div class="ia-stat-value" id="dash-ia-roi">0%</div>
+            <div class="ia-stat-sub" id="dash-ia-count">0 picks</div>
+          </div>
+          <div class="ia-stat">
+            <div class="ia-stat-label">Solde virtuel</div>
+            <div class="ia-stat-value" id="dash-ia-balance">0 €</div>
+            <div class="ia-stat-sub">Mise 100 € / pick</div>
+          </div>
+        </div>
+        <div class="bets-list" id="ia-recent-picks"><div class="empty-state">Aucun prono FORTE auto-loggé</div></div>
+      </div>
       <div class="card">
         <div class="card-header"><h2>📉 Évolution Bankroll</h2></div>
         <div class="chart-container"><canvas id="chart-bankroll"></canvas></div>
