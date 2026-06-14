@@ -1996,7 +1996,9 @@ function renderTabLive(data, home, away) {
   var esp = data.espnStats || {};
 
   var html = '<div class="stats-live">';
-  html += '<div class="stats-section-title">⚡ Stats ESPN en direct</div>';
+  html += esp.completed
+    ? '<div class="stats-section-title">📊 Stats ESPN — Match terminé (score final)</div>'
+    : '<div class="stats-section-title">⚡ Stats ESPN en direct</div>';
 
   if (!esp || !esp.found) {
     html += '<div class="stats-empty">Pas de stats ESPN disponibles — match non démarré ou hors couverture ESPN</div>';

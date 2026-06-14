@@ -2585,19 +2585,23 @@ async function buildMatchStatsData(home, away, sport, matchId) {
           const comp  = (ev.competitions || [])[0] || {};
           const comps = comp.competitors || [];
           const n0 = espnName(comps[0]), n1 = espnName(comps[1]);
-          if (!((teamMatch(n0,home) && teamMatch(n1,away)) || (teamMatch(n0,away) && teamMatch(n1,home)))) continue;
-          const statsA = (comps[0] || {}).statistics || [];
-          const statsB = (comps[1] || {}).statistics || [];
+          const homeIsFirst = teamMatch(n0,home) && teamMatch(n1,away);
+          const awayIsFirst = teamMatch(n0,away) && teamMatch(n1,home);
+          if (!homeIsFirst && !awayIsFirst) continue;
+          const compHome = homeIsFirst ? (comps[0]||{}) : (comps[1]||{});
+          const compAway = homeIsFirst ? (comps[1]||{}) : (comps[0]||{});
+          const statsA = compHome.statistics || [];
+          const statsB = compAway.statistics || [];
           function gs(stats, name) { const s = stats.find(function(x){ return x.name === name || x.abbreviation === name; }); return s ? s.displayValue : null; }
           // Incidents timeline (goals, cards, subs)
           const rawDetails = comp.details || [];
+          const homeTeamId = compHome.team ? String(compHome.team.id) : '';
           const incidents = rawDetails.map(function(d) {
             const type = (d.type && d.type.text) || '';
             const clock = (d.clock && d.clock.displayValue) || '';
             const athletes = (d.athletesInvolved || []).map(function(a){ return a.displayName || a.shortName || ''; });
             const teamId = d.team ? String(d.team.id) : '';
-            const homeId = comps[0] && comps[0].team ? String(comps[0].team.id) : '';
-            const side = teamId === homeId ? 'home' : 'away';
+            const side = teamId === homeTeamId ? 'home' : 'away';
             return { type, clock, athletes, side, scoring: !!d.scoringPlay, penalty: !!d.penaltyPlay, yellowCard: !!d.yellowCard, redCard: !!d.redCard };
           }).filter(function(d){ return d.type && d.clock; });
           // Venue + referee
@@ -2605,9 +2609,14 @@ async function buildMatchStatsData(home, away, sport, matchId) {
           const officials = (comp.officials || []);
           const referee = officials.find(function(o){ return /referee|arbitre/i.test((o.position && o.position.displayName) || ''); }) || officials[0] || null;
           const refereeInfo = referee ? { name: referee.fullName || referee.displayName || '', role: (referee.position && referee.position.displayName) || 'Arbitre' } : null;
+          // Statut ESPN (termine / en cours) -- evite d'afficher "MATCH EN COURS"
+          // pour un match deja termine (status.type.completed / state === 'post')
+          const statusType = (ev.status && ev.status.type) || {};
+          const completed = !!statusType.completed || statusType.state === 'post';
           return {
             found: true,
-            score: { home: (comps[0]||{}).score||'0', away: (comps[1]||{}).score||'0' },
+            completed,
+            score: { home: compHome.score||'0', away: compAway.score||'0' },
             period: (ev.status||{}).period || 1,
             clock:  (ev.status||{}).displayClock || '',
             incidents,
@@ -2672,7 +2681,7 @@ function buildIaUserMessage(params) {
   // Le match est-il déjà en cours ? (score ESPN dispo) -- sert à qualifier les
   // valeurs "modèle local" ci-dessous, qui sont calculées avant/au début du match
   // et peuvent être obsolètes une fois la rencontre lancée.
-  const isLiveMatch = !!(stats && stats.espnStats && stats.espnStats.found);
+  const isLiveMatch = !!(stats && stats.espnStats && stats.espnStats.found && !stats.espnStats.completed);
   const localValSuffix = isLiveMatch ? ' (pré-match, à titre indicatif)' : '';
 
   const lines = [];
@@ -2699,7 +2708,10 @@ function buildIaUserMessage(params) {
   if (mvA && mvA.pctChange != null) lines.push('Mouvement de cote ' + away + ' : ' + (mvA.pctChange > 0 ? '+' : '') + mvA.pctChange.toFixed(1) + '%' + (mvA.steam ? ' (steam move détecté)' : ''));
 
   const espn = (stats && stats.espnStats) || null;
-  if (espn && espn.found) {
+  if (espn && espn.found && espn.completed) {
+    lines.push('MATCH TERMINÉ — Score final : ' + espn.score.home + ' - ' + espn.score.away + ' (' + home + ' / ' + away + ')');
+    lines.push('Le marché de paris pour ce match est FERMÉ : ne propose AUCUNE recommandation de pari "Live", AUCUN edge ni mise sur ce match. Tu peux faire un bref bilan post-match si pertinent.');
+  } else if (espn && espn.found) {
     lines.push('MATCH EN COURS — Score actuel : ' + espn.score.home + ' - ' + espn.score.away + ' (période ' + espn.period + ', ' + espn.clock + ')');
     function fmtStats(label, s) {
       if (!s) return null;
