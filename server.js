@@ -1442,7 +1442,7 @@ const SPORTSDB_MAP = {
                           'soccer_italy_serie_a','soccer_germany_bundesliga','soccer_portugal_primeira_liga',
                           'soccer_netherlands_eredivisie','soccer_usa_mls','soccer_brazil_campeonato',
                           'soccer_argentina_primera_division','soccer_colombia_primera_a'],
-  'Tennis':              ['tennis_atp','tennis_wta'],
+  'Tennis':              SPORTS.filter(function(s){ return s.group==='tennis'; }).map(function(s){ return s.key; }),
   'Basketball':          ['basketball_nba','basketball_nba_championship','basketball_wnba','basketball_euroleague'],
   'Baseball':            ['baseball_mlb'],
   'Ice Hockey':          ['icehockey_nhl'],
@@ -1524,7 +1524,7 @@ app.get('/api/live/all', async (req, res) => {
       liveMatches.push({
         homeTeam:    sdbEv.strHomeTeam,
         awayTeam:    sdbEv.strAwayTeam,
-        sportKey:    (enrichedOdds&&enrichedOdds.sportKey)||sportKs[0]||'unknown',
+        sportKey:    (enrichedOdds&&enrichedOdds.sport)||sportKs[0]||'unknown',
         sportLabel:  meta.label,
         sportIcon:   meta.icon,
         commenceTime:(sdbEv.dateEvent||now)+'T'+(sdbEv.strTime||'00:00:00'),
@@ -2773,8 +2773,8 @@ function buildIaUserMessage(params) {
 
   const fh = (stats && stats.formHome) || null;
   const fa = (stats && stats.formAway) || null;
-  if (fh) lines.push('FORME RÉCENTE ' + home + ' (5 derniers matchs) : ' + (fh.form || '?') + (fh.formPct != null ? ' — ' + fh.formPct + '% de points pris' : '') + (fh.streak ? ', série en cours ' + fh.streak : ''));
-  if (fa) lines.push('FORME RÉCENTE ' + away + ' (5 derniers matchs) : ' + (fa.form || '?') + (fa.formPct != null ? ' — ' + fa.formPct + '% de points pris' : '') + (fa.streak ? ', série en cours ' + fa.streak : ''));
+  if (fh) lines.push('FORME RÉCENTE ' + home + ' (5 derniers matchs) : ' + (fh.form && fh.form.length ? fh.form.map(function(f){ return f.result; }).join('') : '?') + (fh.formPct != null ? ' — ' + fh.formPct + '% de points pris' : '') + (fh.streak ? ', série en cours ' + fh.streak : ''));
+  if (fa) lines.push('FORME RÉCENTE ' + away + ' (5 derniers matchs) : ' + (fa.form && fa.form.length ? fa.form.map(function(f){ return f.result; }).join('') : '?') + (fa.formPct != null ? ' — ' + fa.formPct + '% de points pris' : '') + (fa.streak ? ', série en cours ' + fa.streak : ''));
 
   const h2h = (stats && stats.h2h) || null;
   if (h2h && h2h.total) {

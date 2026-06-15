@@ -290,7 +290,7 @@ const ScannerModule = (() => {
 
     const bet = {
       date:      new Date().toISOString().split('T')[0],
-      sport:     SPORT_MAP[opp.sport] || 'tennis',
+      sport:     SPORT_MAP[opp.sport] || 'football',
       sportKey:  opp.sport,
       match:     `${opp.homeTeam} vs ${opp.awayTeam}`,
       type:      opp.isLive ? 'live' : 'prematch',
@@ -797,7 +797,7 @@ const ScannerModule = (() => {
       setTimeout(function() {
         const setVal = function(id, v) { const el = document.getElementById(id); if(el) el.value = v; };
         setVal('j-date',      new Date().toISOString().split('T')[0]);
-        setVal('j-sport',     SPORT_MAP[opp.sport] || 'tennis');
+        setVal('j-sport',     SPORT_MAP[opp.sport] || 'football');
         setVal('j-match',     opp.homeTeam + ' vs ' + opp.awayTeam);
         setVal('j-type',      opp.isLive ? 'live' : 'prematch');
         setVal('j-market',    'Vainqueur match');
@@ -830,7 +830,7 @@ const ScannerModule = (() => {
       setTimeout(function() {
         const setVal = function(id, v) { const el = document.getElementById(id); if(el) el.value = v; };
         setVal('j-date',      new Date().toISOString().split('T')[0]);
-        setVal('j-sport',     SPORT_MAP[opp.sport] || 'tennis');
+        setVal('j-sport',     SPORT_MAP[opp.sport] || 'football');
         setVal('j-match',     opp.homeTeam + ' vs ' + opp.awayTeam);
         setVal('j-type',      opp.isLive ? 'live' : 'prematch');
         setVal('j-market',    em.marketName);
