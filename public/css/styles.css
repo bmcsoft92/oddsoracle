@@ -547,7 +547,7 @@ option,optgroup{background:var(--bg1)}
 .sc2-sel-name{font-size:.88rem;font-weight:700;color:var(--cyan);flex:1}
 .sc2-time{font-size:.65rem;color:var(--text2);font-family:var(--mono);white-space:nowrap;flex-shrink:0}
 .sc2-live-dot{display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--lime);margin-right:3px;animation:pulse 1.2s infinite;box-shadow:0 0 6px var(--lime)}
-@keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.5;transform:scale(.85)}}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.5}}
 
 /* Metrics */
 .sc2-metrics{display:grid;grid-template-columns:repeat(3,1fr);border-bottom:1px solid var(--border0)}
@@ -984,6 +984,7 @@ option,optgroup{background:var(--bg1)}
   transform:none!important;
   box-shadow:var(--shadow-sm)!important;
 }
+#tab-live .card:not(.ctx-card){backdrop-filter:none!important;-webkit-backdrop-filter:none!important;}
 .ctx-card-title{
   font-size:.8rem;font-weight:700;letter-spacing:.05em;text-transform:uppercase;
   color:var(--accent);margin-bottom:.65rem;padding-bottom:.42rem;border-bottom:1px solid var(--border0);
