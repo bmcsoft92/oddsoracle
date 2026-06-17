@@ -205,7 +205,7 @@ a:hover{text-decoration:underline}
   border:1px solid var(--border0);
   border-radius:var(--r2);
   margin-bottom:.9rem;
-  overflow:hidden;
+  overflow:clip;
   box-shadow:var(--shadow-sm);
   backdrop-filter:blur(8px);
   -webkit-backdrop-filter:blur(8px);
