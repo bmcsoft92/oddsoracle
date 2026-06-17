@@ -2291,21 +2291,20 @@ function autoAnalyzeCards(container) {
 
 // ── THEME TOGGLE ─────────────────────────────────────────────────
 (function() {
-  var btn = document.getElementById('theme-toggle');
-  if (!btn) return;
-  function applyTheme(theme) {
-    if (theme === 'light') {
+  var cb = document.getElementById('theme-cb');
+  if (!cb) return;
+  // Init depuis localStorage
+  var saved = localStorage.getItem('oo-theme') === 'light';
+  cb.checked = saved;
+  if (saved) document.documentElement.setAttribute('data-theme', 'light');
+  // Changement
+  cb.addEventListener('change', function() {
+    if (cb.checked) {
       document.documentElement.setAttribute('data-theme', 'light');
-      btn.title = 'Passer en mode nuit';
+      localStorage.setItem('oo-theme', 'light');
     } else {
       document.documentElement.removeAttribute('data-theme');
-      btn.title = 'Passer en mode jour';
+      localStorage.setItem('oo-theme', 'dark');
     }
-  }
-  applyTheme(localStorage.getItem('oo-theme') || 'dark');
-  btn.addEventListener('click', function() {
-    var next = document.documentElement.getAttribute('data-theme') === 'light' ? 'dark' : 'light';
-    localStorage.setItem('oo-theme', next);
-    applyTheme(next);
   });
 }());

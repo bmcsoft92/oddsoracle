@@ -1315,11 +1315,14 @@ option,optgroup{background:var(--bg1)}
 .incident-item:hover{background:var(--glass-mid)}
 .inc-clock{font-size:.72rem;font-weight:700;color:var(--text2);min-widt
 /* ── THEME TOGGLE PILL ─────────────────────────────────────────── */
+.theme-cb{
+  position:absolute;opacity:0;width:0;height:0;pointer-events:none;
+}
 .theme-toggle{
   position:relative;
   display:flex;align-items:center;justify-content:space-between;
   width:52px;height:26px;border-radius:13px;
-  border:none;cursor:pointer;padding:3px 5px;
+  cursor:pointer;padding:3px 5px;
   background:var(--bg3);
   box-shadow:inset 0 1px 3px rgba(0,0,0,0.5);
   transition:background .3s;flex-shrink:0;
@@ -1327,7 +1330,7 @@ option,optgroup{background:var(--bg1)}
 .tt-sun,.tt-moon{
   font-size:.7rem;line-height:1;z-index:1;
   pointer-events:none;user-select:none;
-  transition:opacity .3s;
+  transition:opacity .3s,color .3s;
 }
 .tt-sun{opacity:.4;color:var(--text1)}
 .tt-moon{opacity:1;color:var(--text0)}
@@ -1339,6 +1342,14 @@ option,optgroup{background:var(--bg1)}
   transition:left .28s cubic-bezier(.4,0,.2,1);
   left:calc(100% - 23px);
   pointer-events:none;
+}
+/* Checked = mode jour */
+.theme-cb:checked ~ .tt-thumb{left:3px;background:#fff8e0}
+.theme-cb:checked ~ .tt-sun{opacity:1;color:#fff}
+.theme-cb:checked ~ .tt-moon{opacity:.4;color:rgba(255,255,255,0.7)}
+.theme-toggle:has(.theme-cb:checked){
+  background:#f5a300;
+  box-shadow:inset 0 1px 2px rgba(0,0,0,0.15);
 }
 
 /* ── LIGHT MODE ────────────────────────────────────────────────── */
@@ -1377,15 +1388,5 @@ option,optgroup{background:var(--bg1)}
   border-bottom:1px solid rgba(0,0,0,0.09);
   box-shadow:0 1px 0 rgba(0,0,0,0.04),0 4px 24px rgba(0,0,0,0.06);
 }
-[data-theme="light"] .theme-toggle{
-  background:#f5a300;
-  box-shadow:inset 0 1px 2px rgba(0,0,0,0.15);
-}
-[data-theme="light"] .tt-thumb{
-  left:3px;
-  background:#fff8e0;
-}
-[data-theme="light"] .tt-sun{opacity:1;color:#fff}
-[data-theme="light"] .tt-moon{opacity:.4;color:rgba(255,255,255,0.7)}
 [data-theme="light"] ::-webkit-scrollbar-thumb{background:rgba(0,0,0,0.14)}
 [data-theme="light"] ::-webkit-scrollbar-thumb:hover{background:rgba(0,0,0,0.24)}
