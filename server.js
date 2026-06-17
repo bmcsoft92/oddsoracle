@@ -805,6 +805,12 @@ function mapSportKeyToJournalCategory(key) {
   return key.split('_')[0];
 }
 
+// Détecte un verdict Gemini clairement négatif (pour filtrer l'auto-pick)
+const NEGATIVE_VERDICT_RE = /\b(éviter|eviter|risqu|risqué|déconseill|deconseill|contre-indiqu|incertain|pas recommandé|pas recommande|avoid|risky|unfavorable|pass)\b/i;
+function isVerdictNegative(verdict) {
+  return verdict ? NEGATIVE_VERDICT_RE.test(verdict) : false;
+}
+
 // -- AUTO-LOG QUOTIDIEN DES PICKS FORTE --
 // Recupere les opportunites du scanner (memes donnees que /api/pronos-du-jour),
 // dedupliquees par match, et logge automatiquement au Journal (mise fixe 100EUR)
@@ -831,7 +837,14 @@ async function autoLogFortePicks() {
     });
 
     const fortePicks = deduped.filter(function(o) {
-      return o.predLabel === 'FORTE' && !alreadyToday.has(o.matchId);
+      if (o.predLabel !== 'FORTE') return false;
+      if (alreadyToday.has(o.matchId)) return false;
+      // Score ajusté (edge + forme/H2H) : rejeter si nettement sous le seuil fiable
+      const score = o.adjustedScore != null ? o.adjustedScore : (o.predScore || 0);
+      if (score < PRONOS_MIN_RELIABLE_SCORE) return false;
+      // Verdict Gemini : si disponible et clairement négatif, passer ce pick
+      if (isVerdictNegative(o.verdict)) return false;
+      return true;
     });
     if (!fortePicks.length) return;
 
@@ -1864,8 +1877,11 @@ async function getScannerData() {
   // indisponible/non configure/en erreur, les picks restent simplement sans
   // verdict (le frontend masque la section correspondante).
   if (GEMINI_API_KEY) {
+    // Verdicts pour top 6 (h2h) + marches extra des top 2 — un seul appel groupé
+    const TOP_N_VERDICTS = 6;
+    const verdictTargets = opportunities.slice(0, TOP_N_VERDICTS);
     const verdictItems = [];
-    extraMarketTargets.forEach(function(opp) {
+    verdictTargets.forEach(function(opp) {
       verdictItems.push({ opp: opp, kind: 'h2h' });
       (opp.extraMarkets || []).forEach(function(em, idx) {
         verdictItems.push({ opp: opp, kind: 'extra', extraIdx: idx });
