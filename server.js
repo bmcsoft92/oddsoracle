@@ -489,7 +489,7 @@ const SPORTS_PRIORITY = new Set([
   'mma_mixed_martial_arts', 'americanfootball_nfl',
 ]);
 
-const BOOKMAKERS = ['betclic', 'unibet', 'pinnacle', 'winamax', 'bet365'];
+const BOOKMAKERS = ['betclic_fr', 'unibet_fr', 'pinnacle', 'winamax_fr', 'williamhill'];
 // ── Icône par groupe de sport ──────────────────────────────────────────────
 function mapGroupIcon(group) {
   const g = (group || '').toLowerCase();
