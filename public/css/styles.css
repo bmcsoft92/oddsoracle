@@ -1313,7 +1313,7 @@ option,optgroup{background:var(--bg1)}
   border-left:3px solid transparent;transition:background .15s;
 }
 .incident-item:hover{background:var(--glass-mid)}
-.inc-clock{font-size:.72rem;font-weight:700;color:var(--text2);min-widt
+.inc-clock{font-size:.72rem;font-weight:700;color:var(--text2);min-width:36px;text-align:right}
 /* ── THEME TOGGLE PILL ─────────────────────────────────────────── */
 .theme-toggle{
   position:relative;
