@@ -1,5 +1,5 @@
 /**
- * OddsOracle — Journal des Paris
+ * OddsOracle - Journal des Paris
  * Enregistrement, affichage, filtrage, statistiques
  */
 
@@ -104,9 +104,9 @@ const JournalModule = (() => {
             <td>${escHtml(bet.selection)}</td>
             <td class="mono">${parseFloat(bet.cote).toFixed(2)}</td>
             <td class="mono">${parseFloat(bet.stake).toFixed(0)} €</td>
-            <td class="mono ${bet.edge > 9 ? 'text-green' : bet.edge > 4 ? 'text-cyan' : 'text-muted'}">${bet.edge ? '+' + bet.edge + '%' : '—'}</td>
+            <td class="mono ${bet.edge > 9 ? 'text-green' : bet.edge > 4 ? 'text-cyan' : 'text-muted'}">${bet.edge ? '+' + bet.edge + '%' : '-'}</td>
             <td class="mono ${bet.result === 'win' ? 'pnl-positive' : bet.result === 'loss' ? 'pnl-negative' : 'pnl-pending'}">
-              ${bet.result === 'win' ? '+' : ''}${bet.result !== 'pending' ? pnl.toFixed(0) + ' €' : '—'}
+              ${bet.result === 'win' ? '+' : ''}${bet.result !== 'pending' ? pnl.toFixed(0) + ' €' : '-'}
             </td>
             <td><span class="result-badge result-${bet.result}">${resultLabel(bet.result)}</span></td>
             <td>

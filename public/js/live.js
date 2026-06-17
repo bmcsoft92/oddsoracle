@@ -190,11 +190,11 @@ const LiveModule = (() => {
     var showCls = function(cls) { document.querySelectorAll('.'+cls).forEach(function(e){ e.style.display=''; }); };
     var hideCls = function(cls) { document.querySelectorAll('.'+cls).forEach(function(e){ e.style.display='none'; }); };
 
-    // Surface — uniquement tennis
+    // Surface - uniquement tennis
     showCls('ctx-field-surface');
     if (!isTennis) hideCls('ctx-field-surface');
 
-    // Cycle féminin — uniquement WTA
+    // Cycle féminin - uniquement WTA
     showCls('ctx-field-cycle');
     if (!isWTA) hideCls('ctx-field-cycle');
 
@@ -504,7 +504,7 @@ const LiveModule = (() => {
 
 
   // ═══════════════════════════════════════════════════════════════════
-  // CONTEXT FACTORS — modificateurs pBase selon état joueur/match
+  // CONTEXT FACTORS - modificateurs pBase selon état joueur/match
   // ═══════════════════════════════════════════════════════════════════
   const MENTAL_FACTORS = {
     optimal:   0,
@@ -531,7 +531,7 @@ const LiveModule = (() => {
   };
   const ROUND_FACTORS = {
     early:    0,      // 1er/2e tour
-    quarter: +0.01,  // QF — pression symétrique
+    quarter: +0.01,  // QF - pression symétrique
     semi:    -0.02,  // demi: outsiders surprennent
     final:   -0.04,  // finale: pression maximale sur favori
   };
@@ -631,7 +631,7 @@ const LiveModule = (() => {
       const statusEl = document.getElementById('auto-detect-status');
 
       if (!data.found) {
-        if (statusEl) statusEl.textContent = '⊕ Scan #' + _autoCount + ' — match non trouvé en live ESPN';
+        if (statusEl) statusEl.textContent = '⊕ Scan #' + _autoCount + ' - match non trouvé en live ESPN';
         return;
       }
 
@@ -684,11 +684,11 @@ const LiveModule = (() => {
       if (newSignals) {
         calcAndShowAlert();
         if (statusEl) {
-          statusEl.innerHTML = '<span style="color:var(--green)">⚡ Signal détecté automatiquement — alerte recalculée</span>';
+          statusEl.innerHTML = '<span style="color:var(--green)">⚡ Signal détecté automatiquement - alerte recalculée</span>';
         }
       } else {
         if (statusEl) {
-          statusEl.textContent = '✓ Scan #' + _autoCount + ' — ' + (data.clock ? data.clock + "'" : 'live') + ' | Score ESPN: ' + data.score.home + '-' + data.score.away;
+          statusEl.textContent = '✓ Scan #' + _autoCount + ' - ' + (data.clock ? data.clock + "'" : 'live') + ' | Score ESPN: ' + data.score.home + '-' + data.score.away;
         }
       }
 
@@ -707,10 +707,10 @@ const LiveModule = (() => {
     if (!el) return;
     const sA = data.statsA || {}, sB = data.statsB || {};
     var parts = [];
-    if (sA.aces || sB.aces)           parts.push('Aces: ' + (sA.aces||'—') + ' / ' + (sB.aces||'—'));
-    if (sA.doubleFaults || sB.doubleFaults) parts.push('DFautes: ' + (sA.doubleFaults||'—') + ' / ' + (sB.doubleFaults||'—'));
-    if (sA.possession || sB.possession)   parts.push('Poss.: ' + (sA.possession||'—') + '% / ' + (sB.possession||'—') + '%');
-    if (sA.shots || sB.shots)         parts.push('Tirs: ' + (sA.shots||'—') + ' / ' + (sB.shots||'—'));
+    if (sA.aces || sB.aces)           parts.push('Aces: ' + (sA.aces||'-') + ' / ' + (sB.aces||'-'));
+    if (sA.doubleFaults || sB.doubleFaults) parts.push('DFautes: ' + (sA.doubleFaults||'-') + ' / ' + (sB.doubleFaults||'-'));
+    if (sA.possession || sB.possession)   parts.push('Poss.: ' + (sA.possession||'-') + '% / ' + (sB.possession||'-') + '%');
+    if (sA.shots || sB.shots)         parts.push('Tirs: ' + (sA.shots||'-') + ' / ' + (sB.shots||'-'));
     el.textContent = parts.join('  ·  ');
   }
 
@@ -722,7 +722,7 @@ const LiveModule = (() => {
     detectAndApplySignals();
     _autoTimer = setInterval(detectAndApplySignals, 30000);
     var statusEl = document.getElementById('auto-detect-status');
-    if (statusEl) statusEl.textContent = '⊕ Auto-détection ESPN activée — refresh 30s';
+    if (statusEl) statusEl.textContent = '⊕ Auto-détection ESPN activée - refresh 30s';
   }
 
   function stopAutoDetection() {
@@ -731,7 +731,7 @@ const LiveModule = (() => {
   }
 
   // ═══════════════════════════════════════════════════════════════════
-  // PLAYER FORM — chargement TheSportsDB
+  // PLAYER FORM - chargement TheSportsDB
   // ═══════════════════════════════════════════════════════════════════
   async function loadPlayerForm(name, side) {
     if (!name || name.length < 3) return;
@@ -759,7 +759,7 @@ const LiveModule = (() => {
       el.innerHTML =
         '<div class="player-ctx-name">' + d.name + (d.nationality ? ' <span class="player-ctx-nat">' + d.nationality + '</span>' : '') + '</div>'
         + '<div class="player-ctx-form-row">'
-        + '<span class="player-ctx-form-pct" style="color:' + formPctColor + '">' + (d.formPct !== null ? d.formPct + '%' : '—') + '</span>'
+        + '<span class="player-ctx-form-pct" style="color:' + formPctColor + '">' + (d.formPct !== null ? d.formPct + '%' : '-') + '</span>'
         + '<span class="player-ctx-badges">' + formBadges + '</span>'
         + streakStr
         + '</div>'

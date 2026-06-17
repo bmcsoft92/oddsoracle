@@ -1,6 +1,6 @@
 /* ================================================================
-   OddsOracle — Dark Premium v5.0
-   Style : Betclic / Stake — Glassmorphism + Neon Glow
+   OddsOracle - Dark Premium v5.0
+   Style : Betclic / Stake - Glassmorphism + Neon Glow
 ================================================================ */
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
 
@@ -616,12 +616,25 @@ option,optgroup{background:var(--bg1)}
 
 /* Verdict IA */
 .sc2-verdict{
-  display:flex;gap:.55rem;align-items:flex-start;padding:.6rem .9rem;
+  display:flex;flex-direction:column;gap:.35rem;padding:.6rem .9rem;
   border-bottom:1px solid var(--border0);
   background:rgba(155,114,255,0.04);
 }
+.sc2-verdict-head{display:flex;align-items:center;gap:.5rem}
 .sc2-verdict-icon{font-size:.88rem;line-height:1.4;flex-shrink:0}
 .sc2-verdict-text{font-size:.72rem;font-style:italic;color:var(--text1);line-height:1.45;margin:0}
+.sc2-verdict-conflict{
+  font-size:.62rem;font-weight:700;letter-spacing:.04em;
+  color:#ff4d6a;background:rgba(255,77,106,0.12);
+  border:1px solid rgba(255,77,106,0.3);border-radius:4px;
+  padding:.1rem .45rem;
+}
+.sc2-verdict-confirm{
+  font-size:.62rem;font-weight:700;letter-spacing:.04em;
+  color:var(--lime);background:var(--lime-d);
+  border:1px solid rgba(200,245,62,0.25);border-radius:4px;
+  padding:.1rem .45rem;
+}
 
 /* Footer */
 .sc2-footer{display:flex;align-items:center;justify-content:space-between;padding:.5rem .9rem}
@@ -1300,14 +1313,4 @@ option,optgroup{background:var(--bg1)}
   border-left:3px solid transparent;transition:background .15s;
 }
 .incident-item:hover{background:var(--glass-mid)}
-.inc-clock{font-size:.72rem;font-weight:700;color:var(--text2);min-width:36px;text-align:right}
-.inc-icon{font-size:1rem;min-width:22px;text-align:center}
-.inc-info{font-size:.78rem;color:var(--text1);flex:1}
-.inc-info strong{color:var(--text0)}
-.inc-goal{border-left-color:var(--lime)}
-.inc-yellow{border-left-color:var(--yellow)}
-.inc-red{border-left-color:var(--red)}
-.inc-sub{border-left-color:var(--blue)}
-.inc-event{border-left-color:rgba(107,114,128,0.5)}
-.inc-side-home .inc-info strong{color:#38bdf8}
-.inc-side-away .inc-info strong{color:#fb923c}
+.inc-clock{font-size:.72rem;font-weight:700;color:var(--text2);min-widt

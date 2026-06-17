@@ -1,5 +1,5 @@
 /**
- * OddsOracle — Models & Probability Engine
+ * OddsOracle - Models & Probability Engine
  * Calcul probabiliste pré-match et live
  */
 
@@ -145,7 +145,7 @@ const OddsModels = (() => {
   }
 
   /**
-   * MODÈLE LIVE — Recalcul après événement
+   * MODÈLE LIVE - Recalcul après événement
    * data: { pBase, setsA, setsB, gamesA, gamesB, setNum, minutesPlayed, tiebreaksPlayed, signals }
    */
   function liveRecalc(data) {

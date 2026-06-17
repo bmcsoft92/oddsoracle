@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>OddsOracle — Terminal Pro</title>
+  <title>OddsOracle - Terminal Pro</title>
   <link rel="stylesheet" href="css/styles.css" />
   <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 </head>
@@ -288,7 +288,7 @@
           <div class="form-group" style="flex:2">
             <label>Match</label>
             <select id="live-match-select" class="form-control">
-              <option value="">— Actualiser pour charger les matchs —</option>
+              <option value="">- Actualiser pour charger les matchs -</option>
             </select>
           </div>
           <div>
@@ -598,7 +598,7 @@
           <div class="card-header"><h2>🔴 Score Live</h2></div>
           <div class="live-match-header" id="live-match-header">
             <div class="live-player" id="live-pA-name">Équipe A</div>
-            <div class="live-score" id="live-score-display">— — —</div>
+            <div class="live-score" id="live-score-display">- - -</div>
             <div class="live-player" id="live-pB-name">Équipe B</div>
           </div>
           <div class="live-score-input">
@@ -731,7 +731,7 @@
   <!-- ========== À VENIR (PREMATCH FEED) ========== -->
   <section class="tab-content" id="tab-prematch">
     <div class="page-header">
-      <h1>◆ Matchs à venir <span class="header-meta">— 24h · Auto</span></h1>
+      <h1>◆ Matchs à venir <span class="header-meta">- 24h · Auto</span></h1>
       <div style="display:flex;gap:.5rem">
         <button class="btn btn-sm btn-secondary" onclick="PrematchFeedModule.load()">↺ Actualiser</button>
         <button class="btn btn-sm btn-secondary" id="btn-new-analysis">↺ Reset analyse</button>
@@ -956,7 +956,7 @@
               <div class="form-group" style="flex:2">
                 <label>Match</label>
                 <select id="pm-api-match" class="form-control">
-                  <option value="">— Actualiser pour charger —</option>
+                  <option value="">- Actualiser pour charger -</option>
                 </select>
               </div>
               <div style="display:flex;gap:.35rem;align-items:flex-end">
@@ -1132,7 +1132,7 @@
   <!-- ========== SCANNER IA ========== -->
   <section class="tab-content" id="tab-scanner">
     <div class="page-header">
-      <h1>⚡ Scanner IA <span class="header-meta">— Valeur positive · Kelly auto</span></h1>
+      <h1>⚡ Scanner IA <span class="header-meta">- Valeur positive · Kelly auto</span></h1>
       <div style="display:flex;gap:.5rem;align-items:center;flex-wrap:wrap">
         <select id="scan-filter-sport" class="form-control" style="width:auto">
           <option value="all">Tous les sports</option>
@@ -1165,7 +1165,7 @@
     </div>
 
     <div class="card">
-      <div id="scanner-status">Prêt — Cliquez sur Scanner pour analyser tous les marchés</div>
+      <div id="scanner-status">Prêt - Cliquez sur Scanner pour analyser tous les marchés</div>
       <div id="scanner-meta" style="font-size:.75rem;color:var(--text-muted);margin-top:.25rem"></div>
       <div id="scanner-results" style="margin-top:1rem">
         <div class="feed-empty">Lancez un scan pour voir les opportunités</div>
@@ -1187,7 +1187,7 @@
         <span class="stat-icon">💎</span>
         <div class="stat-label">Bankroll</div>
         <div class="stat-value" id="dash-bankroll">0 €</div>
-        <div class="stat-sub" id="dash-bankroll-sub">—</div>
+        <div class="stat-sub" id="dash-bankroll-sub">-</div>
       </div>
       <div class="stat-card stat-card-green">
         <span class="stat-icon">📈</span>
@@ -1204,8 +1204,8 @@
       <div class="stat-card stat-card-cyan">
         <span class="stat-icon">🔥</span>
         <div class="stat-label">Séquence</div>
-        <div class="stat-value" id="dash-streak">—</div>
-        <div class="stat-sub" id="dash-streak-sub">—</div>
+        <div class="stat-value" id="dash-streak">-</div>
+        <div class="stat-sub" id="dash-streak-sub">-</div>
       </div>
     </div>
 
@@ -1306,11 +1306,11 @@
           <div class="form-group"><label>Bankroll actuelle (€)</label><input type="number" id="br-current" class="form-control" placeholder="1000" /></div>
           <button class="btn btn-primary btn-full mt-8" id="btn-br-save">Enregistrer</button>
           <div class="br-breakdown" id="br-breakdown">
-            <div class="breakdown-item"><span>Budget Pré-match (70%)</span><strong id="br-prematch-budget">—</strong></div>
-            <div class="breakdown-item"><span>Budget Live (30%)</span><strong id="br-live-budget">—</strong></div>
-            <div class="breakdown-item warning"><span>Stop-loss journalier (-15%)</span><strong id="br-stoploss">—</strong></div>
-            <div class="breakdown-item danger"><span>Stop-loss hebdo (-25%)</span><strong id="br-stoploss-week">—</strong></div>
-            <div class="breakdown-item success"><span>Protection gains (+20%)</span><strong id="br-protect-gains">—</strong></div>
+            <div class="breakdown-item"><span>Budget Pré-match (70%)</span><strong id="br-prematch-budget">-</strong></div>
+            <div class="breakdown-item"><span>Budget Live (30%)</span><strong id="br-live-budget">-</strong></div>
+            <div class="breakdown-item warning"><span>Stop-loss journalier (-15%)</span><strong id="br-stoploss">-</strong></div>
+            <div class="breakdown-item danger"><span>Stop-loss hebdo (-25%)</span><strong id="br-stoploss-week">-</strong></div>
+            <div class="breakdown-item success"><span>Protection gains (+20%)</span><strong id="br-protect-gains">-</strong></div>
           </div>
         </div>
       </div>
@@ -1497,7 +1497,7 @@
         <div class="card-header"><h2>ℹ️ À propos</h2></div>
         <div class="about-content">
           <div class="about-logo">⬡ OddsOracle</div>
-          <div class="about-version">Version 4.0 — Terminal Pro</div>
+          <div class="about-version">Version 4.0 - Terminal Pro</div>
           <div class="about-desc">Système expert de prédiction sportive : analyse quantitative, veille marché automatique et gestion bankroll rigoureuse.</div>
           <div class="about-stat">Auto-alimenté · The Odds API · Kelly Criterion</div>
           <div class="divider"></div>

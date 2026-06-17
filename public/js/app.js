@@ -985,9 +985,9 @@ function renderMatchCard(match, isLive) {
     var sc = match.liveScore;
     var prog = sc.progress ? '<span class="mc-score-prog">'+sc.progress+'</span>' : '';
     scoreHtml = '<div class="mc-score">'
-      +'<span class="mc-score-h">'+(sc.homeScore != null ? sc.homeScore : '—')+'</span>'
+      +'<span class="mc-score-h">'+(sc.homeScore != null ? sc.homeScore : '-')+'</span>'
       +'<span class="mc-score-sep">:</span>'
-      +'<span class="mc-score-a">'+(sc.awayScore != null ? sc.awayScore : '—')+'</span>'
+      +'<span class="mc-score-a">'+(sc.awayScore != null ? sc.awayScore : '-')+'</span>'
       +prog+'</div>';
   }
 
@@ -1022,7 +1022,7 @@ function renderMatchCard(match, isLive) {
     var pw   = Math.min(100,Math.max(0,s.trueProb||0));
     return '<div class="mc-odd'+(best?' mc-best':'')+'">'
       +'<div class="mc-ol">'+lbl+'</div>'
-      +'<div class="mc-op">'+(s.bestPrice?s.bestPrice.toFixed(2):'—')+'</div>'
+      +'<div class="mc-op">'+(s.bestPrice?s.bestPrice.toFixed(2):'-')+'</div>'
       +'<div class="mc-ob">'+(s.bestBook||'')+'</div>'
       +'<div class="mc-bar-wrap"><div class="mc-bar" style="width:'+pw+'%"></div></div>'
       +'<div class="mc-oe '+ec+'">'+et+'</div>'
@@ -1166,12 +1166,12 @@ const LiveFeedModule = (() => {
     }
     if (upcoming.length) {
       html += '<div class="feed-section-header feed-section-upcoming">'
-            + '&#9201; &Agrave; VENIR — prochaines heures (' + upcoming.length + ')'
+            + '&#9201; &Agrave; VENIR - prochaines heures (' + upcoming.length + ')'
             + '</div>'
             + '<div class="match-list">' + upcoming.map(function(m){ return renderMatchCard(m, false); }).join('') + '</div>';
     }
     if (!liveOnly.length && upcoming.length) {
-      html = '<div class="feed-no-live">&#9679; Aucun match en direct — ' + upcoming.length + ' match' + (upcoming.length>1?'s':'') + ' &agrave; venir</div>' + html;
+      html = '<div class="feed-no-live">&#9679; Aucun match en direct - ' + upcoming.length + ' match' + (upcoming.length>1?'s':'') + ' &agrave; venir</div>' + html;
     }
     el.innerHTML = html;
     attachCardClicks(el);
@@ -1191,7 +1191,7 @@ const LiveFeedModule = (() => {
       render(json.data);
     } catch(e) {
       if (el) {
-        const msg = e.name === 'AbortError' ? 'Délai dépassé — cliquez Actualiser' : e.message;
+        const msg = e.name === 'AbortError' ? 'Délai dépassé - cliquez Actualiser' : e.message;
         el.innerHTML = '<div class="feed-empty">'
           + '<div>⚠ ' + msg + '</div>'
           + '<button onclick="LiveFeedModule.load()" class="btn btn-sm btn-secondary" style="margin-top:.75rem">&#8635; Actualiser</button>'
@@ -1202,7 +1202,7 @@ const LiveFeedModule = (() => {
 
   function startAutoRefresh() {
     stopAutoRefresh();
-    _refreshTimer = setInterval(load, 180000); // 3 min — economise le quota Odds API
+    _refreshTimer = setInterval(load, 180000); // 3 min - economise le quota Odds API
   }
 
   function stopAutoRefresh() {
@@ -1236,7 +1236,7 @@ const PrematchFeedModule = (() => {
       el.innerHTML = '<div class="feed-empty">'
         + '<div style="font-size:1.8rem;margin-bottom:.5rem">&#9671;</div>'
         + '<div>Aucun match programm&eacute; dans les 24 prochaines heures.</div>'
-        + '<div style="font-size:.72rem;margin-top:.4rem;color:var(--text2)">Essayez d&#39;actualiser — les cotes apparaissent quand les bookmakers les proposent.</div>'
+        + '<div style="font-size:.72rem;margin-top:.4rem;color:var(--text2)">Essayez d&#39;actualiser - les cotes apparaissent quand les bookmakers les proposent.</div>'
         + '<button onclick="PrematchFeedModule.load()" class="btn btn-sm btn-secondary" style="margin-top:.75rem">&#8635; Rafra&icirc;chir</button>'
         + '</div>';
       return;
@@ -1268,7 +1268,7 @@ const PrematchFeedModule = (() => {
 
   function startAutoRefresh() {
     stopAutoRefresh();
-    _refreshTimer = setInterval(load, 1800000); // 30 min — aligne sur le cache serveur upcoming_all
+    _refreshTimer = setInterval(load, 1800000); // 30 min - aligne sur le cache serveur upcoming_all
   }
 
   function stopAutoRefresh() {
@@ -1353,7 +1353,7 @@ const PronosDuJourModule = (() => {
       + '<span class="mc-team">'+safeA+'</span>'
       + '</div>'
       + '<div class="prono-pick">Pari conseill&eacute; : <strong>'+safeSel+'</strong>'
-      + ' @ '+(p.bestPrice ? p.bestPrice.toFixed(2) : '—')
+      + ' @ '+(p.bestPrice ? p.bestPrice.toFixed(2) : '-')
       + (p.bestBook ? ' ('+p.bestBook+')' : '')
       + pickMetaHtml
       + '</div>'
@@ -1441,7 +1441,7 @@ function openMatchStats(btnOrCard) {
   if (!modal || !overlay) return;
 
   var titleEl = document.getElementById('stats-modal-title');
-  if (titleEl) titleEl.textContent = home + ' — ' + away;
+  if (titleEl) titleEl.textContent = home + ' - ' + away;
 
   overlay.style.display = 'flex';
 
@@ -1460,7 +1460,7 @@ function openMatchStats(btnOrCard) {
 
   fetch(url)
     .then(function(r){
-      if (!r.ok) throw new Error('Serveur: ' + r.status + ' — Endpoint non disponible (déploiement en attente ?)');
+      if (!r.ok) throw new Error('Serveur: ' + r.status + ' - Endpoint non disponible (déploiement en attente ?)');
       return r.json();
     })
     .then(function(data){
@@ -1472,7 +1472,7 @@ function openMatchStats(btnOrCard) {
     .catch(function(err){
       var msg = err.message || 'Erreur inconnue';
       if (msg.indexOf('<!DOCTYPE') >= 0 || msg.indexOf('JSON') >= 0) {
-        msg = 'Endpoint non disponible — redéployez le serveur';
+        msg = 'Endpoint non disponible - redéployez le serveur';
       }
       if (body) body.innerHTML = '<div class="stats-error">&#x26A0; ' + escHtml(msg) + '<br><small style="opacity:.6">Vérifiez que le serveur Render est à jour</small></div>';
     });
@@ -1584,7 +1584,7 @@ function renderTabIA(data, home, away, edge, prob) {
 
   var html = '<div class="ia-panel">';
 
-  // Analyse IA (Claude / OddsOracle) — chargée de façon asynchrone
+  // Analyse IA (Claude / OddsOracle) - chargée de façon asynchrone
   html += '<div class="ia-llm-box" id="ia-llm-result">'
         + '<div class="ia-llm-loading"><span class="stats-spinner ia-llm-spinner"></span>Analyse IA en cours…</div>'
         + '</div>';
@@ -1602,12 +1602,12 @@ function renderTabIA(data, home, away, edge, prob) {
 
   // Quick stats row
   html += '<div class="ia-quick-grid">';
-  html += iaQuickCard('Prob. Victoire', prob > 0 ? Math.round(prob) + '%' : '—', 'via The Odds API');
+  html += iaQuickCard('Prob. Victoire', prob > 0 ? Math.round(prob) + '%' : '-', 'via The Odds API');
   html += iaQuickCard('Edge bookmakers', edgeSign + edge.toFixed(1) + '%', edge >= 1 ? 'Valeur positive' : 'Pas de value');
-  html += iaQuickCard('H2H', h2h.total > 0 ? h2h.homeWins + 'V / ' + h2h.draws + 'N / ' + h2h.awayWins + 'D' : '—', home + ' vs ' + away);
-  html += iaQuickCard('Forme ' + escHtml(home.split(' ')[0]), fh.formPct != null ? fh.formPct + '%' : '—', fh.streak ? (fh.streak>0?'🔥':'❄️') + ' Série ' + fh.streak : 'N/A');
-  html += iaQuickCard('Forme ' + escHtml(away.split(' ')[0]), fa.formPct != null ? fa.formPct + '%' : '—', fa.streak ? (fa.streak>0?'🔥':'❄️') + ' Série ' + fa.streak : 'N/A');
-  if (mvH.current) html += iaQuickCard('Mouv. cote ' + escHtml(home.split(' ')[0]), (mvH.pctChange!=null?(mvH.pctChange>0?'+':'')+mvH.pctChange.toFixed(1)+'%':'—'), mvH.steam?'🚨 Steam':'');
+  html += iaQuickCard('H2H', h2h.total > 0 ? h2h.homeWins + 'V / ' + h2h.draws + 'N / ' + h2h.awayWins + 'D' : '-', home + ' vs ' + away);
+  html += iaQuickCard('Forme ' + escHtml(home.split(' ')[0]), fh.formPct != null ? fh.formPct + '%' : '-', fh.streak ? (fh.streak>0?'🔥':'❄️') + ' Série ' + fh.streak : 'N/A');
+  html += iaQuickCard('Forme ' + escHtml(away.split(' ')[0]), fa.formPct != null ? fa.formPct + '%' : '-', fa.streak ? (fa.streak>0?'🔥':'❄️') + ' Série ' + fa.streak : 'N/A');
+  if (mvH.current) html += iaQuickCard('Mouv. cote ' + escHtml(home.split(' ')[0]), (mvH.pctChange!=null?(mvH.pctChange>0?'+':'')+mvH.pctChange.toFixed(1)+'%':'-'), mvH.steam?'🚨 Steam':'');
   html += '</div>';
 
   html += '</div>';
@@ -1817,8 +1817,8 @@ function renderTabApercu(data, home, away) {
 
   html += '<div class="stats-quick-row">';
   html += makeQuickStat('Forme (5M)', renderFormBadgesArr(fh.form, 5), renderFormBadgesArr(fa.form, 5));
-  html += makeQuickStat('% Victoires', fh.formPct != null ? fh.formPct + '%' : '—', fa.formPct != null ? fa.formPct + '%' : '—');
-  html += makeQuickStat('H2H Vict.', h2h.homeWins != null ? String(h2h.homeWins) : '—', h2h.awayWins != null ? String(h2h.awayWins) : '—');
+  html += makeQuickStat('% Victoires', fh.formPct != null ? fh.formPct + '%' : '-', fa.formPct != null ? fa.formPct + '%' : '-');
+  html += makeQuickStat('H2H Vict.', h2h.homeWins != null ? String(h2h.homeWins) : '-', h2h.awayWins != null ? String(h2h.awayWins) : '-');
   if (fh.goalsScored != null) html += makeQuickStat('Buts marqués', String(fh.goalsScored||0), String(fa.goalsScored||0));
   if (fh.goalsConceded != null) html += makeQuickStat('Buts encaissés', String(fh.goalsConceded||0), String(fa.goalsConceded||0));
   html += '</div>';
@@ -1960,7 +1960,7 @@ function renderTabCotes(data, home, away) {
   html += '<div class="stats-section-title">📊 Variation des cotes <span class="cotes-live-badge">🔄 live</span></div>';
 
   if (!om.homeTeam && !om.awayTeam) {
-    html += '<div class="stats-empty">Historique des cotes non disponible — les variations s\'enregistrent au fil des scans</div>';
+    html += '<div class="stats-empty">Historique des cotes non disponible - les variations s\'enregistrent au fil des scans</div>';
     return html + '</div>';
   }
 
@@ -1974,10 +1974,10 @@ function renderTabCotes(data, home, away) {
     return '<div class="odds-block">'
          + '<div class="odds-block-label">' + escHtml(label) + '</div>'
          + '<div class="odds-vals-row">'
-         + '<div class="odds-val-item"><div class="ovl">Ouverture</div><div class="ovv">' + (mov.opening?mov.opening.toFixed(2):'—') + '</div></div>'
+         + '<div class="odds-val-item"><div class="ovl">Ouverture</div><div class="ovv">' + (mov.opening?mov.opening.toFixed(2):'-') + '</div></div>'
          + '<div class="odds-arrow-big ' + cls + '">' + arrow + '</div>'
-         + '<div class="odds-val-item"><div class="ovl">Actuel</div><div class="ovv">' + (mov.current?mov.current.toFixed(2):'—') + '</div></div>'
-         + '<div class="odds-val-item"><div class="ovl">Variation</div><div class="ovv ' + cls + '">' + (mov.pctChange!=null?(mov.pctChange>0?'+':'')+mov.pctChange.toFixed(1)+'%':'—') + '</div></div>'
+         + '<div class="odds-val-item"><div class="ovl">Actuel</div><div class="ovv">' + (mov.current?mov.current.toFixed(2):'-') + '</div></div>'
+         + '<div class="odds-val-item"><div class="ovl">Variation</div><div class="ovv ' + cls + '">' + (mov.pctChange!=null?(mov.pctChange>0?'+':'')+mov.pctChange.toFixed(1)+'%':'-') + '</div></div>'
          + steamBadge
          + '</div>'
          + sparkHtml
@@ -1997,11 +1997,11 @@ function renderTabLive(data, home, away) {
 
   var html = '<div class="stats-live">';
   html += esp.completed
-    ? '<div class="stats-section-title">📊 Stats ESPN — Match terminé (score final)</div>'
+    ? '<div class="stats-section-title">📊 Stats ESPN - Match terminé (score final)</div>'
     : '<div class="stats-section-title">⚡ Stats ESPN en direct</div>';
 
   if (!esp || !esp.found) {
-    html += '<div class="stats-empty">Pas de stats ESPN disponibles — match non démarré ou hors couverture ESPN</div>';
+    html += '<div class="stats-empty">Pas de stats ESPN disponibles - match non démarré ou hors couverture ESPN</div>';
     return html + '</div>';
   }
 
@@ -2033,7 +2033,7 @@ function renderTabLive(data, home, away) {
   var hStats = esp.statsA || {};
   var aStats = esp.statsB || {};
 
-  // Build stat rows — football + tennis complets
+  // Build stat rows - football + tennis complets
   var statDefs = [
     { key: 'possession', label: 'Possession (%)' },
     { key: 'shots', label: 'Tirs' },
@@ -2075,7 +2075,7 @@ function renderTabLive(data, home, away) {
     html += '<div class="stats-empty">Statistiques pas encore disponibles pour ce match</div>';
   }
 
-  // Timeline incidents (style Flashscore) — buts, cartons, remplacement
+  // Timeline incidents (style Flashscore) - buts, cartons, remplacement
   var incidents = esp.incidents || [];
   if (incidents.length) {
     html += '<div class="stats-section-title" style="margin-top:18px">📋 Chronologie du match</div>';
@@ -2100,7 +2100,7 @@ function renderTabLive(data, home, away) {
             + '<span class="inc-clock">' + escHtml(inc.clock) + '</span>'
             + '<span class="inc-icon">' + icon + '</span>'
             + '<span class="inc-info"><strong>' + (inc.side === 'home' ? escHtml(home) : escHtml(away)) + '</strong>'
-            + (athlete ? ' — ' + athlete : '')
+            + (athlete ? ' - ' + athlete : '')
             + '</span>'
             + '</div>';
     });
@@ -2130,7 +2130,7 @@ function renderOddsMini(label, mov) {
   var cls = dir==='down'?'odds-down':dir==='up'?'odds-up':'odds-stable';
   return '<div class="odds-mini">'
        + '<div class="odds-mini-label">' + escHtml(label) + '</div>'
-       + '<div class="odds-mini-val ' + cls + '">' + arrow + ' ' + (mov.current?mov.current.toFixed(2):'—') + '</div>'
+       + '<div class="odds-mini-val ' + cls + '">' + arrow + ' ' + (mov.current?mov.current.toFixed(2):'-') + '</div>'
        + (mov.pctChange!=null ? '<div class="odds-mini-pct ' + cls + '">' + (mov.pctChange>0?'+':'') + mov.pctChange.toFixed(1) + '%</div>' : '')
        + '</div>';
 }

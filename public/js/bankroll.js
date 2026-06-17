@@ -1,5 +1,5 @@
 /**
- * OddsOracle — Bankroll Manager
+ * OddsOracle - Bankroll Manager
  * Gestion bankroll, stop-loss, Kelly, allocation 70/30
  */
 
@@ -113,13 +113,13 @@ const BankrollManager = (() => {
       warnings.push({ type: 'STOP_LOSS_DAILY', msg: `Stop-loss journalier atteint (${state.todayLosses.toFixed(0)}€ / ${alloc.stopLossDaily.toFixed(0)}€)` });
     }
     if (state.weekLosses >= alloc.stopLossWeekly) {
-      warnings.push({ type: 'STOP_LOSS_WEEKLY', msg: `Stop-loss hebdomadaire atteint — pause 48h obligatoire` });
+      warnings.push({ type: 'STOP_LOSS_WEEKLY', msg: `Stop-loss hebdomadaire atteint - pause 48h obligatoire` });
     }
     if (state.liveStreakLosses >= 3) {
-      warnings.push({ type: 'LIVE_STREAK', msg: `3 pertes live consécutives — arrêt du live pour aujourd'hui` });
+      warnings.push({ type: 'LIVE_STREAK', msg: `3 pertes live consécutives - arrêt du live pour aujourd'hui` });
     }
     if (state.current >= alloc.protectGains) {
-      warnings.push({ type: 'PROTECT_GAINS', msg: `Objectif +${config.protectGainsPct}% atteint — protéger 50% des gains` });
+      warnings.push({ type: 'PROTECT_GAINS', msg: `Objectif +${config.protectGainsPct}% atteint - protéger 50% des gains` });
     }
 
     return warnings;

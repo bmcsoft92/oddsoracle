@@ -21,10 +21,10 @@ const GEMINI_API_KEY      = process.env.GEMINI_API_KEY || '';
 const GEMINI_MODEL        = process.env.GEMINI_MODEL          || 'gemini-2.5-flash';
 const GEMINI_MODEL_FALLBACK = process.env.GEMINI_MODEL_FALLBACK || 'gemini-2.5-flash-lite';
 const GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/';
-const GEMINI_RETRYABLE_STATUSES = [429, 503]; // surcharge / quota — on retente puis on bascule de modèle
+const GEMINI_RETRYABLE_STATUSES = [429, 503]; // surcharge / quota - on retente puis on bascule de modèle
 
 // ═══════════════════════════════════════════════════════════════════════
-// PROMPT SYSTÈME — ANALYSE IA ODDSORACLE
+// PROMPT SYSTÈME - ANALYSE IA ODDSORACLE
 // ═══════════════════════════════════════════════════════════════════════
 const ODDSORACLE_SYSTEM_PROMPT = `Tu es OddsOracle, un système expert en prédiction sportive quantitative.
 Pour chaque match analysé, tu dois exploiter TOUTES les statistiques disponibles
@@ -32,11 +32,11 @@ ci-dessous selon le sport concerné, pondérer chaque signal, et produire des
 pronos fiables avec niveau de confiance et valeur attendue (edge).
 
 ══════════════════════════════════════════════
-⚽ FOOTBALL — STATISTIQUES À ANALYSER
+⚽ FOOTBALL - STATISTIQUES À ANALYSER
 ══════════════════════════════════════════════
 ATTAQUE / DÉFENSE :
 - Buts marqués/encaissés par match (domicile / extérieur séparément)
-- xG (expected goals) pour et contre — moyenne sur 5/10 derniers matchs
+- xG (expected goals) pour et contre - moyenne sur 5/10 derniers matchs
 - Tirs cadrés, tirs totaux, ratio tirs cadrés/total
 - Touches dans la surface adverse (indicateur pression offensive)
 - Big chances créées / gâchées
@@ -52,7 +52,7 @@ DISCIPLINE / DUELS :
 - Tacles réussis, interceptions
 - Duels aériens gagnés (%)
 TRANSITIONS / PRESSING :
-- PPDA (passes autorisées par action défensive) — intensité du pressing
+- PPDA (passes autorisées par action défensive) - intensité du pressing
 - Contre-attaques créées / subies
 - Récupérations hautes (pressing offensif)
 TOUCHES / JEUX DE TRANSITIONS :
@@ -79,7 +79,7 @@ CONTEXTE ÉQUIPE :
 - Motivation : maintien / titre / coupe / derby / match sans enjeu
 
 ══════════════════════════════════════════════
-🎾 TENNIS — STATISTIQUES À ANALYSER
+🎾 TENNIS - STATISTIQUES À ANALYSER
 ══════════════════════════════════════════════
 SURFACE (CRUCIAL) :
 - Win rate sur terre battue / dur / gazon / indoor (toute carrière + 12 derniers mois)
@@ -128,7 +128,7 @@ CONTEXTE :
 - Historique H2H (global + surface + format)
 
 ══════════════════════════════════════════════
-🏀 BASKETBALL — STATISTIQUES À ANALYSER
+🏀 BASKETBALL - STATISTIQUES À ANALYSER
 ══════════════════════════════════════════════
 SCORING / EFFICACITÉ :
 - Points par match (équipe + par joueur clé)
@@ -145,7 +145,7 @@ RYTHME / POSSESSIONS :
 - Second chance points par match
 - Fast break points par match
 MARCHÉS SPÉCIFIQUES :
-- Total points : Over/Under — fiabilité selon pace de l'équipe
+- Total points : Over/Under - fiabilité selon pace de l'équipe
 - 1er quart-temps : scoring moyen Q1 pour/contre
 - Mi-temps : scoring moyen 1ère MT pour/contre
 - Spread : couverture du handicap (%) domicile/extérieur
@@ -155,13 +155,13 @@ DÉFENSE / PRESSION :
 - % matchs défensivement sous/au-dessus de leur moyenne
 - Steals / Blocks par match
 FATIGUE (CRUCIAL EN NBA) :
-- Back-to-back (2ème match en 2 jours) — impact ~4 pts
+- Back-to-back (2ème match en 2 jours) - impact ~4 pts
 - 3ème match en 4 jours
 - Rotation effectuée (minutes stars réduites ?)
 - Blessure star : impact scoring attendu
 
 ══════════════════════════════════════════════
-🏒 HOCKEY SUR GLACE — STATISTIQUES À ANALYSER
+🏒 HOCKEY SUR GLACE - STATISTIQUES À ANALYSER
 ══════════════════════════════════════════════
 - Buts pour/contre par match
 - xG pour/contre (attendu)
@@ -176,21 +176,21 @@ FATIGUE (CRUCIAL EN NBA) :
 - % matchs Over 5.5 / 6.5 buts
 
 ══════════════════════════════════════════════
-⚾ BASEBALL — STATISTIQUES À ANALYSER
+⚾ BASEBALL - STATISTIQUES À ANALYSER
 ══════════════════════════════════════════════
 - ERA du lanceur partant (earned run average)
 - WHIP (walks + hits per inning)
 - Strikeouts / 9 innings
 - Batting average / OBP / SLG / OPS de l'équipe adverse vs lanceur droitier/gaucher
 - Runs par match (pour/contre)
-- Over/Under total runs — % de couverture sur 10 derniers matchs
+- Over/Under total runs - % de couverture sur 10 derniers matchs
 - Run line (handicap -1.5) couverture %
 - Bullpen ERA (importance en fin de match)
 - Park factor (certains stades favorisent plus de runs)
-- Vent (direction + vitesse) — impact home runs
+- Vent (direction + vitesse) - impact home runs
 
 ══════════════════════════════════════════════
-🥊 MMA / UFC — STATISTIQUES À ANALYSER
+🥊 MMA / UFC - STATISTIQUES À ANALYSER
 ══════════════════════════════════════════════
 - Win rate par méthode (KO/TKO, soumission, décision)
 - Frappes significatives atterries / tentées par minute
@@ -204,7 +204,7 @@ FATIGUE (CRUCIAL EN NBA) :
 - Style matchup : striker vs grappler, wrestler vs boxer
 
 ══════════════════════════════════════════════
-🏈 NFL — STATISTIQUES À ANALYSER
+🏈 NFL - STATISTIQUES À ANALYSER
 ══════════════════════════════════════════════
 - Points pour/contre par match
 - Yards totaux offensifs / défensifs
@@ -271,14 +271,14 @@ SIGNAUX D'ALERTE (réduire confiance) :
 ══════════════════════════════════════════════
 Si les données fournies indiquent "MATCH EN COURS" (score actuel, période/manche/
 temps de jeu), le match a déjà commencé : tu DOIS quand même produire une analyse
-et des pronos adaptés au LIVE BETTING — ne refuse JAMAIS d'analyser au seul motif
+et des pronos adaptés au LIVE BETTING - ne refuse JAMAIS d'analyser au seul motif
 que le match est en cours.
 - Base ton analyse sur l'état ACTUEL du match : score, période/manche/set, temps
   écoulé/restant, dynamique récente (qui domine depuis le coup d'envoi), et les
   stats live fournies (tirs, possession, incidents, etc. si disponibles).
 - Les pronos doivent porter sur LA SUITE du match à partir de maintenant :
   vainqueur final, total buts/points/jeux restants, prochain but/point/score,
-  handicap ou over/under live, etc. — pas sur l'issue "pré-match".
+  handicap ou over/under live, etc. - pas sur l'issue "pré-match".
 - "PROBABILITÉ RÉELLE ESTIMÉE", "COTE MINIMUM POUR VALEUR" et "EDGE ESTIMÉ"
   doivent refléter la situation ACTUELLE (compte tenu du score et du temps
   restant), pas la probabilité pré-match. Si tu ne disposes pas de la cote live
@@ -286,7 +286,7 @@ que le match est en cours.
   indique-le clairement.
 - Si les statistiques détaillées habituelles (xG, ERA, bullpen, etc.) manquent
   pour ce match, base-toi sur le score actuel, le rythme du match et ta
-  connaissance générale des équipes/joueurs pour une estimation qualitative —
+  connaissance générale des équipes/joueurs pour une estimation qualitative -
   précise alors que l'estimation est qualitative plutôt que statistique.
 - Le bloc "(pré-match)" sur la cote/probabilité/edge du modèle local (s'il est
   fourni) est calculé avant ou au début du match et peut être obsolète une fois
@@ -299,7 +299,7 @@ que le match est en cours.
 Tu reçois ci-dessous UNIQUEMENT les statistiques réellement disponibles via les
 sources connectées (The Odds API, ESPN, TheSportsDB). Beaucoup de stats avancées
 listées ci-dessus (xG détaillé, PPDA, corners par tranche, Elo, PDO, DVOA...) ne
-sont PAS fournies — base ton analyse sur les données réelles transmises, et pour
+sont PAS fournies - base ton analyse sur les données réelles transmises, et pour
 le reste utilise ton expertise générale du sport et des équipes/joueurs cités
 pour estimer qualitativement les facteurs manquants. Indique clairement quand une
 estimation repose sur ta connaissance générale plutôt que sur une donnée fournie.
@@ -633,7 +633,7 @@ const UNKNOWN_QUOTA_LIMIT = 15; // max appels sans connaître le solde
 
 function quotaOk() {
   if (apiUsage.requestsRemaining === null) {
-    // Pas encore de header reçu — limiter le nombre d'appels "à l'aveugle"
+    // Pas encore de header reçu - limiter le nombre d'appels "à l'aveugle"
     if (_apiCallsMadeUnknown >= UNKNOWN_QUOTA_LIMIT) return false;
     _apiCallsMadeUnknown++;
     return true;
@@ -649,8 +649,8 @@ function quotaOk() {
 // tournants, pour étaler la consommation de quota dans le temps.
 let _scanRotationIndex = 0;
 const SCAN_ROTATION_BATCH      = 5;    // nb de sports secondaires scannés par cycle
-const SCAN_ODDS_TTL_PRIORITY   = 14400; // 4h — sports prioritaires (economie quota)
-const SCAN_ODDS_TTL_SECONDARY  = 21600; // 6h — sports secondaires (rotation)
+const SCAN_ODDS_TTL_PRIORITY   = 14400; // 4h - sports prioritaires (economie quota)
+const SCAN_ODDS_TTL_SECONDARY  = 21600; // 6h - sports secondaires (rotation)
 
 // -- CHARGEMENT SÉRIALISÉ avec vérification quota entre chaque sport --
 // Remplace Promise.allSettled pour éviter 36 appels simultanés au démarrage
@@ -658,7 +658,7 @@ async function loadSportsSafely(sports) {
   const results = [];
   for (const sport of sports) {
     if (!quotaOk()) {
-      console.warn('[quota] Arrêt chargement sports — quota faible');
+      console.warn('[quota] Arrêt chargement sports - quota faible');
       break;
     }
     try {
@@ -1096,7 +1096,7 @@ async function loadOddsForSport(sport) {
   // 1. Cache mémoire (priorité)
   let data = cache.get(cacheKey);
   if (data) return data;
-  // 2. Cache disque (survit aux redémarrages — TTL 12h)
+  // 2. Cache disque (survit aux redémarrages - TTL 12h)
   const disk = diskCacheLoad('odds_' + sport.key, 12 * 3600 * 1000);
   if (disk) {
     cache.set(cacheKey, disk, 43200);
@@ -1106,7 +1106,7 @@ async function loadOddsForSport(sport) {
   // 3. Guard quota : servir le stale si quota bas
   if (!quotaOk()) {
     const stale = cache.get(cacheKey + '_stale');
-    if (stale) { console.warn('[quota] faible — stale servi pour ' + sport.key); return stale; }
+    if (stale) { console.warn('[quota] faible - stale servi pour ' + sport.key); return stale; }
     throw new Error('Quota Odds API épuisé et pas de données stale');
   }
   // 4. Appel API
@@ -1331,7 +1331,7 @@ async function fetchEventExtraMarkets(sportKey, eventId) {
         };
       });
 
-    cache.set(cacheKey, picks, 14400); // 4h — economie quota
+    cache.set(cacheKey, picks, 14400); // 4h - economie quota
     return picks;
   } catch (e) {
     console.warn('[extramkt] ' + eventId + ': ' + e.message);
@@ -1342,7 +1342,7 @@ async function fetchEventExtraMarkets(sportKey, eventId) {
 // -- LIVE ALL: tous les matchs en cours sur tous les sports --
 
 // -----------------------------------------------------------------------
-// SCORES LIVE — TheSportsDB (gratuit, sans quota)
+// SCORES LIVE - TheSportsDB (gratuit, sans quota)
 // -----------------------------------------------------------------------
 async function getLiveScores() {
   try {
@@ -1423,7 +1423,7 @@ function analyzeConsensus(allBookmakers, bestPrice) {
 }
 
 // Calcule un ajustement de score basé sur la forme récente et le H2H,
-// sans se substituer à l'edge marché (qui reste le signal principal) —
+// sans se substituer à l'edge marché (qui reste le signal principal) -
 // sert juste à départager / affiner la confiance sur le top des opportunités.
 function computeFormAdjustment(opp, formHome, formAway, h2h) {
   let adj = 0;
@@ -1567,7 +1567,7 @@ app.get('/api/live/all', async (req, res) => {
       });
     }
 
-    // PARTIE 2 : matchs à venir (24h) — limité aux sports prioritaires (quota Odds API)
+    // PARTIE 2 : matchs à venir (24h) - limité aux sports prioritaires (quota Odds API)
     const activeSports2 = (await getActiveSports()).filter(function(s){ return SPORTS_PRIORITY.has(s.key); });
     const upcomingResults = await loadSportsSafely(activeSports2);
     activeSports2.forEach(function(sport, i) {
@@ -1622,7 +1622,7 @@ app.get('/api/upcoming', async (req, res) => {
   if (cached) return res.json({ data: cached, cached: true, fetchedAt: cached._fetchedAt, apiUsage });
 
   const now          = Date.now();
-  // Limité aux sports prioritaires (quota Odds API) — voir SPORTS_PRIORITY
+  // Limité aux sports prioritaires (quota Odds API) - voir SPORTS_PRIORITY
   const activeSports = (await getActiveSports()).filter(function(s){ return SPORTS_PRIORITY.has(s.key); });
   const h24 = now + 24 * 3600 * 1000;
   const upcoming = [];
@@ -1689,7 +1689,7 @@ async function getScannerData() {
           const stale = cache.get(oddsCacheKey + '_stale');
           if (stale) {
             oddsData = stale;
-            console.warn('[quota] faible — stale servi pour ' + sport.key + ' (scanner)');
+            console.warn('[quota] faible - stale servi pour ' + sport.key + ' (scanner)');
           } else {
             continue;
           }
@@ -1877,7 +1877,7 @@ async function getScannerData() {
   // indisponible/non configure/en erreur, les picks restent simplement sans
   // verdict (le frontend masque la section correspondante).
   if (GEMINI_API_KEY) {
-    // Verdicts pour top 6 (h2h) + marches extra des top 2 — un seul appel groupé
+    // Verdicts pour top 6 (h2h) + marches extra des top 2 - un seul appel groupé
     const TOP_N_VERDICTS = 6;
     const verdictTargets = opportunities.slice(0, TOP_N_VERDICTS);
     const verdictItems = [];
@@ -1949,7 +1949,7 @@ async function getScannerData() {
     _scannedAt: new Date().toISOString(),
   };
 
-  cache.set(cacheKey, result, 3600); // 1h — economie quota Odds API
+  cache.set(cacheKey, result, 3600); // 1h - economie quota Odds API
   return { data: result, cached: false, scannedAt: result._scannedAt };
 }
 
@@ -2204,7 +2204,7 @@ app.get('/api/stream', (req, res) => {
 async function broadcastScores() {
   if (sseClients.size === 0) return;
   try {
-    // TheSportsDB uniquement — 0 quota Odds API
+    // TheSportsDB uniquement - 0 quota Odds API
     const liveEvents = await getLiveScores();
     const payload = JSON.stringify({ liveMatches: liveEvents, timestamp: new Date().toISOString() });
     sseClients.forEach(client => client.res.write('event: scores\ndata: ' + payload + '\n\n'));
@@ -2559,7 +2559,7 @@ app.get('/api/player-form', async function(req, res) {
 
 
 // ═══════════════════════════════════════════════════════════════════════
-// MATCH STATS — H2H + Forme + Mouvement cotes + Stats ESPN
+// MATCH STATS - H2H + Forme + Mouvement cotes + Stats ESPN
 // Inspiré Flashscore / bookmakers
 // ═══════════════════════════════════════════════════════════════════════
 
@@ -2824,8 +2824,8 @@ function buildIaUserMessage(params) {
 
   const fh = (stats && stats.formHome) || null;
   const fa = (stats && stats.formAway) || null;
-  if (fh) lines.push('FORME RÉCENTE ' + home + ' (5 derniers matchs) : ' + (fh.form && fh.form.length ? fh.form.map(function(f){ return f.result; }).join('') : '?') + (fh.formPct != null ? ' — ' + fh.formPct + '% de points pris' : '') + (fh.streak ? ', série en cours ' + fh.streak : ''));
-  if (fa) lines.push('FORME RÉCENTE ' + away + ' (5 derniers matchs) : ' + (fa.form && fa.form.length ? fa.form.map(function(f){ return f.result; }).join('') : '?') + (fa.formPct != null ? ' — ' + fa.formPct + '% de points pris' : '') + (fa.streak ? ', série en cours ' + fa.streak : ''));
+  if (fh) lines.push('FORME RÉCENTE ' + home + ' (5 derniers matchs) : ' + (fh.form && fh.form.length ? fh.form.map(function(f){ return f.result; }).join('') : '?') + (fh.formPct != null ? ' - ' + fh.formPct + '% de points pris' : '') + (fh.streak ? ', série en cours ' + fh.streak : ''));
+  if (fa) lines.push('FORME RÉCENTE ' + away + ' (5 derniers matchs) : ' + (fa.form && fa.form.length ? fa.form.map(function(f){ return f.result; }).join('') : '?') + (fa.formPct != null ? ' - ' + fa.formPct + '% de points pris' : '') + (fa.streak ? ', série en cours ' + fa.streak : ''));
 
   const h2h = (stats && stats.h2h) || null;
   if (h2h && h2h.total) {
@@ -2839,10 +2839,10 @@ function buildIaUserMessage(params) {
 
   const espn = (stats && stats.espnStats) || null;
   if (espn && espn.found && espn.completed) {
-    lines.push('MATCH TERMINÉ — Score final : ' + espn.score.home + ' - ' + espn.score.away + ' (' + home + ' / ' + away + ')');
+    lines.push('MATCH TERMINÉ - Score final : ' + espn.score.home + ' - ' + espn.score.away + ' (' + home + ' / ' + away + ')');
     lines.push('Le marché de paris pour ce match est FERMÉ : ne propose AUCUNE recommandation de pari "Live", AUCUN edge ni mise sur ce match. Tu peux faire un bref bilan post-match si pertinent.');
   } else if (espn && espn.found) {
-    lines.push('MATCH EN COURS — Score actuel : ' + espn.score.home + ' - ' + espn.score.away + ' (période ' + espn.period + ', ' + espn.clock + ')');
+    lines.push('MATCH EN COURS - Score actuel : ' + espn.score.home + ' - ' + espn.score.away + ' (période ' + espn.period + ', ' + espn.clock + ')');
     function fmtStats(label, s) {
       if (!s) return null;
       const parts = [];
@@ -2872,7 +2872,7 @@ function buildIaUserMessage(params) {
   return lines.join('\n');
 }
 
-// Appelle Gemini une fois pour un modèle donné. Ne lève jamais — renvoie un descripteur de résultat.
+// Appelle Gemini une fois pour un modèle donné. Ne lève jamais - renvoie un descripteur de résultat.
 async function callGeminiOnce(model, payload) {
   const ctrl = new AbortController();
   const timer = setTimeout(function(){ ctrl.abort(); }, 30000);
@@ -2969,7 +2969,7 @@ app.get('/api/ia-analysis', async function(req, res) {
     const text  = parts.map(function(p){ return p.text || ''; }).join('');
 
     const result = { analysis: text, model: resp.model, generatedAt: Date.now() };
-    cache.set(cacheKey, result, 600); // 10 min — limite le nombre d'appels (quota gratuit)
+    cache.set(cacheKey, result, 600); // 10 min - limite le nombre d'appels (quota gratuit)
     res.json(result);
   } catch(err) {
     console.error('[ia-analysis]', err.message);

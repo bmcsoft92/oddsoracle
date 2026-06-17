@@ -12,7 +12,7 @@ const ScannerModule = (() => {
   let _dedupedOpps      = null;
   let _displayedOpps    = null; // sous-ensemble actuellement affiche (apres filtres) -- source pour openStats/addToJournal
   let _bankroll         = 1000;
-  const REFRESH_INTERVAL = 30 * 60 * 1000; // 30 min — economie quota Odds API
+  const REFRESH_INTERVAL = 30 * 60 * 1000; // 30 min - economie quota Odds API
 
   // IDs des opportunités deja notifiees/loggees (evite doublons sur refresh)
   const _seenIds    = new Set();
@@ -519,9 +519,16 @@ const ScannerModule = (() => {
       : '';
 
     // Verdict IA (Gemini) sur le pick principal -- style sportplus.tv
-    const verdictHtml = opp.verdict
-      ? '<div class="sc2-verdict"><span class="sc2-verdict-icon">🤖</span><p class="sc2-verdict-text">' + opp.verdict + '</p></div>'
-      : '';
+    // verdictSupports=false → badge conflit rouge; true → badge confirmation verte
+    let verdictHtml = '';
+    if (opp.verdict) {
+      const conflictBadge = (opp.verdictSupports === false)
+        ? '<span class="sc2-verdict-conflict">⚠️ IA recommande l\'autre sélection</span>'
+        : (opp.verdictSupports === true ? '<span class="sc2-verdict-confirm">✅ IA confirme</span>' : '');
+      verdictHtml = '<div class="sc2-verdict">'
+        + '<div class="sc2-verdict-head"><span class="sc2-verdict-icon">🤖</span>' + conflictBadge + '</div>'
+        + '<p class="sc2-verdict-text">' + opp.verdict + '</p></div>';
+    }
 
     return `
     <div class="sc2-card${opp.isLive ? ' sc2-card--live' : ''}${opp.edge >= 10 ? ' sc2-card--forte' : ''}">
@@ -898,23 +905,4 @@ const ScannerModule = (() => {
       autoLogChk.addEventListener('change', function() {
         _autoLogEnabled = autoLogChk.checked;
         showToast(_autoLogEnabled
-          ? 'Auto-log active -- nouvelles opportunites ajoutees au journal'
-          : 'Auto-log desactive');
-      });
-    }
-
-    updateNotifButton();
-    startAutoRefresh();
-
-    const scanTab = document.querySelector('[data-tab="scanner"]');
-    if (scanTab) {
-      scanTab.addEventListener('click', function() {
-        if (!_lastScanData) runScan(false);
-      });
-    }
-  }
-
-  return { init, runScan, addToJournal, addExtraToJournal, applyFilters, focusSport, watchMatch, openStats };
-})();
-
-
+          ? 'Auto-log active -- nouvelles oppor

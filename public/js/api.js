@@ -1,5 +1,5 @@
 /**
- * OddsOracle — API Client (Frontend)
+ * OddsOracle - API Client (Frontend)
  * Communique avec le backend Express pour les données live
  */
 
@@ -77,7 +77,7 @@ const APIClient = (() => {
   function getLastQuota() { return _quotaInfo; }
 
   // ──────────────────────────────────────────────
-  // SSE — LIVE STREAM
+  // SSE - LIVE STREAM
   // Se connecte quand l'onglet Live est ouvert
   // Se déconnecte automatiquement à la fermeture
   // ──────────────────────────────────────────────
@@ -140,7 +140,7 @@ const APIClient = (() => {
 
     return {
       id:           event.id,
-      label:        `${timeLabel} — ${home} vs ${away}`,
+      label:        `${timeLabel} - ${home} vs ${away}`,
       homeTeam:     home,
       awayTeam:     away,
       commenceTime: event.commenceTime || event.commence_time,
