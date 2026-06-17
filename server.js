@@ -842,8 +842,8 @@ async function autoLogFortePicks() {
       // Score ajusté (edge + forme/H2H) : rejeter si nettement sous le seuil fiable
       const score = o.adjustedScore != null ? o.adjustedScore : (o.predScore || 0);
       if (score < PRONOS_MIN_RELIABLE_SCORE) return false;
-      // Verdict Gemini : si disponible et clairement négatif, passer ce pick
-      if (isVerdictNegative(o.verdict)) return false;
+      // Verdict Gemini : si disponible et explicitement contre, passer ce pick
+      if (o.verdictSupports === false) return false;
       return true;
     });
     if (!fortePicks.length) return;
@@ -1918,8 +1918,15 @@ async function getScannerData() {
           verdicts.forEach(function(v, i) {
             if (!v) return;
             const it = verdictItems[i];
-            if (it.kind === 'h2h') it.opp.verdict = v;
-            else if (it.opp.extraMarkets && it.opp.extraMarkets[it.extraIdx]) it.opp.extraMarkets[it.extraIdx].verdict = v;
+            const verdictText     = (typeof v === 'object') ? v.text     : v;
+            const verdictSupports = (typeof v === 'object') ? v.supports : true;
+            if (it.kind === 'h2h') {
+              it.opp.verdict         = verdictText;
+              it.opp.verdictSupports = verdictSupports;
+            } else if (it.opp.extraMarkets && it.opp.extraMarkets[it.extraIdx]) {
+              it.opp.extraMarkets[it.extraIdx].verdict         = verdictText;
+              it.opp.extraMarkets[it.extraIdx].verdictSupports = verdictSupports;
+            }
           });
         } else if (resp) {
           console.warn('[scanner-verdicts] Gemini ' + resp.status + ' (' + resp.model + '): ' + resp.errText);
@@ -1994,10 +2001,10 @@ function parsePronosVerdicts(text, count) {
 function buildScannerVerdictsPrompt(items) {
   const lines = [
     'Voici ' + items.length + ' pronostics issus du scanner de value bets (cote bookmaker vs probabilite reelle calculee a partir des cotes sharp).',
-    'Pour CHAQUE pronostic, redige un verdict court (2 phrases maximum, en francais, sans markdown, ton expert et incisif) expliquant pourquoi ce pari ressort.',
+    'Pour CHAQUE pronostic, indique si tu recommandes de jouer ce pari (OUI ou NON), puis explique en 1-2 phrases (francais, sans markdown, ton expert).',
     'Reponds STRICTEMENT selon ce format, une seule ligne par pronostic :',
-    'PICK 1: <verdict>',
-    'PICK 2: <verdict>',
+    'PICK 1: JOUER:OUI | <verdict>',
+    'PICK 2: JOUER:NON | <verdict>',
     '',
   ];
   items.forEach(function(it, i) {
@@ -2017,14 +2024,29 @@ function buildScannerVerdictsPrompt(items) {
   return lines.join('\n');
 }
 
-// Extrait les verdicts "PICK n: ..." du texte renvoye par Gemini.
+// Extrait les verdicts "PICK n: JOUER:OUI/NON | <texte>" du texte Gemini.
+// Retourne un tableau d'objets { text, supports } ou null.
 function parseScannerVerdicts(text, count) {
   const out = new Array(count).fill(null);
-  const re = /PICK\s*(\d+)\s*[:\-]\s*(.+)/gi;
+  const reStructured = /PICK\s*(\d+)\s*[:\-]\s*JOUER\s*:\s*(OUI|NON)\s*[|\-]\s*(.+)/gi;
+  const reFallback   = /PICK\s*(\d+)\s*[:\-]\s*(.+)/gi;
   let m;
-  while ((m = re.exec(text || ''))) {
+  // Format structuré (prioritaire)
+  while ((m = reStructured.exec(text || ''))) {
     const idx = parseInt(m[1], 10) - 1;
-    if (idx >= 0 && idx < count && m[2].trim()) out[idx] = m[2].trim();
+    if (idx >= 0 && idx < count && m[3].trim()) {
+      out[idx] = { text: m[3].trim(), supports: m[2].toUpperCase() === 'OUI' };
+    }
+  }
+  // Fallback : format simple sans OUI/NON
+  while ((m = reFallback.exec(text || ''))) {
+    const idx = parseInt(m[1], 10) - 1;
+    if (idx >= 0 && idx < count && !out[idx] && m[2].trim()) {
+      const raw = m[2].trim();
+      // Essayer de déduire supports depuis le texte brut
+      const supportsGuess = !NEGATIVE_VERDICT_RE.test(raw);
+      out[idx] = { text: raw, supports: supportsGuess };
+    }
   }
   return out;
 }
