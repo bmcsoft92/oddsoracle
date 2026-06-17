@@ -85,7 +85,7 @@
 
 /* ── RESET ─────────────────────────────────────────────────────── */
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
-html{font-size:16px;scroll-behavior:smooth}
+html{font-size:16px;scroll-behavior:auto}
 body{
   background:var(--bg0);
   background-image:
@@ -418,7 +418,8 @@ a:hover{text-decoration:underline}
   padding:.45rem .8rem;color:var(--text0);font-size:.82rem;font-family:var(--font);
   outline:none;transition:border-color .15s, box-shadow .15s;
 }
-.form-control:focus{border-color:rgba(200,245,62,0.4);box-shadow:0 0 0 3px rgba(200,245,62,0.08)}
+.form-control:focus{border-color:rgba(200,245,62,0.4)}
+select.form-control:focus{box-shadow:none}
 .form-control::placeholder{color:var(--text2)}
 select.form-control{cursor:pointer}
 option,optgroup{background:var(--bg1)}
