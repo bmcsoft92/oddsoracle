@@ -2306,9 +2306,7 @@ function toggleTheme() {
 (function() {
   if (localStorage.getItem('oo-theme') === 'light') {
     document.documentElement.setAttribute('data-theme', 'light');
-    document.addEventListener('DOMContentLoaded', function() {
-      var t = document.getElementById('theme-toggle');
-      if (t) t.classList.add('is-light');
-    });
+    var t = document.getElementById('theme-toggle');
+    if (t) t.classList.add('is-light');
   }
 }());
