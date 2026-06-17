@@ -2290,21 +2290,25 @@ function autoAnalyzeCards(container) {
 }
 
 // ── THEME TOGGLE ─────────────────────────────────────────────────
+function toggleTheme() {
+  var t = document.getElementById('theme-toggle');
+  var isLight = t && t.classList.contains('is-light');
+  if (isLight) {
+    document.documentElement.removeAttribute('data-theme');
+    localStorage.setItem('oo-theme', 'dark');
+    if (t) t.classList.remove('is-light');
+  } else {
+    document.documentElement.setAttribute('data-theme', 'light');
+    localStorage.setItem('oo-theme', 'light');
+    if (t) t.classList.add('is-light');
+  }
+}
 (function() {
-  var cb = document.getElementById('theme-cb');
-  if (!cb) return;
-  // Init depuis localStorage
-  var saved = localStorage.getItem('oo-theme') === 'light';
-  cb.checked = saved;
-  if (saved) document.documentElement.setAttribute('data-theme', 'light');
-  // Changement
-  cb.addEventListener('change', function() {
-    if (cb.checked) {
-      document.documentElement.setAttribute('data-theme', 'light');
-      localStorage.setItem('oo-theme', 'light');
-    } else {
-      document.documentElement.removeAttribute('data-theme');
-      localStorage.setItem('oo-theme', 'dark');
-    }
-  });
+  if (localStorage.getItem('oo-theme') === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+    document.addEventListener('DOMContentLoaded', function() {
+      var t = document.getElementById('theme-toggle');
+      if (t) t.classList.add('is-light');
+    });
+  }
 }());
