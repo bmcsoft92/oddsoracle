@@ -969,7 +969,16 @@ option,optgroup{background:var(--bg1)}
 /* ── CONTEXT GRID ────────────────────────────────────────────────── */
 .context-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:.85rem;margin-bottom:1.1rem}
 @media(max-width:900px){.context-grid{grid-template-columns:1fr}}
-.ctx-card{padding:.85rem!important;background:var(--glass)!important}
+.ctx-card{
+  padding:.85rem!important;background:var(--glass)!important;
+  transition:none!important;
+  will-change:auto;
+}
+.ctx-card:hover{
+  border-color:var(--border0)!important;
+  transform:none!important;
+  box-shadow:var(--shadow-sm)!important;
+}
 .ctx-card-title{
   font-size:.8rem;font-weight:700;letter-spacing:.05em;text-transform:uppercase;
   color:var(--accent);margin-bottom:.65rem;padding-bottom:.42rem;border-bottom:1px solid var(--border0);
