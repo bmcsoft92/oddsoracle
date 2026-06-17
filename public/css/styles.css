@@ -1395,3 +1395,140 @@ option,optgroup{background:var(--bg1)}
 [data-theme="light"] .nav-item.active{color:var(--lime)}
 [data-theme="light"] ::-webkit-scrollbar-thumb{background:rgba(0,0,0,0.14)}
 [data-theme="light"] ::-webkit-scrollbar-thumb:hover{background:rgba(0,0,0,0.24)}
+
+/* ── LIGHT MODE – ACCENTS + ÉLÉMENTS SPÉCIFIQUES ──────────────────
+   Surcharge les couleurs accent trop claires sur fond blanc/gris
+   et corrige les bordures blanches invisibles en mode jour
+─────────────────────────────────────────────────────────────────── */
+[data-theme="light"]{
+  /* Accents plus foncés pour fond clair */
+  --lime:        #2d7a00;
+  --lime-d:      rgba(45,122,0,0.11);
+  --lime-glow:   rgba(45,122,0,0.18);
+  --lime-glow2:  rgba(45,122,0,0.07);
+
+  --violet:      #5525b8;
+  --violet-d:    rgba(85,37,184,0.10);
+  --violet-glow: rgba(85,37,184,0.18);
+
+  --red:         #b8112e;
+  --red-d:       rgba(184,17,46,0.10);
+
+  --blue:        #0f52a8;
+  --blue-d:      rgba(15,82,168,0.10);
+
+  --yellow:      #805800;
+  --yellow-d:    rgba(128,88,0,0.10);
+
+  --cyan:        #08736a;
+  --cyan-d:      rgba(8,115,106,0.10);
+
+  --green:       var(--lime);
+  --green-d:     var(--lime-d);
+  --purple:      var(--violet);
+}
+
+/* Logo – gradient lime→violet lisible sur fond clair */
+[data-theme="light"] .logo-text{
+  background:linear-gradient(135deg, #1a6600 0%, #3d9900 50%, var(--violet) 100%);
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;
+}
+[data-theme="light"] .logo-tag{
+  background:rgba(45,122,0,0.12);color:#1a6600;border-color:rgba(45,122,0,0.25);
+}
+
+/* Navbar – bordure et fond (renforce l'existant) */
+[data-theme="light"] #navbar{
+  background:rgba(248,249,253,0.97) !important;
+  border-bottom:1px solid rgba(0,0,0,0.10) !important;
+}
+
+/* Cartes – bordures invisibles blanches → gris */
+[data-theme="light"] .card{
+  border-color:rgba(0,0,0,0.09);
+  box-shadow:0 2px 8px rgba(0,0,0,0.06),0 0 0 1px rgba(0,0,0,0.04);
+}
+[data-theme="light"] .card:hover{border-color:rgba(0,0,0,0.16)}
+[data-theme="light"] .card-header{
+  border-bottom-color:rgba(0,0,0,0.08);
+  background:rgba(255,255,255,0.7);
+}
+
+/* Feed – bordure en pointillés blanche → gris */
+[data-theme="light"] .feed-empty{
+  border-color:rgba(0,0,0,0.12);
+  color:var(--text1);
+}
+[data-theme="light"] .feed-card{
+  border-color:rgba(0,0,0,0.08);
+  box-shadow:0 1px 4px rgba(0,0,0,0.06);
+}
+[data-theme="light"] .feed-card:hover{
+  border-color:rgba(45,122,0,0.35);
+  box-shadow:0 4px 12px rgba(0,0,0,0.10),0 0 12px rgba(45,122,0,0.08);
+}
+[data-theme="light"] .feed-sel{
+  background:rgba(255,255,255,0.8);
+  border-color:rgba(0,0,0,0.08);
+}
+[data-theme="light"] .feed-match-name{color:#0d0e1a}
+
+/* Boutons */
+[data-theme="light"] .btn{
+  background:rgba(255,255,255,0.85);
+  border-color:rgba(0,0,0,0.14);
+  color:#0d0e1a;
+}
+[data-theme="light"] .btn:hover{
+  background:rgba(255,255,255,1);
+  border-color:rgba(0,0,0,0.22);
+}
+[data-theme="light"] .btn-secondary{
+  background:rgba(0,0,0,0.04);
+  border-color:rgba(0,0,0,0.10);
+  color:#454870;
+}
+[data-theme="light"] .btn-ghost{background:none;border-color:transparent;color:#454870}
+[data-theme="light"] .btn-ghost:hover{background:rgba(0,0,0,0.05);color:#0d0e1a}
+
+/* Badges */
+[data-theme="light"] .badge-gray{
+  background:rgba(0,0,0,0.06);color:#454870;border-color:rgba(0,0,0,0.10);
+}
+
+/* Liens streaming */
+[data-theme="light"] .streaming-link{
+  background:rgba(255,255,255,0.75);
+  border-color:rgba(0,0,0,0.11);
+  color:#454870;
+}
+[data-theme="light"] .streaming-link:hover{
+  background:#fff;border-color:rgba(0,0,0,0.20);color:#0d0e1a;
+}
+
+/* Collapsible toggle */
+[data-theme="light"] .advanced-toggle{
+  background:rgba(255,255,255,0.75);
+  border-color:rgba(0,0,0,0.11);
+  color:#8a8fb8;
+}
+[data-theme="light"] .advanced-toggle:hover{color:#454870;border-color:rgba(0,0,0,0.20)}
+
+/* Table stats */
+[data-theme="light"] .stats-table td{
+  border-bottom-color:rgba(0,0,0,0.06);
+  color:#0d0e1a;
+}
+[data-theme="light"] .stats-table th{
+  background:rgba(0,0,0,0.04);
+  border-bottom-color:rgba(0,0,0,0.08);
+}
+
+/* Toggle pill – bordure hardcodée */
+[data-theme="light"] .theme-toggle{
+  border-color:rgba(245,163,0,0.45) !important;
+}
+
+/* Textes généraux */
+[data-theme="light"] h1,[data-theme="light"] h2,[data-theme="light"] h3{color:#0d0e1a}
+[data-theme="light"] .section-title,[data-theme="light"] .card-header h2{color:#454870}
