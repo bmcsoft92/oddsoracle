@@ -2296,11 +2296,9 @@ function autoAnalyzeCards(container) {
   function applyTheme(theme) {
     if (theme === 'light') {
       document.documentElement.setAttribute('data-theme', 'light');
-      btn.innerHTML = '&#9790;'; // crescent moon
       btn.title = 'Passer en mode nuit';
     } else {
       document.documentElement.removeAttribute('data-theme');
-      btn.innerHTML = '&#9728;'; // sun
       btn.title = 'Passer en mode jour';
     }
   }
