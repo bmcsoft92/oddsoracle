@@ -917,6 +917,19 @@ app.get('/api/sports', async (req, res) => {
 // Stockage côté serveur (voir loadJournalBets/saveJournalBets) : remplace
 // l'ancien stockage localStorage pour que le journal soit partagé entre le
 // navigateur et les tâches planifiées (ex: log automatique des pronos FORTE).
+// Déclenche manuellement autoLogFortePicks (pour tester sans attendre le timer)
+app.get('/api/run-auto-forte', async (req, res) => {
+  try {
+    await autoLogFortePicks();
+    const bets = loadJournalBets();
+    const today = new Date().toISOString().split('T')[0];
+    const added = bets.filter(function(b) { return b.autoForte && b.date === today; });
+    res.json({ ok: true, autoForteToday: added.length, totalBets: bets.length });
+  } catch(e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 app.get('/api/journal', (req, res) => {
   res.json({ data: loadJournalBets() });
 });
@@ -1134,7 +1147,7 @@ function classifyPick(trueProb, bestPrice, edge, confidence, consensus) {
   if (!passesValueFilter(trueProb, bestPrice)) return null;
   let label = edge >= 10 ? 'FORTE' : edge >= 6 ? 'BONNE' : edge >= 2 ? 'CORRECTE' : null;
   if (!label) return null;
-  if (label === 'FORTE' && (trueProb < MIN_TRUE_PROB_FORTE || confidence !== 'high' || (consensus && consensus.consensus === 'thin'))) {
+  if (label === 'FORTE' && (trueProb < MIN_TRUE_PROB_FORTE || confidence === 'low' || (consensus && consensus.consensus === 'thin'))) {
     label = 'BONNE';
   }
   if (consensus && consensus.lowAgreement) {
