@@ -2288,3 +2288,26 @@ function autoAnalyzeCards(container) {
     }
   });
 }
+
+// ── THEME TOGGLE ─────────────────────────────────────────────────
+(function() {
+  var btn = document.getElementById('theme-toggle');
+  if (!btn) return;
+  function applyTheme(theme) {
+    if (theme === 'light') {
+      document.documentElement.setAttribute('data-theme', 'light');
+      btn.innerHTML = '&#9790;'; // crescent moon
+      btn.title = 'Passer en mode nuit';
+    } else {
+      document.documentElement.removeAttribute('data-theme');
+      btn.innerHTML = '&#9728;'; // sun
+      btn.title = 'Passer en mode jour';
+    }
+  }
+  applyTheme(localStorage.getItem('oo-theme') || 'dark');
+  btn.addEventListener('click', function() {
+    var next = document.documentElement.getAttribute('data-theme') === 'light' ? 'dark' : 'light';
+    localStorage.setItem('oo-theme', next);
+    applyTheme(next);
+  });
+}());
