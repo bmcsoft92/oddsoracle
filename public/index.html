@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>OddsOracle - Terminal Pro</title>
   <link rel="stylesheet" href="css/styles.css" />
+  <script>(function(){var t=localStorage.getItem('oo-theme');if(t==='light')document.documentElement.setAttribute('data-theme','light');}());</script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 </head>
 <body>
@@ -47,6 +48,7 @@
       <span id="quota-display"></span>
     </div>
     <span class="quota-badge" id="quota-badge"></span>
+    <button id="theme-toggle" class="theme-toggle" title="Mode jour/nuit">&#9728;</button>
     <span class="live-indicator" id="live-dot">LIVE</span>
   </div>
 </nav>
@@ -1516,7 +1518,7 @@
 <script src="js/scanner.js?v=47"></script>
 <script src="js/bankroll.js?v=43"></script>
 <script src="js/journal.js?v=48"></script>
-<script src="js/app.js?v=47"></script>
+<script src="js/app.js?v=48"></script>
 
 <!-- ===== STATS MODAL ===== -->
 <div id="stats-modal-overlay" style="display:none" onclick="if(event.target===this)closeStatsModal()" class="stats-overlay">
@@ -1531,12 +1533,4 @@
       <button class="stats-tab" data-tab="h2h" onclick="switchStatsTab('h2h')">&#x1F91C; H2H</button>
       <button class="stats-tab" data-tab="forme" onclick="switchStatsTab('forme')">&#x1F4C8; Forme</button>
       <button class="stats-tab" data-tab="cotes" onclick="switchStatsTab('cotes')">&#x1F4B0; Cotes</button>
-      <button class="stats-tab" data-tab="live" onclick="switchStatsTab('live')">&#x26A1; Live</button>
-    </div>
-    <div id="stats-modal-body" class="stats-modal-body">
-      <div class="stats-loading">&#x23F3; Chargement...</div>
-    </div>
-  </div>
-</div>
-</body>
-</html>
+      <button class="stats-tab" dat
