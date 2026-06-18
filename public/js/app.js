@@ -791,7 +791,7 @@ function initNavigation() {
       if (target === 'bankroll')  BankrollUI.refresh();
       if (target === 'journal')   JournalModule.renderTable();
       if (target === 'live')     { LiveFeedModule.load(); LiveFeedModule.startAutoRefresh(); }
-      if (target === 'prematch') { PrematchFeedModule.load(); PrematchFeedModule.startAutoRefresh(); }
+      if (target === 'prematch') { PrematchFeedModule.load(); PrematchFeedModule.startAutoRefresh(); PronosDuJourModule.load(); }
     });
   });
 }
@@ -1380,10 +1380,7 @@ const PronosDuJourModule = (() => {
   }
 
   function init() {
-    const tab = document.getElementById('tab-prematch');
-    if (tab) {
-      tab.addEventListener('click', function() { load(); });
-    }
+    // load() is triggered from initNavigation() on nav-item click, not on section click
   }
 
   return { init, load };

@@ -640,7 +640,7 @@ function quotaOk() {
   }
   // Reset compteur une fois qu'on connaît le solde
   _apiCallsMadeUnknown = 0;
-  return apiUsage.requestsRemaining > 60;
+  return apiUsage.requestsRemaining > 10;
 }
 
 // ── ROTATION SCANNER : ne pas scanner TOUS les sports actifs à chaque cycle ──
@@ -1342,23 +1342,70 @@ async function fetchEventExtraMarkets(sportKey, eventId) {
 // -- LIVE ALL: tous les matchs en cours sur tous les sports --
 
 // -----------------------------------------------------------------------
-// SCORES LIVE - TheSportsDB (gratuit, sans quota)
+// SCORES LIVE - ESPN Scoreboard API (gratuit, sans quota, sans clé)
 // -----------------------------------------------------------------------
+const ESPN_LIVE_LEAGUES = [
+  { path: 'soccer/fra.1',                 sportKey: 'soccer_france_ligue1',               icon: '⚽', label: 'Ligue 1' },
+  { path: 'soccer/eng.1',                 sportKey: 'soccer_epl',                         icon: '⚽', label: 'Premier League' },
+  { path: 'soccer/esp.1',                 sportKey: 'soccer_spain_la_liga',               icon: '⚽', label: 'La Liga' },
+  { path: 'soccer/ita.1',                 sportKey: 'soccer_italy_serie_a',               icon: '⚽', label: 'Serie A' },
+  { path: 'soccer/ger.1',                 sportKey: 'soccer_germany_bundesliga',          icon: '⚽', label: 'Bundesliga' },
+  { path: 'soccer/uefa.champions',        sportKey: 'soccer_uefa_champs_league',          icon: '⚽', label: 'Champions League' },
+  { path: 'soccer/uefa.europa',           sportKey: 'soccer_uefa_europa_league',          icon: '⚽', label: 'Europa League' },
+  { path: 'soccer/conmebol.libertadores', sportKey: 'soccer_conmebol_copa_libertadores',  icon: '⚽', label: 'Copa Libertadores' },
+  { path: 'soccer/usa.1',                 sportKey: 'soccer_usa_mls',                     icon: '⚽', label: 'MLS' },
+  { path: 'basketball/nba',               sportKey: 'basketball_nba',                     icon: '🏀', label: 'NBA' },
+  { path: 'basketball/euroleague',        sportKey: 'basketball_euroleague',              icon: '🏀', label: 'EuroLeague' },
+  { path: 'baseball/mlb',                 sportKey: 'baseball_mlb',                       icon: '⚾', label: 'MLB' },
+  { path: 'hockey/nhl',                   sportKey: 'icehockey_nhl',                      icon: '🏒', label: 'NHL' },
+  { path: 'mma/ufc',                      sportKey: 'mma_mixed_martial_arts',             icon: '🥊', label: 'UFC / MMA' },
+];
+
 async function getLiveScores() {
-  try {
-    const ctrl = new AbortController();
-    setTimeout(function(){ ctrl.abort(); }, 6000);
-    const resp = await fetch(
-      'https://www.thesportsdb.com/api/v1/json/3/eventslive.php',
-      { signal: ctrl.signal }
-    );
-    if (!resp.ok) return [];
-    const data = await resp.json();
-    return (data && data.events) ? data.events : [];
-  } catch(e) {
-    console.warn('[thesportsdb] ' + e.message);
-    return [];
-  }
+  const liveEvents = [];
+  await Promise.allSettled(ESPN_LIVE_LEAGUES.map(async function(league) {
+    try {
+      const ctrl = new AbortController();
+      setTimeout(function(){ ctrl.abort(); }, 5000);
+      const resp = await fetch(
+        'https://site.api.espn.com/apis/site/v2/sports/' + league.path + '/scoreboard',
+        { signal: ctrl.signal }
+      );
+      if (!resp.ok) return;
+      const data = await resp.json();
+      const events = data.events || [];
+      for (const ev of events) {
+        const comp = ev.competitions && ev.competitions[0];
+        if (!comp) continue;
+        const status     = comp.status || ev.status || {};
+        const statusType = status.type || {};
+        // Seulement les matchs EN COURS (state: 'in')
+        if (statusType.state !== 'in') continue;
+        // Ignorer les matchs terminés
+        if (FINISHED_STATUSES.test((statusType.shortDetail || statusType.name || '').trim())) continue;
+        const competitors = comp.competitors || [];
+        const home = competitors.find(function(c){ return c.homeAway === 'home'; });
+        const away = competitors.find(function(c){ return c.homeAway === 'away'; });
+        if (!home || !away) continue;
+        liveEvents.push({
+          strHomeTeam:  (home.team && home.team.displayName) || '',
+          strAwayTeam:  (away.team && away.team.displayName) || '',
+          _sportKey:    league.sportKey,
+          _sportIcon:   league.icon,
+          _sportLabel:  league.label,
+          intHomeScore: home.score  || '0',
+          intAwayScore: away.score  || '0',
+          strStatus:    statusType.shortDetail || 'Live',
+          strProgress:  status.displayClock   || statusType.shortDetail || '',
+          strLeague:    (data.leagues && data.leagues[0] && data.leagues[0].name) || league.label,
+          commenceTime: ev.date || new Date().toISOString(),
+        });
+      }
+    } catch(e) {
+      console.warn('[espn-live] ' + league.path + ': ' + e.message);
+    }
+  }));
+  return liveEvents;
 }
 
 function normTeam(s) {
@@ -1510,60 +1557,46 @@ app.get('/api/live/all', async (req, res) => {
   const deadline = new Promise(function(_, rej) { setTimeout(function(){ rej(new Error('timeout')); }, 12000); });
 
   async function buildLiveFeed() {
-    // PARTIE 1 : TheSportsDB (matchs EN COURS, gratuit, sans quota)
-    const sdbEvents = await getLiveScores(); // timeout 6s interne
-    // Sports uniques trouvés dans TheSportsDB → charger odds en parallèle
-    const sdbSports = [...new Set(
-      sdbEvents.flatMap(function(e){ return SPORTSDB_MAP[e.strSport||'']||[]; })
-    )];
+    // PARTIE 1 : ESPN Scoreboard (matchs EN COURS, gratuit, sans quota)
+    const espnEvents = await getLiveScores();
+    // Sports uniques trouvés dans ESPN → charger odds en parallèle
+    const liveSportKeys = [...new Set(espnEvents.map(function(e){ return e._sportKey; }))];
     const oddsResults = await Promise.allSettled(
-      sdbSports.map(function(key){
+      liveSportKeys.map(function(key){
         const sp = SPORTS.find(function(s){ return s.key===key; });
         return sp ? loadOddsForSport(sp) : Promise.resolve([]);
       })
     );
     const loadedOdds = {};
-    sdbSports.forEach(function(key, i){
+    liveSportKeys.forEach(function(key, i){
       loadedOdds[key] = oddsResults[i].status==='fulfilled' ? oddsResults[i].value : [];
     });
 
-    for (const sdbEv of sdbEvents) {
-      const sportName = sdbEv.strSport || '';
-      if (!sdbEv.strHomeTeam || !sdbEv.strAwayTeam) continue;
-      // Ignore les matchs déjà terminés que TheSportsDB renvoie encore dans
-      // eventslive.php (statut stale, ex: "Match Finished" pendant un moment
-      // après la fin réelle de la rencontre).
-      if (FINISHED_STATUSES.test((sdbEv.strStatus || '').trim())) continue;
-      const meta     = SPORTSDB_META[sportName] || { icon: '⚡', label: sportName };
-      const sportKs  = SPORTSDB_MAP[sportName]  || [];
-      const mk = normTeam(sdbEv.strHomeTeam)+'|'+normTeam(sdbEv.strAwayTeam);
+    for (const espnEv of espnEvents) {
+      if (!espnEv.strHomeTeam || !espnEv.strAwayTeam) continue;
+      const mk = normTeam(espnEv.strHomeTeam)+'|'+normTeam(espnEv.strAwayTeam);
       if (seenKeys.has(mk)) continue;
       seenKeys.add(mk);
-      let enrichedOdds = null;
-      for (const key of sportKs) {
-        const matched = matchOddsEvent(loadedOdds[key]||[], sdbEv);
-        if (matched) {
-          enrichedOdds = enrichEvent(matched, SPORTS.find(function(s){ return s.key===key; }));
-          break;
-        }
-      }
+      const key = espnEv._sportKey;
+      const matched = matchOddsEvent(loadedOdds[key]||[], espnEv);
+      const enrichedOdds = matched ? enrichEvent(matched, SPORTS.find(function(s){ return s.key===key; })) : null;
       liveMatches.push({
-        homeTeam:    sdbEv.strHomeTeam,
-        awayTeam:    sdbEv.strAwayTeam,
-        sportKey:    (enrichedOdds&&enrichedOdds.sport)||sportKs[0]||'unknown',
-        sportLabel:  meta.label,
-        sportIcon:   meta.icon,
-        commenceTime:(sdbEv.dateEvent||now)+'T'+(sdbEv.strTime||'00:00:00'),
+        homeTeam:    espnEv.strHomeTeam,
+        awayTeam:    espnEv.strAwayTeam,
+        sportKey:    key,
+        sportLabel:  espnEv._sportLabel,
+        sportIcon:   espnEv._sportIcon,
+        commenceTime: espnEv.commenceTime,
         isLive:      true,
         isImminent:  false,
         liveScore: {
-          homeScore: sdbEv.intHomeScore,
-          awayScore: sdbEv.intAwayScore,
-          progress:  sdbEv.strProgress||sdbEv.strStatus||'',
-          status:    sdbEv.strStatus||''
+          homeScore: espnEv.intHomeScore,
+          awayScore: espnEv.intAwayScore,
+          progress:  espnEv.strProgress,
+          status:    espnEv.strStatus,
         },
         selections: enrichedOdds ? (enrichedOdds.selections||[]) : [],
-        league:     sdbEv.strLeague||''
+        league:     espnEv.strLeague,
       });
     }
 
