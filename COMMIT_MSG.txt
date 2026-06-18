@@ -1,0 +1,7 @@
+fix: live matches ESPN + quota + gigotement + modal stats
+
+- server.js: remplace TheSportsDB eventslive.php (404 cle gratuite) par ESPN Scoreboard API (gratuit, sans quota, sans cle) pour les scores live - 14 ligues couvertes (Ligue 1, EPL, La Liga, Serie A, Bundesliga, Champions League, Europa League, Copa Libertadores, MLS, NBA, EuroLeague, MLB, NHL, UFC/MMA)
+- server.js: seuil quotaOk() abaisse de >60 a >10 pour debloquer les appels Odds API (quota etait bloque car 60 restants avec seuil >60)
+- public/js/app.js: fix gigotement onglet A venir - PronosDuJourModule.init() n'ecoute plus les clics sur la section #tab-prematch, le chargement est desormais declenche depuis initNavigation() uniquement
+- public/js/app.js: correction octets nuls en fin de fichier (suppression 23 null bytes)
+- public/index.html: restauration de la fin du fichier tronquee - ajout des onglets Forme/Cotes/Live manquants + div#stats-modal-body + fermetures </body></html>
