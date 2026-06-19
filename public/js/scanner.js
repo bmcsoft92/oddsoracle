@@ -282,8 +282,10 @@ const ScannerModule = (() => {
   // -----------------------------------------------------------------
   // AUTO-LOG JOURNAL
   // -----------------------------------------------------------------
-  function autoLogToJournal(opp, kelly) {
+  function autoLogToJournal(opp) {
     if (!_autoLogEnabled) return;
+    // Seuls les picks FORTE (edge >= 10, confiance high) sont auto-loggues, mise fixe 100 EUR
+    if (opp.predLabel !== 'FORTE') return;
     const id = oppId(opp);
     if (_loggedIds.has(id)) return;
     _loggedIds.add(id);
@@ -297,10 +299,12 @@ const ScannerModule = (() => {
       market:    'Vainqueur match',
       selection: opp.selection,
       cote:      opp.bestPrice,
-      stake:     kelly ? kelly.stake : 1,
+      stake:     100,
       edge:      opp.edge,
       result:    'pending',
-      reason:    `[AUTO] Scanner IA -- Edge ${opp.edge}% -- ${opp.bestBook} -- Prob ${opp.trueProb}%`,
+      reason:    `[AUTO-FORTE] Scanner IA -- Edge +${opp.edge}% -- ${opp.bestBook} -- Prob ${opp.trueProb}%`,
+      matchId:   opp.matchId || id,
+      autoForte: true,
     };
 
     JournalModule.addBet(bet);
@@ -366,7 +370,7 @@ const ScannerModule = (() => {
           _seenIds.add(id);
           const kelly = autoKelly(opp.trueProb, opp.bestPrice, _bankroll, opp.isLive);
           if (_notifyEnabled) sendBrowserNotification(opp, kelly);
-          autoLogToJournal(opp, kelly);
+          autoLogToJournal(opp);
         }
       });
 
