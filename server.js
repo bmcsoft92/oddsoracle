@@ -484,12 +484,13 @@ const SPORTS_PRIORITY = new Set([
   'soccer_spain_la_liga', 'soccer_italy_serie_a', 'soccer_germany_bundesliga',
   'soccer_uefa_europa_league', 'soccer_fifa_world_cup', 'soccer_uefa_european_championship',
   'soccer_uefa_nations_league', 'soccer_conmebol_copa_libertadores', 'soccer_conmebol_copa_america',
+  'soccer_fifa_club_world_cup', 'soccer_brazil_campeonato', 'soccer_usa_mls',
   'basketball_nba', 'basketball_euroleague',
   'icehockey_nhl', 'baseball_mlb',
   'mma_mixed_martial_arts', 'americanfootball_nfl',
 ]);
 
-const BOOKMAKERS = ['betclic_fr', 'unibet_fr', 'pinnacle', 'winamax_fr', 'williamhill'];
+const BOOKMAKERS = ['betclic_fr', 'unibet_fr', 'pinnacle', 'winamax_fr', 'williamhill', 'bet365'];
 // ── Icône par groupe de sport ──────────────────────────────────────────────
 function mapGroupIcon(group) {
   const g = (group || '').toLowerCase();
@@ -1693,7 +1694,13 @@ async function getScannerData() {
   const activeSportsScan = await getActiveSports();
 
   // ── Scan par paliers : sports prioritaires à chaque cycle + rotation sur les sports secondaires ──
-  const prioritySports  = activeSportsScan.filter(s => SPORTS_PRIORITY.has(s.key));
+  // Sports prioritaires : la liste statique SPORTS_PRIORITY + tout tennis actif détecté
+  // dynamiquement (clés variables selon le tournoi) + les ligues sudaméricaines/MLS actives
+  const prioritySports  = activeSportsScan.filter(s =>
+    SPORTS_PRIORITY.has(s.key) ||
+    s.key.startsWith('tennis_atp') ||
+    s.key.startsWith('tennis_wta')
+  );
   const secondarySports = activeSportsScan.filter(s => !SPORTS_PRIORITY.has(s.key));
   let rotationBatch = [];
   if (secondarySports.length) {
