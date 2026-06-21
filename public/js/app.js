@@ -2297,4 +2297,3 @@ function toggleTheme() {
     if (t) t.classList.add('is-light');
   }
 }());
-      
