@@ -377,7 +377,7 @@ const BankrollUI = (() => {
           P. implicite brute: ${(r.pImplicit*100).toFixed(1)}%<br/>
           P. corrigée (marge retirée): ${(r.pCorrected*100).toFixed(1)}%<br/>
           Marge bookmaker: ${r.margin.toFixed(1)}%<br/>
-          ${r.isStrongBet ? '\U0001f525 STRONG VALUE BET (&gt;10%)' :
+          ${r.isStrongBet ? '🔥 STRONG VALUE BET (&gt;10%)' :
             r.isValueBet  ? '✅ Value bet (&gt;5%)' :
             r.edge >= 0   ? '⚠️ Edge positif mais insuffisant' : '❌ Pas de value'}
         </div>
@@ -1678,7 +1678,7 @@ var IA_JSON_KEY_MAP = [
 
 // Normalise une clé (accents retirés, majuscules, lettres uniquement) pour matcher IA_JSON_KEY_MAP
 function normIaKey(s) {
-  return String(s).normalize('NFD').replace(/[̀-ͯ]/g, '').toUpperCase().replace(/[^A-Z]+/g, ' ').trim();
+  return String(s).normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase().replace(/[^A-Z]+/g, ' ').trim();
 }
 
 // Tente d'extraire un tableau JSON (éventuellement dans un bloc ```json ... ```) de la réponse du LLM
@@ -2297,3 +2297,4 @@ function toggleTheme() {
     if (t) t.classList.add('is-light');
   }
 }());
+      

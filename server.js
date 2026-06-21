@@ -1411,7 +1411,7 @@ async function getLiveScores() {
 
 function normTeam(s) {
   return (s || '').toLowerCase()
-    .normalize('NFD').replace(/[̀-ͯ]/g, '') // retire les accents (Náutico -> Nautico)
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '') // retire les accents (Nautico -> Nautico)
     .replace(/\s+fc$/,'').replace(/^fc\s+/,'')
     .replace(/[^a-z0-9]/g, '');
 }
@@ -1580,7 +1580,8 @@ app.get('/api/live/all', async (req, res) => {
       seenKeys.add(mk);
       const key = espnEv._sportKey;
       const matched = matchOddsEvent(loadedOdds[key]||[], espnEv);
-      const enrichedOdds = matched ? enrichEvent(matched, SPORTS.find(function(s){ return s.key===key; })) : null;
+      const sportObj = SPORTS.find(function(s){ return s.key===key; });
+      const enrichedOdds = (matched && sportObj) ? enrichEvent(matched, sportObj) : null;
       liveMatches.push({
         homeTeam:    espnEv.strHomeTeam,
         awayTeam:    espnEv.strAwayTeam,
@@ -1657,7 +1658,9 @@ app.get('/api/upcoming', async (req, res) => {
 
   const now          = Date.now();
   // Limité aux sports prioritaires (quota Odds API) - voir SPORTS_PRIORITY
-  const activeSports = (await getActiveSports()).filter(function(s){ return SPORTS_PRIORITY.has(s.key); });
+  const activeSports = (await getActiveSports()).filter(function(s){
+    return SPORTS_PRIORITY.has(s.key) || s.key.startsWith('tennis_atp') || s.key.startsWith('tennis_wta');
+  });
   const h24 = now + 24 * 3600 * 1000;
   const upcoming = [];
 
@@ -1701,7 +1704,11 @@ async function getScannerData() {
     s.key.startsWith('tennis_atp') ||
     s.key.startsWith('tennis_wta')
   );
-  const secondarySports = activeSportsScan.filter(s => !SPORTS_PRIORITY.has(s.key));
+  const secondarySports = activeSportsScan.filter(s =>
+    !SPORTS_PRIORITY.has(s.key) &&
+    !s.key.startsWith('tennis_atp') &&
+    !s.key.startsWith('tennis_wta')
+  );
   let rotationBatch = [];
   if (secondarySports.length) {
     const batchSize = Math.min(SCAN_ROTATION_BATCH, secondarySports.length);
@@ -1753,7 +1760,8 @@ async function getScannerData() {
               _raw:         event.bookmakers || [],
             };
           });
-          const ttl = SPORTS_PRIORITY.has(sport.key) ? SCAN_ODDS_TTL_PRIORITY : SCAN_ODDS_TTL_SECONDARY;
+          const isPrioritySport = SPORTS_PRIORITY.has(sport.key) || sport.key.startsWith('tennis_atp') || sport.key.startsWith('tennis_wta');
+          const ttl = isPrioritySport ? SCAN_ODDS_TTL_PRIORITY : SCAN_ODDS_TTL_SECONDARY;
           cache.set(oddsCacheKey, oddsData, ttl);
           cache.set(oddsCacheKey + '_stale', oddsData, 604800); // 7j stale
         }
