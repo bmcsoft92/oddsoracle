@@ -1136,6 +1136,43 @@ async function loadOddsForSport(sport) {
   return data;
 }
 
+
+// Cache cotes LIVE : TTL 90 min pour que les cotes se rafraichissent pendant les matchs
+// Distinct du cache 12h de loadOddsForSport utilise par le scanner
+async function loadOddsForSportFresh(sport) {
+  const liveKey = 'live_odds_' + sport.key;
+  // 1. Cache court (90 min)
+  const hit = cache.get(liveKey);
+  if (hit) return hit;
+  // 2. Si quota trop bas, fallback sur le cache 12h
+  if (!quotaOk()) {
+    console.warn('[live] quota bas - fallback cache 12h pour ' + sport.key);
+    return loadOddsForSport(sport);
+  }
+  // 3. Appel API fresh
+  console.log('[live] refresh cotes live pour ' + sport.key);
+  const raw = await oddsApiFetch('/sports/' + sport.key + '/odds', {
+    regions: 'eu', markets: 'h2h', oddsFormat: 'decimal',
+    bookmakers: BOOKMAKERS.join(','),
+  });
+  const data = (Array.isArray(raw) ? raw : [raw]).map(function(event) {
+    recordOddsSnapshot(event.id, event.home_team, event.away_team, event.bookmakers || []);
+    return {
+      id:           event.id,
+      sport:        event.sport_key,
+      sportLabel:   sport.label,
+      sportIcon:    sport.icon,
+      homeTeam:     event.home_team,
+      awayTeam:     event.away_team,
+      commenceTime: event.commence_time,
+      bookmakers:   formatBookmakers(event.bookmakers || []),
+      bestOdds:     extractBestOdds(event.bookmakers || []),
+      _raw:         event.bookmakers || [],
+    };
+  });
+  cache.set(liveKey, data, 5400); // 90 min TTL live
+  return data;
+}
 // -- FILTRE VALUE : exclut les picks a cote extreme / faible probabilite --
 // Une cote tres elevee (ex: 26.00, 51.00) avec une probabilite reelle tres
 // faible (2-4%) peut avoir un "edge" mathematique eleve mais ne "passe"
@@ -1565,7 +1602,7 @@ app.get('/api/live/all', async (req, res) => {
     const oddsResults = await Promise.allSettled(
       liveSportKeys.map(function(key){
         const sp = SPORTS.find(function(s){ return s.key===key; });
-        return sp ? loadOddsForSport(sp) : Promise.resolve([]);
+        return sp ? loadOddsForSportFresh(sp) : Promise.resolve([]);
       })
     );
     const loadedOdds = {};
