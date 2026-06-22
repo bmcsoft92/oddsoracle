@@ -404,8 +404,8 @@ const ScannerModule = (() => {
             <strong>${err.message}</strong>
             <div style="margin-top:.5rem;font-size:.78rem;color:var(--text-muted)">
               ${err.message.includes('ODDS_API_KEY')
-                ? 'Configurez votre cle API The Odds API dans les parametres Render.'
-                : 'Verifiez votre connexion et reessayez.'}
+                ? 'Configurez votre clé API The Odds API dans les paramètres Render.'
+                : 'Vérifiez votre connexion et réessayez.'}
             </div>
           </div>`;
       }
@@ -427,10 +427,10 @@ const ScannerModule = (() => {
       container.innerHTML = `
         <div class="scanner-empty">
           <div style="font-size:3rem;margin-bottom:1rem">[?]</div>
-          <strong>Aucune opportunite detectee</strong>
+          <strong>Aucune opportunité détectée</strong>
           <div style="margin-top:.5rem;color:var(--text-muted);font-size:.8rem">
             Pas de matchs avec edge positif dans les prochaines 48h.<br>
-            Reessayez plus tard ou verifiez que votre cle API est configuree.
+            Réessayez plus tard ou vérifiez que votre clé API est configurée.
           </div>
         </div>`;
       _dedupedOpps   = [];
@@ -650,7 +650,7 @@ const ScannerModule = (() => {
     const meta    = document.getElementById('scanner-meta');
 
     if (!filtered.length) {
-      container.innerHTML = '<div class="scanner-empty">Aucune opportunite avec ces filtres</div>';
+      container.innerHTML = '<div class="scanner-empty">Aucune opportunité avec ces filtres</div>';
       if (badgeEl) { badgeEl.textContent = '0'; badgeEl.style.display = 'none'; }
       if (meta && _lastScanData && _lastScanData.meta) {
         const m = _lastScanData.meta;
@@ -918,7 +918,4 @@ const ScannerModule = (() => {
     }
   }
 
-  return { init, runScan, addToJournal, addExtraToJournal, applyFilters, focusSport, watchMatch, openStats };
-})();
-
-
+  return { init, runScan, addToJournal, addExtraToJournal, applyFilters, focusSport, watchMatch, openStats
