@@ -899,6 +899,7 @@ const ScannerModule = (() => {
 
     const autoLogChk = document.getElementById('scan-auto-log');
     if (autoLogChk) {
+      _autoLogEnabled = autoLogChk.checked; // lit l'etat initial de la checkbox
       autoLogChk.addEventListener('change', function() {
         _autoLogEnabled = autoLogChk.checked;
         showToast(_autoLogEnabled
@@ -918,4 +919,7 @@ const ScannerModule = (() => {
     }
   }
 
-  return { init, runScan, addToJournal, addExtraToJournal, applyFilters, focusSport, watchMatch, openStats
+  return { init, runScan, addToJournal, addExtraToJournal, applyFilters, focusSport, watchMatch, openStats };
+})();
+
+
