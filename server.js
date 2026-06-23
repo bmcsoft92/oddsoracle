@@ -1383,6 +1383,12 @@ async function fetchEventExtraMarkets(sportKey, eventId) {
 // SCORES LIVE - ESPN Scoreboard API (gratuit, sans quota, sans clé)
 // -----------------------------------------------------------------------
 const ESPN_LIVE_LEAGUES = [
+  // Tennis – Grand Slams + tour général (paths valides pendant les tournois)
+  { path: 'tennis/wimbledon',             sportKey: 'tennis_atp_wimbledon',               icon: '🎾', label: 'Wimbledon' },
+  { path: 'tennis/wimbledon',             sportKey: 'tennis_wta_wimbledon',               icon: '🎾', label: 'Wimbledon' },
+  { path: 'tennis/french-open',           sportKey: 'tennis_atp_french_open',             icon: '🎾', label: 'Roland Garros' },
+  { path: 'tennis/us-open',              sportKey: 'tennis_atp_us_open',                 icon: '🎾', label: 'US Open' },
+  { path: 'tennis/australian-open',       sportKey: 'tennis_atp_australian_open',         icon: '🎾', label: 'Australian Open' },
   { path: 'soccer/fra.1',                 sportKey: 'soccer_france_ligue1',               icon: '⚽', label: 'Ligue 1' },
   { path: 'soccer/eng.1',                 sportKey: 'soccer_epl',                         icon: '⚽', label: 'Premier League' },
   { path: 'soccer/esp.1',                 sportKey: 'soccer_spain_la_liga',               icon: '⚽', label: 'La Liga' },
@@ -1658,6 +1664,12 @@ app.get('/api/live/all', async (req, res) => {
         if (seenKeys.has(mk2)) continue;
         seenKeys.add(mk2);
         const started  = t <= now;
+        // Si le sport est couvert par ESPN (liveSportKeys) mais que ce match n'est
+        // pas dans le feed ESPN (pas dans seenKeys), il est probablement terminé →
+        // on ne l'affiche pas comme live (isImminent: !started le mettra en "à venir")
+        const espnCoversThisSport = liveSportKeys.includes(sport.key);
+        const likelyFinished = started && espnCoversThisSport;
+        if (likelyFinished) continue; // ESPN aurait dû le détecter s'il était en cours
         const hoursLeft = started ? 0 : Math.round((t-now)/360000)/10;
         liveMatches.push({
           ...enriched,
