@@ -1880,6 +1880,12 @@ async function getScannerData() {
           let confidence = pinnacle ? 'high' : rawBk.length >= 3 ? 'medium' : 'low';
           if (consensus.lowAgreement) confidence = 'low';
 
+          // Marché suspect : peu de bookmakers + divergence élevée pour un match non démarré.
+          // Signal typique d'un marché suspendu (forfait, abandon) que l'Odds API n'a pas
+          // encore retiré : les bookmakers sérieux ont déjà gelé/retiré leurs cotes (d'où
+          // la faible profondeur) et ceux qui restent divergent (ligne non mise à jour).
+          if (!isLive && confidence === 'low' && rawBk.length < 4) continue;
+
           const hoursLeft  = (t - now) / 3600000;
           const urgency    = isLive ? 'live' : hoursLeft < 2 ? 'soon' : hoursLeft < 6 ? 'today' : 'upcoming';
 
