@@ -840,9 +840,9 @@ async function autoLogFortePicks() {
     const fortePicks = deduped.filter(function(o) {
       if (o.predLabel !== 'FORTE') return false;
       if (alreadyToday.has(o.matchId)) return false;
-      // Score ajusté (edge + forme/H2H) : rejeter si nettement sous le seuil fiable
-      const score = o.adjustedScore != null ? o.adjustedScore : (o.predScore || 0);
-      if (score < PRONOS_MIN_RELIABLE_SCORE) return false;
+      // predLabel='FORTE' est le filtre qualité principal (edge>=10, prob>=28%, confidence high)
+      // Le check adjustedScore est retiré : prédScore était en fraction (bug), et
+      // le filter FORTE garantit déjà la qualité minimale voulue.
       // Verdict Gemini : si disponible et explicitement contre, passer ce pick
       if (o.verdictSupports === false) return false;
       return true;
@@ -1883,7 +1883,7 @@ async function getScannerData() {
           const hoursLeft  = (t - now) / 3600000;
           const urgency    = isLive ? 'live' : hoursLeft < 2 ? 'soon' : hoursLeft < 6 ? 'today' : 'upcoming';
 
-          const predScore  = Math.min(99, Math.round(trueProb * (1 + edge / 100)));
+          const predScore  = Math.min(99, Math.round(trueProb * 100 * (1 + edge / 100))); // trueProb fraction → x100 pour score 0-99
           const predLabel  = classifyPick(trueProb, bestPrice, edge, confidence, consensus);
 
           opportunities.push({
