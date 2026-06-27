@@ -838,11 +838,9 @@ async function autoLogFortePicks() {
     });
 
     const fortePicks = deduped.filter(function(o) {
-      if (o.predLabel !== 'FORTE') return false;
+      // Auto-log : FORTE (edge>=10) + BONNE (edge>=6), verdictSupports garde-fou qualité
+      if (o.predLabel !== 'FORTE' && o.predLabel !== 'BONNE') return false;
       if (alreadyToday.has(o.matchId)) return false;
-      // predLabel='FORTE' est le filtre qualité principal (edge>=10, prob>=28%, confidence high)
-      // Le check adjustedScore est retiré : prédScore était en fraction (bug), et
-      // le filter FORTE garantit déjà la qualité minimale voulue.
       // Verdict Gemini : si disponible et explicitement contre, passer ce pick
       if (o.verdictSupports === false) return false;
       return true;
@@ -851,6 +849,7 @@ async function autoLogFortePicks() {
 
     const baseId = Date.now();
     fortePicks.forEach(function(o, i) {
+      const stake = PRONOS_STAKE_BY_LABEL[o.predLabel] || 60;
       bets.unshift({
         id:        baseId + i,
         date:      today,
@@ -861,10 +860,10 @@ async function autoLogFortePicks() {
         market:    'Vainqueur match',
         selection: o.selection,
         cote:      o.bestPrice,
-        stake:     100,
+        stake:     stake,
         edge:      o.edge,
         result:    'pending',
-        reason:    '[AUTO-FORTE] Score ajuste ' + o.adjustedScore + '/100 -- Edge +' + o.edge + '% -- ' + o.bestBook,
+        reason:    '[AUTO-' + o.predLabel + '] Score ajuste ' + o.adjustedScore + '/100 -- Edge +' + o.edge + '% -- ' + o.bestBook,
         matchId:   o.matchId,
         autoForte: true,
       });
