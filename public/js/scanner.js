@@ -772,12 +772,14 @@ const ScannerModule = (() => {
     if (typeof openMatchStats !== 'function') return;
     openMatchStats({
       dataset: {
-        home:    opp.homeTeam || '',
-        away:    opp.awayTeam || '',
-        sport:   opp.sport || '',
-        matchId: opp.matchId || '',
-        edge:    String(opp.edge != null ? opp.edge : ''),
-        prob:    String(opp.trueProb != null ? opp.trueProb : ''),
+        home:      opp.homeTeam || '',
+        away:      opp.awayTeam || '',
+        sport:     opp.sport || '',
+        matchId:   opp.matchId || '',
+        edge:      String(opp.edge != null ? opp.edge : ''),
+        prob:      String(opp.trueProb != null ? opp.trueProb : ''),
+        selection: opp.selection || '',
+        cote:      String(opp.bestPrice != null ? opp.bestPrice : ''),
       }
     });
   }

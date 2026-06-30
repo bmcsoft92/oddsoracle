@@ -2905,7 +2905,7 @@ app.get('/api/match-stats', async function(req, res) {
 // Construit le message utilisateur envoyé au LLM à partir des données réellement
 // disponibles (stats déjà collectées par buildMatchStatsData + contexte du modèle local)
 function buildIaUserMessage(params) {
-  const { home, away, sport, edge, prob, market, cote, stats } = params;
+  const { home, away, sport, edge, prob, market, cote, stats, selection } = params;
   const sportInfo  = SPORTS.find(function(s){ return s.key === sport; }) || null;
   const sportLabel = sportInfo ? sportInfo.label : (sport || 'Sport inconnu');
   const sportGroup = sportInfo ? sportInfo.group : '';
@@ -2968,6 +2968,18 @@ function buildIaUserMessage(params) {
     lines.push('Match à venir (pas de données live disponibles pour le moment).');
   }
 
+  // Quand le scanner a identifié un pick précis, on ancre Gemini sur CE pick.
+  // Sans cet ancrage, Gemini choisit librement son camp et peut recommander l'adversaire,
+  // créant une incohérence entre la carte scanner et l'onglet IA Analyse.
+  if (selection) {
+    lines.push('PICK RECOMMANDÉ PAR LE MODÈLE MARCHÉ : parier sur ' + selection
+      + (cote ? ' @ ' + cote : '')
+      + (edge ? ' (edge marché +' + edge + '%)' : ''));
+    lines.push('Évalue si ce pari spécifique a de la valeur au regard des données ci-dessus.'
+      + ' Ton MARCHÉ principal DOIT porter sur ce camp (' + selection + ').'
+      + ' Ne recommande le camp adverse QUE si les données révèlent une raison fondamentale et majeure de rejeter ce pick (ex: blessure confirmée, suspension, forme catastrophique combinée à H2H très défavorable).');
+  }
+
   lines.push('');
   lines.push('Analyse ce match selon le sport "' + sportLabel + '" et propose 1 à 3 pronos au format demandé.');
 
@@ -3006,7 +3018,8 @@ app.get('/api/ia-analysis', async function(req, res) {
   const edge    = req.query.edge;
   const prob    = req.query.prob;
   const market  = (req.query.market  || '').trim();
-  const cote    = req.query.cote;
+  const cote      = req.query.cote;
+  const selection = (req.query.selection || '').trim();
 
   if (!home || !away) {
     return res.status(400).json({ error: 'Paramètres home et away requis' });
@@ -3015,13 +3028,13 @@ app.get('/api/ia-analysis', async function(req, res) {
     return res.status(503).json({ error: 'GEMINI_API_KEY non configurée sur le serveur. Voir .env.example' });
   }
 
-  const cacheKey = 'ia_' + normTeam(home) + '_' + normTeam(away) + '_' + sport;
+  const cacheKey = 'ia_' + normTeam(home) + '_' + normTeam(away) + '_' + sport + (selection ? '_' + normTeam(selection) : '');
   const cached = cache.get(cacheKey);
   if (cached) return res.json(cached);
 
   try {
     const stats = await buildMatchStatsData(home, away, sport, matchId);
-    const userMessage = buildIaUserMessage({ home, away, sport, edge, prob, market, cote, stats });
+    const userMessage = buildIaUserMessage({ home, away, sport, edge, prob, market, cote, stats, selection });
 
     const payload = {
       systemInstruction: { parts: [{ text: ODDSORACLE_SYSTEM_PROMPT }] },

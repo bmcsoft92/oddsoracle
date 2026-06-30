@@ -1420,8 +1420,10 @@ function openMatchStats(btnOrCard) {
   var away    = card.dataset.away    || '';
   var sport   = card.dataset.sport   || '';
   var matchId = card.dataset.matchId || card.dataset['match-id'] || '';
-  var edge    = parseFloat(card.dataset.edge) || 0;
-  var prob    = parseFloat(card.dataset.prob)  || 0;
+  var edge      = parseFloat(card.dataset.edge)      || 0;
+  var prob      = parseFloat(card.dataset.prob)      || 0;
+  var selection = card.dataset.selection             || '';
+  var cote      = parseFloat(card.dataset.cote)      || 0;
 
   var overlay = document.getElementById('stats-modal-overlay');
   var modal   = document.getElementById('stats-modal');
@@ -1453,7 +1455,7 @@ function openMatchStats(btnOrCard) {
     .then(function(data){
       if (data && data.error) throw new Error(data.error);
       window._statsModalData = data;
-      window._statsModalMeta = { home: home, away: away, sport: sport, edge: edge, prob: prob };
+      window._statsModalMeta = { home: home, away: away, sport: sport, edge: edge, prob: prob, selection: selection, cote: cote };
       renderStatsTab('ia', data, home, away, edge, prob);
     })
     .catch(function(err){
@@ -1600,7 +1602,7 @@ function renderTabIA(data, home, away, edge, prob) {
   html += '</div>';
 
   // Lance le chargement de l'analyse IA après l'injection du HTML dans le DOM
-  setTimeout(function(){ loadIaAnalysis(home, away, meta.sport || '', edge, prob); }, 0);
+  setTimeout(function(){ loadIaAnalysis(home, away, meta.sport || '', edge, prob, meta.selection || '', meta.cote || 0); }, 0);
 
   return html;
 }
@@ -1613,7 +1615,7 @@ function iaQuickCard(label, val, sub) {
 }
 
 /* ---- ANALYSE IA AVANCÉE (Claude / OddsOracle) ---- */
-function loadIaAnalysis(home, away, sport, edge, prob) {
+function loadIaAnalysis(home, away, sport, edge, prob, selection, cote) {
   var loadingBox = document.getElementById('ia-llm-result');
   if (loadingBox) loadingBox.innerHTML = '<div class="ia-llm-loading"><span class="stats-spinner ia-llm-spinner"></span>Analyse IA en cours…</div>';
 
@@ -1621,7 +1623,9 @@ function loadIaAnalysis(home, away, sport, edge, prob) {
           + '&away=' + encodeURIComponent(away)
           + '&sport=' + encodeURIComponent(sport || '')
           + '&edge=' + encodeURIComponent(edge || 0)
-          + '&prob=' + encodeURIComponent(prob || 0);
+          + '&prob=' + encodeURIComponent(prob || 0)
+          + (selection ? '&selection=' + encodeURIComponent(selection) : '')
+          + (cote      ? '&cote='      + encodeURIComponent(cote)      : '');
 
   fetch(url)
     .then(function(r){
@@ -1636,7 +1640,7 @@ function loadIaAnalysis(home, away, sport, edge, prob) {
       if (!res.ok) {
         var errMsg = (res.data && res.data.error) || 'Analyse IA indisponible';
         box.innerHTML = iaErrorBox(errMsg);
-        bindIaRetry(box, home, away, sport, edge, prob);
+        bindIaRetry(box, home, away, sport, edge, prob, selection, cote);
         return;
       }
       box.innerHTML = formatIaAnalysis((res.data && res.data.analysis) || '');
@@ -1658,9 +1662,9 @@ function iaErrorBox(msg) {
 }
 
 // Branche le bouton "Réessayer" sur un nouvel appel à loadIaAnalysis
-function bindIaRetry(box, home, away, sport, edge, prob) {
+function bindIaRetry(box, home, away, sport, edge, prob, selection, cote) {
   var btn = box.querySelector('.ia-llm-retry-btn');
-  if (btn) btn.addEventListener('click', function(){ loadIaAnalysis(home, away, sport, edge, prob); });
+  if (btn) btn.addEventListener('click', function(){ loadIaAnalysis(home, away, sport, edge, prob, selection, cote); });
 }
 
 // Correspondance clés JSON (réponse de secours de Gemini) -> émoji/classe/libellé attendus
