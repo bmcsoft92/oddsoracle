@@ -2994,7 +2994,7 @@ function buildIaUserMessage(params) {
     lines.push('- Possession : estimation home/away (ex: 55%/45%)');
     lines.push('- Over/Under buts : 1.5, 2.5 ou 3.5 selon ton analyse');
     lines.push('Utilise ta connaissance du style de jeu et des stats récentes de ces équipes pour estimer ces valeurs.');
-    lines.push('Indique "(estimation qualitative)" si tu n'as pas les données précises.');
+    lines.push('Indique "(estimation qualitative)" si tu n\'as pas les données précises.');
   }
 
   lines.push('');
