@@ -2980,6 +2980,23 @@ function buildIaUserMessage(params) {
       + ' Ne recommande le camp adverse QUE si les données révèlent une raison fondamentale et majeure de rejeter ce pick (ex: blessure confirmée, suspension, forme catastrophique combinée à H2H très défavorable).');
   }
 
+  // Pour les matchs de football/soccer, demande explicitement des prédictions
+  // sur les statistiques de jeu (tirs, corners, possession, BTTS).
+  // Ces marchés sont déjà dans le system prompt mais sans instruction explicite
+  // dans le message utilisateur, Gemini se limite souvent au vainqueur du match.
+  if (sportGroup === 'soccer' || (sport && sport.startsWith('soccer'))) {
+    lines.push('');
+    lines.push('FOOTBALL - PRÉDICTIONS DE STATISTIQUES DEMANDÉES :');
+    lines.push('En plus du vainqueur du match, inclus dans ta réponse des pronos chiffrés sur :');
+    lines.push('- Corners : total estimé du match et Over/Under recommandé (ex: Total corners Over 8.5)');
+    lines.push('- Tirs cadrés : estimation home/away (ex: Tirs cadrés : 4-6 / 2-3)');
+    lines.push('- BTTS (les deux équipes marquent) : probabilité estimée (%)');
+    lines.push('- Possession : estimation home/away (ex: 55%/45%)');
+    lines.push('- Over/Under buts : 1.5, 2.5 ou 3.5 selon ton analyse');
+    lines.push('Utilise ta connaissance du style de jeu et des stats récentes de ces équipes pour estimer ces valeurs.');
+    lines.push('Indique "(estimation qualitative)" si tu n'as pas les données précises.');
+  }
+
   lines.push('');
   lines.push('Analyse ce match selon le sport "' + sportLabel + '" et propose 1 à 3 pronos au format demandé.');
 
