@@ -1,0 +1,19 @@
+[
+  {
+    "id": 1783097841498,
+    "date": "2026-07-03",
+    "sport": "tennis",
+    "sportKey": "tennis_wta_wimbledon",
+    "match": "Claire Liu vs Coco Gauff",
+    "type": "live",
+    "market": "Vainqueur match",
+    "selection": "Coco Gauff",
+    "cote": 1.14,
+    "stake": 60,
+    "edge": 6.2,
+    "result": "pending",
+    "reason": "[AUTO-BONNE] Score ajuste 99/100 -- Edge +6.2% -- William Hill",
+    "matchId": "2e6bee29238d535c24d76aa2425c32ed",
+    "autoForte": true
+  }
+]
