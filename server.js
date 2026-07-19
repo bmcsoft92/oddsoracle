@@ -3432,7 +3432,45 @@ app.get('/api/check-result', async (req, res) => {
     }
   }
 
-  // ── 4. Sofascore fallback (tennis + autres sports) ─────────────────────
+  // ── 3b. TheSportsDB - recherche par noms de famille (tennis) ──────────
+  // Les joueurs de tennis sont parfois indexés avec leurs noms de famille seulement
+  {
+    const lastA = home.trim().split(/\s+/).pop();
+    const lastB = away.trim().split(/\s+/).pop();
+    const extraQueries = [lastA + ' vs ' + lastB, lastB + ' vs ' + lastA,
+                          lastA + ' ' + lastB, lastB + ' ' + lastA];
+    for (const q of extraQueries) {
+      if (q.length < 4) continue;
+      try {
+        const ctrl5 = new AbortController();
+        setTimeout(function(){ ctrl5.abort(); }, 6000);
+        const r5 = await fetch(
+          'https://www.thesportsdb.com/api/v1/json/3/searchevents.php?e=' + encodeURIComponent(q),
+          { signal: ctrl5.signal }
+        );
+        if (!r5.ok) continue;
+        const d5 = await r5.json();
+        const evs5 = (d5.event || []).filter(function(ev) {
+          const fwd = teamMatch(ev.strHomeTeam, home) && teamMatch(ev.strAwayTeam, away);
+          const rev = teamMatch(ev.strHomeTeam, away) && teamMatch(ev.strAwayTeam, home);
+          if (!fwd && !rev) return false;
+          if (date && ev.dateEvent && !ev.dateEvent.startsWith(date)) return false;
+          return true;
+        });
+        const ev5 = evs5[0];
+        if (!ev5) continue;
+        const finished5 = FINISHED_STATUSES.test((ev5.strStatus || '').trim());
+        if (!finished5) return res.json({ result: 'pending', status: ev5.strStatus });
+        const hs5 = parseInt(ev5.intHomeScore || 0);
+        const as5 = parseInt(ev5.intAwayScore || 0);
+        let winner5 = hs5 > as5 ? ev5.strHomeTeam : as5 > hs5 ? ev5.strAwayTeam : 'draw';
+        const result5 = teamMatch(selection, winner5) ? 'win' : 'loss';
+        return res.json({ result: result5, winner: winner5, score: hs5+'-'+as5, home, away, source: 'thesportsdb-lastnames' });
+      } catch(e5) { /* timeout */ }
+    }
+  }
+
+    // ── 4. Sofascore fallback (tennis + autres sports) ─────────────────────
   // API non-officielle, la plus complète pour les résultats tennis individuels.
   if (date) {
     // Détermine le nom de sport Sofascore
@@ -3449,7 +3487,14 @@ app.get('/api/check-result', async (req, res) => {
         setTimeout(function(){ ctrl4.abort(); }, 8000);
         const r4 = await fetch(
           'https://api.sofascore.com/api/v1/sport/' + sfSport + '/scheduled-events/' + date,
-          { signal: ctrl4.signal, headers: { 'User-Agent': 'Mozilla/5.0', 'Accept': 'application/json, */*' } }
+          { signal: ctrl4.signal, headers: {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36',
+            'Accept': 'application/json, text/plain, */*',
+            'Accept-Language': 'en-US,en;q=0.9',
+            'Referer': 'https://www.sofascore.com/',
+            'Origin': 'https://www.sofascore.com',
+            'Cache-Control': 'no-cache'
+          } }
         );
         if (debug) debugLog.push({ sofascore_url: r4.url, httpOk: r4.ok, status: r4.status });
         if (r4.ok) {
