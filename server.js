@@ -3289,7 +3289,7 @@ app.get('/api/check-result', async (req, res) => {
           if (!r.ok) continue;
           const sb = await r.json();
           const events = sb.events || [];
-          if (debug) debugLog.push({ url, totalEvents: events.length, sampleNames: events.slice(0,5).map(function(ev){ const c=(ev.competitions||[])[0]||{}; const cx=c.competitors||[]; return [espnName(cx[0]),espnName(cx[1])]; }) });
+          if (debug) debugLog.push({ url, totalEvents: events.length, sampleNames: events.slice(0,5).map(function(ev){ const c=(ev.competitions||[])[0]||{}; const cx=c.competitors||[]; return [espnName(cx[0]),espnName(cx[1])]; }), rawFirstEvent: debug && events[0] ? JSON.stringify(events[0]).slice(0,800) : null });
           for (const ev of events) {
             const comp  = (ev.competitions || [])[0] || {};
             const comps = comp.competitors || [];
