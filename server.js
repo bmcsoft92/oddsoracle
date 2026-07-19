@@ -2355,7 +2355,13 @@ app.listen(PORT, () => {
 // ESPN LIVE SIGNAL DETECTION  /api/live-signals
 // ═══════════════════════════════════════════════════════════════════════
 const ESPN_MAP = {
+  // Tennis générique (toutes les semaines hors Grand Chelem)
   tennis_atp: 'tennis/atp', tennis_wta: 'tennis/wta',
+  // Grand Chelems (endpoints ESPN spécifiques, requis pour check-result)
+  tennis_atp_wimbledon: 'tennis/wimbledon',   tennis_wta_wimbledon: 'tennis/wimbledon',
+  tennis_atp_french_open: 'tennis/french-open', tennis_wta_french_open: 'tennis/french-open',
+  tennis_atp_us_open: 'tennis/us-open',         tennis_wta_us_open: 'tennis/us-open',
+  tennis_atp_australian_open: 'tennis/australian-open', tennis_wta_australian_open: 'tennis/australian-open',
   soccer_epl: 'soccer/eng.1', soccer_france_ligue1: 'soccer/fra.1',
   soccer_spain_la_liga: 'soccer/esp.1', soccer_germany_bundesliga: 'soccer/ger.1',
   soccer_italy_serie_a: 'soccer/ita.1', soccer_europe_champs: 'soccer/uefa.champions',
@@ -2379,7 +2385,7 @@ const ESPN_MAP = {
 // connaît que le label générique (ex: "hockey") et non la clé API précise
 // (ex: "icehockey_nhl").
 const GENERIC_SPORT_ESPN_KEYS = {
-  tennis: ['tennis_atp', 'tennis_wta'],
+  tennis: ['tennis_atp', 'tennis_wta', 'tennis_atp_wimbledon', 'tennis_wta_wimbledon', 'tennis_atp_french_open', 'tennis_wta_french_open', 'tennis_atp_us_open', 'tennis_wta_us_open', 'tennis_atp_australian_open', 'tennis_wta_australian_open'],
   basketball: ['basketball_nba', 'basketball_nba_championship', 'basketball_wnba', 'basketball_euroleague', 'basketball_ncaab'],
   baseball: ['baseball_mlb'],
   hockey: ['icehockey_nhl'],
