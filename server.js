@@ -2812,19 +2812,27 @@ async function buildMatchStatsData(home, away, sport, matchId) {
       const espnPath = ESPN_MAP[sport];
       if (!espnPath) return null;
       try {
-        const url = 'https://site.api.espn.com/apis/site/v2/sports/' + espnPath + '/scoreboard';
-        const ctrl = new AbortController();
-        setTimeout(function(){ ctrl.abort(); }, 6000);
-        const r = await fetch(url, { signal: ctrl.signal });
-        if (!r.ok) return null;
-        const sbData = await r.json();
-        const events = sbData.events || [];
-        // MLB et autres sports jouent des séries de plusieurs jours :
-        // le scoreboard peut contenir le match d'hier (terminé) ET celui d'aujourd'hui
-        // (à venir / live). On collecte tous les candidats et on préfère un match
-        // non-terminé (live ou à venir) sur un match terminé.
+        // ?dates=YYYYMMDD : sans ce paramètre ESPN peut renvoyer les matchs d'hier
+        // (MLB etc. - scoreboard par défaut = 'dernière session de jeu' côté ET).
+        // On interroge aujourd'hui UTC + demain pour couvrir les matchs de nuit.
+        function espnDateStr(offMs) {
+          const d = new Date(Date.now() + offMs);
+          return d.getUTCFullYear().toString()
+            + String(d.getUTCMonth()+1).padStart(2,'0')
+            + String(d.getUTCDate()).padStart(2,'0');
+        }
+        let allEvents = [];
+        for (const dateStr of [espnDateStr(0), espnDateStr(86400000)]) {
+          const url2 = 'https://site.api.espn.com/apis/site/v2/sports/' + espnPath + '/scoreboard?dates=' + dateStr;
+          const ctrl2 = new AbortController();
+          const t2 = setTimeout(function(){ ctrl2.abort(); }, 6000);
+          try {
+            const r2 = await fetch(url2, { signal: ctrl2.signal });
+            if (r2.ok) { const sb2 = await r2.json(); allEvents = allEvents.concat(sb2.events || []); }
+          } catch(e2) { /* silencieux */ } finally { clearTimeout(t2); }
+        }
         const candidates = [];
-        for (const ev of events) {
+        for (const ev of allEvents) {
           const comp  = (ev.competitions || [])[0] || {};
           const comps = comp.competitors || [];
           const n0 = espnName(comps[0]), n1 = espnName(comps[1]);
