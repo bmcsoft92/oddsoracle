@@ -3291,42 +3291,43 @@ app.get('/api/check-result', async (req, res) => {
           const events = sb.events || [];
           if (debug) debugLog.push({ url, totalEvents: events.length, sampleNames: events.slice(0,5).map(function(ev){ const c=(ev.competitions||[])[0]||{}; const cx=c.competitors||[]; return [espnName(cx[0]),espnName(cx[1])]; }), rawFirstEvent: debug && events[0] ? JSON.stringify(events[0]).slice(0,800) : null });
           for (const ev of events) {
+            // ── A. Structure classique (sports collectifs) ──
             const comp  = (ev.competitions || [])[0] || {};
             const comps = comp.competitors || [];
-            // espnName() gère team.displayName (sports collectifs) ET athlete.displayName (tennis, MMA...)
             const n0 = espnName(comps[0]);
             const n1 = espnName(comps[1]);
-            if (!((teamMatch(n0,home)&&teamMatch(n1,away))||(teamMatch(n0,away)&&teamMatch(n1,home)))) continue;
-
-            const status  = (ev.status||{});
-            const state   = (status.type||{}).state || ''; // pre / in / post
-            if (state !== 'post') return res.json({ result: 'pending', status: state, score: null });
-
-            const s0 = parseFloat(comps[0].score||0);
-            const s1 = parseFloat(comps[1].score||0);
-            const homeIsComp0 = teamMatch(n0, home);
-            const homeScore = homeIsComp0 ? s0 : s1;
-            const awayScore = homeIsComp0 ? s1 : s0;
-
-            let winner = null;
-            if (homeScore > awayScore) winner = home;
-            else if (awayScore > homeScore) winner = away;
-            else winner = 'draw';
-
-            // Détermine win/loss selon la sélection
-            let result = 'loss';
-            const sel = norm(selection);
-            if (sel === 'nul' || sel === 'draw' || sel === 'x') {
-              result = winner === 'draw' ? 'win' : 'loss';
-            } else if (teamMatch(selection, winner)) {
-              result = 'win';
+            if ((teamMatch(n0,home)&&teamMatch(n1,away))||(teamMatch(n0,away)&&teamMatch(n1,home))) {
+              const state = ((ev.status||{}).type||{}).state || '';
+              if (state !== 'post') return res.json({ result: 'pending', status: state, score: null });
+              const s0 = parseFloat(comps[0].score||0), s1 = parseFloat(comps[1].score||0);
+              const homeFirst = teamMatch(n0, home);
+              const hs = homeFirst ? s0 : s1, as = homeFirst ? s1 : s0;
+              let winner = hs > as ? home : as > hs ? away : 'draw';
+              const sel = norm(selection);
+              let result = 'loss';
+              if (sel==='nul'||sel==='draw'||sel==='x') result = winner==='draw'?'win':'loss';
+              else if (teamMatch(selection,winner)) result = 'win';
+              return res.json({ result, winner, score: hs+'-'+as, home, away, source: 'espn' });
             }
-
-            return res.json({
-              result, winner,
-              score: homeScore + '-' + awayScore,
-              home, away, source: 'espn'
-            });
+            // ── B. Structure tournament ESPN (Grand Chelems tennis) ──
+            // groupings → competitions → notes[0].text = "Joueur A (PAYS) bt Joueur B (PAYS) score"
+            for (const g of (ev.groupings || [])) {
+              for (const gc of (g.competitions || [])) {
+                const noteText = ((gc.notes||[])[0]||{}).text || '';
+                if (!noteText || noteText.indexOf(' bt ') === -1) continue;
+                const nn = norm(noteText);
+                const hw = norm(home).split(' ').filter(function(w){ return w.length>3; })[0] || '';
+                const aw = norm(away).split(' ').filter(function(w){ return w.length>3; })[0] || '';
+                if (!hw || !aw || !nn.includes(hw) || !nn.includes(aw)) continue;
+                const gcState = ((gc.status||{}).type||{}).state || '';
+                if (gcState !== 'post') continue;
+                const btIdx = noteText.indexOf(' bt ');
+                const winnerRaw = noteText.slice(0, btIdx).replace(/\s*\([A-Z]{2,3}\)\s*$/, '').trim();
+                if (debug) debugLog.push({ espn_groupings_note: noteText, winnerRaw });
+                const gcResult = teamMatch(selection, winnerRaw) ? 'win' : 'loss';
+                return res.json({ result: gcResult, winner: winnerRaw, score: noteText.slice(btIdx+4), home, away, source: 'espn-groupings' });
+              }
+            }
           }
         }
       }
