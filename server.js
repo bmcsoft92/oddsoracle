@@ -3232,6 +3232,8 @@ app.get('/api/check-result', async (req, res) => {
   const date      = (req.query.date      || '').trim(); // YYYY-MM-DD
   const selection = (req.query.selection || '').trim();
   const sport     = (req.query.sport     || '').trim();
+  const debug     = req.query.debug === '1';
+  const debugLog  = [];
 
   if (!home || !away) return res.json({ result: 'pending', reason: 'params manquants' });
 
@@ -3283,9 +3285,11 @@ app.get('/api/check-result', async (req, res) => {
 
         for (const url of urls) {
           const r = await fetch(url, { signal: ctrl.signal });
+          if (debug) debugLog.push({ url, httpOk: r.ok, status: r.status });
           if (!r.ok) continue;
           const sb = await r.json();
           const events = sb.events || [];
+          if (debug) debugLog.push({ url, totalEvents: events.length, sampleNames: events.slice(0,5).map(function(ev){ const c=(ev.competitions||[])[0]||{}; const cx=c.competitors||[]; return [espnName(cx[0]),espnName(cx[1])]; }) });
           for (const ev of events) {
             const comp  = (ev.competitions || [])[0] || {};
             const comps = comp.competitors || [];
@@ -3343,6 +3347,7 @@ app.get('/api/check-result', async (req, res) => {
     try {
       const ctrl2 = new AbortController();
       setTimeout(function(){ ctrl2.abort(); }, 6000);
+      if (debug) debugLog.push({ tsdb_search: q });
       const r = await fetch(
         'https://www.thesportsdb.com/api/v1/json/3/searchevents.php?e=' + encodeURIComponent(q),
         { signal: ctrl2.signal }
@@ -3427,96 +3432,8 @@ app.get('/api/check-result', async (req, res) => {
     }
   }
 
+  if (debug) return res.json({ result: 'pending', reason: 'match non trouvé', debugLog });
   return res.json({ result: 'pending', reason: 'match non trouvé' });
 });
 
-// ── DEBUG check-result : voir ce que retournent ESPN + TheSportsDB ──────
-app.get('/api/debug-check-result', async (req, res) => {
-  const home = (req.query.home || '').trim();
-  const away = (req.query.away || '').trim();
-  const date = (req.query.date || '').trim();
-  const sport = (req.query.sport || '').trim();
-  const log = [];
-
-  function norm(s) { return (s||'').toLowerCase().replace(/[^a-z0-9]/g,' ').replace(/\s+/g,' ').trim(); }
-  function teamMatch(a, b) {
-    const na = norm(a), nb = norm(b);
-    if (na === nb) return true;
-    const wa = na.split(' '), wb = nb.split(' ');
-    return wa.some(w => w.length > 3 && nb.includes(w)) || wb.some(w => w.length > 3 && na.includes(w));
-  }
-
-  // ESPN
-  const espnPathsDebug = [];
-  if (ESPN_MAP[sport]) espnPathsDebug.push(ESPN_MAP[sport]);
-  if (/tennis_wta_(wimbledon|french_open|us_open|australian_open)/.test(sport)) espnPathsDebug.push('tennis/wta');
-  if (/tennis_atp_(wimbledon|french_open|us_open|australian_open)/.test(sport)) espnPathsDebug.push('tennis/atp');
-  log.push({ step: 'espnPaths', paths: espnPathsDebug });
-
-  const dates = [];
-  if (date) {
-    const d = new Date(date);
-    for (const i of [0,-1,1]) { const dd = new Date(d); dd.setDate(dd.getDate()+i); dates.push(dd.toISOString().slice(0,10).replace(/-/g,'')); }
-  }
-
-  for (const espnPath of espnPathsDebug) {
-    for (const ds of dates) {
-      try {
-        const url = 'https://site.api.espn.com/apis/site/v2/sports/'+espnPath+'/scoreboard?dates='+ds;
-        const ctrl = new AbortController(); setTimeout(function(){ ctrl.abort(); }, 6000);
-        const r = await fetch(url, { signal: ctrl.signal });
-        const sb = r.ok ? await r.json() : null;
-        const events = sb ? (sb.events||[]) : [];
-        const names = events.slice(0,10).map(function(ev){
-          const comp=(ev.competitions||[])[0]||{};
-          const comps=comp.competitors||[];
-          return [espnName(comps[0]), espnName(comps[1])];
-        });
-        const matched = events.filter(function(ev){
-          const comp=(ev.competitions||[])[0]||{};
-          const comps=comp.competitors||[];
-          const n0=espnName(comps[0]),n1=espnName(comps[1]);
-          return (teamMatch(n0,home)&&teamMatch(n1,away))||(teamMatch(n0,away)&&teamMatch(n1,home));
-        }).map(function(ev){ return { status: (ev.status||{}).type, score: ((ev.competitions||[])[0]||{}).competitors }; });
-        log.push({ espnPath, date: ds, httpOk: r.ok, totalEvents: events.length, sampleNames: names, matched });
-      } catch(e) { log.push({ espnPath, date: ds, error: e.message }); }
-    }
-  }
-
-  // TheSportsDB searchevents
-  for (const q of [home+' vs '+away, away+' vs '+home]) {
-    try {
-      const ctrl2 = new AbortController(); setTimeout(function(){ ctrl2.abort(); }, 6000);
-      const r2 = await fetch('https://www.thesportsdb.com/api/v1/json/3/searchevents.php?e='+encodeURIComponent(q), { signal: ctrl2.signal });
-      const d2 = r2.ok ? await r2.json() : null;
-      const evs = d2 ? (d2.event||[]).map(function(ev){ return { date: ev.dateEvent, home: ev.strHomeTeam, away: ev.strAwayTeam, status: ev.strStatus, score: ev.intHomeScore+'-'+ev.intAwayScore }; }) : [];
-      log.push({ tsdb_search: q, httpOk: r2.ok, events: evs });
-    } catch(e) { log.push({ tsdb_search: q, error: e.message }); }
-  }
-
-  // TheSportsDB eventsday
-  if (date) {
-    for (const sl of ['Tennis','WTA Tennis']) {
-      try {
-        const ctrl3 = new AbortController(); setTimeout(function(){ ctrl3.abort(); }, 6000);
-        const r3 = await fetch('https://www.thesportsdb.com/api/v1/json/3/eventsday.php?d='+encodeURIComponent(date)+'&s='+encodeURIComponent(sl), { signal: ctrl3.signal });
-        const d3 = r3.ok ? await r3.json() : null;
-        const evs3 = d3 ? (d3.events||[]).map(function(ev){ return { home: ev.strHomeTeam, away: ev.strAwayTeam, status: ev.strStatus }; }) : [];
-        const matched3 = (d3 ? (d3.events||[]) : []).filter(function(ev){
-          return (teamMatch(ev.strHomeTeam,home)&&teamMatch(ev.strAwayTeam,away))||(teamMatch(ev.strHomeTeam,away)&&teamMatch(ev.strAwayTeam,home));
-        });
-        log.push({ tsdb_eventsday: sl, httpOk: r3.ok, total: evs3.length, matched: matched3 });
-      } catch(e) { log.push({ tsdb_eventsday: sl, error: e.message }); }
-    }
-  }
-
-  res.json(log);
-});
-
 // -- SPA FALLBACK (doit être EN DERNIER après toutes les routes API) --
-app.get('*', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'index.html'));
-});
-
-
-
