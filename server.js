@@ -3289,8 +3289,9 @@ app.get('/api/check-result', async (req, res) => {
           for (const ev of events) {
             const comp  = (ev.competitions || [])[0] || {};
             const comps = comp.competitors || [];
-            const n0 = (comps[0]&&comps[0].team&&(comps[0].team.displayName||comps[0].team.shortDisplayName))||'';
-            const n1 = (comps[1]&&comps[1].team&&(comps[1].team.displayName||comps[1].team.shortDisplayName))||'';
+            // espnName() gère team.displayName (sports collectifs) ET athlete.displayName (tennis, MMA...)
+            const n0 = espnName(comps[0]);
+            const n1 = espnName(comps[1]);
             if (!((teamMatch(n0,home)&&teamMatch(n1,away))||(teamMatch(n0,away)&&teamMatch(n1,home)))) continue;
 
             const status  = (ev.status||{});
