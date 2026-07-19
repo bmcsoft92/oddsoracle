@@ -3328,8 +3328,8 @@ app.get('/api/check-result', async (req, res) => {
   function stripRegionSuffix(s) { return s.replace(/\s+[A-Z]{2}$/, ''); }
   const homeAlt = stripRegionSuffix(home);
   const awayAlt = stripRegionSuffix(away);
-  const tsdbQueries = [home + ' vs ' + away];
-  if (homeAlt !== home || awayAlt !== away) tsdbQueries.push(homeAlt + ' vs ' + awayAlt);
+  const tsdbQueries = [home + ' vs ' + away, away + ' vs ' + home];
+  if (homeAlt !== home || awayAlt !== away) { tsdbQueries.push(homeAlt + ' vs ' + awayAlt); tsdbQueries.push(awayAlt + ' vs ' + homeAlt); }
 
   for (const q of tsdbQueries) {
     try {
@@ -3342,7 +3342,9 @@ app.get('/api/check-result', async (req, res) => {
       if (!r.ok) continue;
       const d = await r.json();
       const events = (d.event || []).filter(function(ev) {
-        if (!teamMatch(ev.strHomeTeam, home) || !teamMatch(ev.strAwayTeam, away)) return false;
+        const fwd = teamMatch(ev.strHomeTeam, home) && teamMatch(ev.strAwayTeam, away);
+        const rev = teamMatch(ev.strHomeTeam, away) && teamMatch(ev.strAwayTeam, home);
+        if (!fwd && !rev) return false;
         if (date && ev.dateEvent && !ev.dateEvent.startsWith(date)) return false;
         return true;
       });
