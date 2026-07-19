@@ -3248,9 +3248,16 @@ app.get('/api/check-result', async (req, res) => {
   // Si le sport est une clé API précise (ex: 'icehockey_nhl'), on l'utilise
   // directement. Sinon (label générique du Journal, ex: 'hockey'), on essaie
   // les clés ESPN correspondantes via GENERIC_SPORT_ESPN_KEYS.
-  const espnPaths = ESPN_MAP[sport]
+  let espnPaths = ESPN_MAP[sport]
     ? [ESPN_MAP[sport]]
     : (GENERIC_SPORT_ESPN_KEYS[sport] || []).map(k => ESPN_MAP[k]).filter(Boolean);
+  // Pour les Grand Chelems tennis, ajouter le path circuit générique en fallback :
+  // tennis/wta et tennis/atp indexent TOUS les matchs WTA/ATP y compris les GC.
+  if (/tennis_wta_(wimbledon|french_open|us_open|australian_open)/.test(sport)) {
+    if (!espnPaths.includes('tennis/wta')) espnPaths = espnPaths.concat(['tennis/wta']);
+  } else if (/tennis_atp_(wimbledon|french_open|us_open|australian_open)/.test(sport)) {
+    if (!espnPaths.includes('tennis/atp')) espnPaths = espnPaths.concat(['tennis/atp']);
+  }
 
   if (espnPaths.length) {
     try {
