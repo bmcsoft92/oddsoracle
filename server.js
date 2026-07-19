@@ -2986,20 +2986,104 @@ function buildIaUserMessage(params) {
       + ' Ne recommande le camp adverse QUE si les données révèlent une raison fondamentale et majeure de rejeter ce pick (ex: blessure confirmée, suspension, forme catastrophique combinée à H2H très défavorable).');
   }
 
-  // Pour les matchs de football/soccer, demande explicitement des prédictions
-  // sur les statistiques de jeu (tirs, corners, possession, BTTS).
-  // Ces marchés sont déjà dans le system prompt mais sans instruction explicite
-  // dans le message utilisateur, Gemini se limite souvent au vainqueur du match.
-  if (sportGroup === 'soccer' || (sport && sport.startsWith('soccer'))) {
+  // Pour chaque sport, demande explicitement des prédictions de statistiques de jeu.
+  // Sans instruction explicite dans le message, Gemini se limite souvent au vainqueur.
+  const isSoccer  = sportGroup === 'soccer'  || (sport && sport.startsWith('soccer'));
+  const isTennis  = sportGroup === 'tennis'  || (sport && sport.startsWith('tennis'));
+  const isBasket  = sportGroup === 'basketball' || (sport && sport.startsWith('basketball'));
+  const isHockey  = sportGroup === 'icehockey'  || (sport && sport.startsWith('icehockey'));
+  const isBaseball= sportGroup === 'baseball'   || (sport && sport.startsWith('baseball'));
+  const isMma     = sportGroup === 'mma'        || (sport && sport.startsWith('mma')) || (sport && sport.startsWith('boxing'));
+  const isNfl     = sportGroup === 'americanfootball' || (sport && sport.startsWith('americanfootball'));
+  const isRugby   = sportGroup === 'rugby'      || (sport && sport.startsWith('rugby'));
+  const isCricket = sportGroup === 'cricket'    || (sport && sport.startsWith('cricket'));
+
+  if (isSoccer) {
     lines.push('');
     lines.push('FOOTBALL - PRÉDICTIONS DE STATISTIQUES DEMANDÉES :');
     lines.push('En plus du vainqueur du match, inclus dans ta réponse des pronos chiffrés sur :');
-    lines.push('- Corners : total estimé du match et Over/Under recommandé (ex: Total corners Over 8.5)');
-    lines.push('- Tirs cadrés : estimation home/away (ex: Tirs cadrés : 4-6 / 2-3)');
+    lines.push('- Tirs totaux : estimation home/away (ex: 12-15 / 8-10)');
+    lines.push('- Tirs cadrés : estimation home/away (ex: 4-6 / 2-3)');
+    lines.push('- Corners : total estimé + Over/Under recommandé (ex: Total corners Over 8.5)');
     lines.push('- BTTS (les deux équipes marquent) : probabilité estimée (%)');
-    lines.push('- Possession : estimation home/away (ex: 55%/45%)');
+    lines.push('- Possession : estimation home/away (ex: 55% / 45%)');
     lines.push('- Over/Under buts : 1.5, 2.5 ou 3.5 selon ton analyse');
-    lines.push('Utilise ta connaissance du style de jeu et des stats récentes de ces équipes pour estimer ces valeurs.');
+    lines.push('Indique "(estimation qualitative)" si tu n\'as pas les données précises.');
+  } else if (isTennis) {
+    lines.push('');
+    lines.push('TENNIS - PRÉDICTIONS DE STATISTIQUES DEMANDÉES :');
+    lines.push('En plus du vainqueur, inclus dans ta réponse des pronos chiffrés sur :');
+    lines.push('- Total jeux du match : Over/Under recommandé (ex: Total jeux Over 22.5)');
+    lines.push('- Nombre de sets : 2 sets ou 3 sets (BO3) / estimation pour BO5');
+    lines.push('- Tie-break set 1 : probabilité estimée (%)');
+    lines.push('- Aces estimés home/away');
+    lines.push('- % 1ère balle estimé pour chaque joueur');
+    lines.push('Indique "(estimation qualitative)" si tu n\'as pas les données précises.');
+  } else if (isBasket) {
+    lines.push('');
+    lines.push('BASKETBALL - PRÉDICTIONS DE STATISTIQUES DEMANDÉES :');
+    lines.push('En plus du vainqueur, inclus dans ta réponse des pronos chiffrés sur :');
+    lines.push('- Total points du match : Over/Under recommandé (ex: Total Over 215.5)');
+    lines.push('- Points par équipe estimés (ex: 110-115 / 105-110)');
+    lines.push('- Total points Q1 : Over/Under (ex: Q1 Over 55.5)');
+    lines.push('- Rebonds totaux estimés (home/away)');
+    lines.push('- Handicap recommandé si écart attendu significatif');
+    lines.push('Indique "(estimation qualitative)" si tu n\'as pas les données précises.');
+  } else if (isHockey) {
+    lines.push('');
+    lines.push('HOCKEY - PRÉDICTIONS DE STATISTIQUES DEMANDÉES :');
+    lines.push('En plus du vainqueur, inclus dans ta réponse des pronos chiffrés sur :');
+    lines.push('- Total buts du match : Over/Under recommandé (ex: Total Over 5.5)');
+    lines.push('- Buts par équipe estimés');
+    lines.push('- Tirs cadrés estimés home/away');
+    lines.push('- Probabilité de prolongation/OT (%)');
+    lines.push('- 1ère période : Over/Under buts (ex: P1 Over 1.5)');
+    lines.push('Indique "(estimation qualitative)" si tu n\'as pas les données précises.');
+  } else if (isBaseball) {
+    lines.push('');
+    lines.push('BASEBALL - PRÉDICTIONS DE STATISTIQUES DEMANDÉES :');
+    lines.push('En plus du vainqueur, inclus dans ta réponse des pronos chiffrés sur :');
+    lines.push('- Total runs du match : Over/Under recommandé (ex: Total Over 8.5)');
+    lines.push('- Runs par équipe estimés');
+    lines.push('- 1ères manches (F5) : Over/Under et vainqueur');
+    lines.push('- Strikeouts estimés pour le lanceur partant');
+    lines.push('Indique "(estimation qualitative)" si tu n\'as pas les données précises.');
+  } else if (isMma) {
+    lines.push('');
+    lines.push('MMA/BOXE - PRÉDICTIONS DE STATISTIQUES DEMANDÉES :');
+    lines.push('En plus du vainqueur, inclus dans ta réponse des pronos chiffrés sur :');
+    lines.push('- Méthode de victoire : KO/TKO, Soumission ou Décision + probabilité (%)');
+    lines.push('- Round de finish estimé si arrêt précoce probable (ex: Finish avant le round 3)');
+    lines.push('- Distance totale : le combat va-t-il durer toute la distance ? (%)');
+    lines.push('- Total frappes significatives estimées');
+    lines.push('Indique "(estimation qualitative)" si tu n\'as pas les données précises.');
+  } else if (isNfl) {
+    lines.push('');
+    lines.push('NFL - PRÉDICTIONS DE STATISTIQUES DEMANDÉES :');
+    lines.push('En plus du vainqueur, inclus dans ta réponse des pronos chiffrés sur :');
+    lines.push('- Total points du match : Over/Under recommandé (ex: Total Over 47.5)');
+    lines.push('- Points par équipe estimés');
+    lines.push('- Total points 1ère mi-temps : Over/Under');
+    lines.push('- Passing yards estimés pour le QB principal (home/away)');
+    lines.push('- Touchdowns totaux estimés');
+    lines.push('Indique "(estimation qualitative)" si tu n\'as pas les données précises.');
+  } else if (isRugby) {
+    lines.push('');
+    lines.push('RUGBY - PRÉDICTIONS DE STATISTIQUES DEMANDÉES :');
+    lines.push('En plus du vainqueur, inclus dans ta réponse des pronos chiffrés sur :');
+    lines.push('- Total points du match : Over/Under recommandé (ex: Total Over 42.5)');
+    lines.push('- Points par équipe estimés');
+    lines.push('- Nombre d\'essais estimés (total match)');
+    lines.push('- Handicap recommandé si écart attendu significatif');
+    lines.push('Indique "(estimation qualitative)" si tu n\'as pas les données précises.');
+  } else if (isCricket) {
+    lines.push('');
+    lines.push('CRICKET - PRÉDICTIONS DE STATISTIQUES DEMANDÉES :');
+    lines.push('En plus du vainqueur, inclus dans ta réponse des pronos chiffrés sur :');
+    lines.push('- Total runs estimés (match ou 1ère manche selon format)');
+    lines.push('- Over/Under runs recommandé');
+    lines.push('- Wickets estimés par équipe');
+    lines.push('- 1er over : runs estimés');
     lines.push('Indique "(estimation qualitative)" si tu n\'as pas les données précises.');
   }
 
