@@ -3025,13 +3025,17 @@ function buildIaUserMessage(params) {
     lines.push('');
     lines.push('FOOTBALL - PRÉDICTIONS DE STATISTIQUES DEMANDÉES :');
     lines.push('En plus du vainqueur du match, inclus dans ta réponse des pronos chiffrés sur :');
-    lines.push('- Tirs totaux : estimation home/away (ex: 12-15 / 8-10)');
-    lines.push('- Tirs cadrés : estimation home/away (ex: 4-6 / 2-3)');
-    lines.push('- Corners : total estimé + Over/Under recommandé (ex: Total corners Over 8.5)');
-    lines.push('- BTTS (les deux équipes marquent) : probabilité estimée (%)');
-    lines.push('- Possession : estimation home/away (ex: 55% / 45%)');
-    lines.push('- Over/Under buts : 1.5, 2.5 ou 3.5 selon ton analyse');
-    lines.push('Indique "(estimation qualitative)" si tu n\'as pas les données précises.');
+    lines.push('- Tirs totaux : estimation home/away');
+    lines.push('- Tirs cadrés : estimation home/away');
+    lines.push('- Corners : total estimé + Over/Under recommandé (ligne précise ex: Over 8.5 ou Under 9.5)');
+    lines.push('- BTTS (les deux équipes marquent) : probabilité estimée (%) avec justification');
+    lines.push('- Possession : estimation home/away');
+    lines.push('- Over/Under buts : recommande une ligne spécifique (1.5, 2.5, 3.5) avec % de confiance');
+    lines.push('⚠️ AJUSTEMENT OBLIGATOIRE SELON LE CONTEXTE :');
+    lines.push('  Si c\'est une finale ou match à élimination directe : applique un malus de -20% sur buts/corners attendus (biais historique documenté).');
+    lines.push('  Si la forme affichée couvre moins de 5 matchs (tournoi court) : précise-le et évite les chiffres trop précis.');
+    lines.push('  Dans les finales, évalue si Under 2.5 / Under 9.5 corners offre plus de value que l\'Over.');
+    lines.push('Justifie chaque prédiction en 1 ligne. Indique "(estimation qualitative)" si pas de données précises.');
   } else if (isTennis) {
     lines.push('');
     lines.push('TENNIS - PRÉDICTIONS DE STATISTIQUES DEMANDÉES :');
