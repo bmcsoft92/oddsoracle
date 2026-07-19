@@ -2819,6 +2819,11 @@ async function buildMatchStatsData(home, away, sport, matchId) {
         if (!r.ok) return null;
         const sbData = await r.json();
         const events = sbData.events || [];
+        // MLB et autres sports jouent des séries de plusieurs jours :
+        // le scoreboard peut contenir le match d'hier (terminé) ET celui d'aujourd'hui
+        // (à venir / live). On collecte tous les candidats et on préfère un match
+        // non-terminé (live ou à venir) sur un match terminé.
+        const candidates = [];
         for (const ev of events) {
           const comp  = (ev.competitions || [])[0] || {};
           const comps = comp.competitors || [];
@@ -2826,6 +2831,15 @@ async function buildMatchStatsData(home, away, sport, matchId) {
           const homeIsFirst = teamMatch(n0,home) && teamMatch(n1,away);
           const awayIsFirst = teamMatch(n0,away) && teamMatch(n1,home);
           if (!homeIsFirst && !awayIsFirst) continue;
+          const st = (ev.status && ev.status.type) || {};
+          const isDone = !!st.completed || st.state === 'post';
+          candidates.push({ ev, comp, comps, homeIsFirst, isDone });
+        }
+        // Préférer live/à venir, sinon prendre le premier terminé
+        const chosen = candidates.find(function(c){ return !c.isDone; }) || candidates[0];
+        if (chosen) {
+          const { ev, comp, comps, homeIsFirst } = chosen;
+          {
           const compHome = homeIsFirst ? (comps[0]||{}) : (comps[1]||{});
           const compAway = homeIsFirst ? (comps[1]||{}) : (comps[0]||{});
           const statsA = compHome.statistics || [];
@@ -2863,6 +2877,7 @@ async function buildMatchStatsData(home, away, sport, matchId) {
             statsA: { possession: gs(statsA,'possessionPct'), shots: gs(statsA,'shots'), shotsOnTarget: gs(statsA,'shotsOnTarget'), corners: gs(statsA,'cornerKicks'), yellowCards: gs(statsA,'yellowCards'), redCards: gs(statsA,'redCards'), fouls: gs(statsA,'foulsCommitted'), offsides: gs(statsA,'offsides'), xGoals: gs(statsA,'expectedGoals'), aces: gs(statsA,'aces'), doubleFaults: gs(statsA,'doubleFaults'), firstServePct: gs(statsA,'firstServeIn') },
             statsB: { possession: gs(statsB,'possessionPct'), shots: gs(statsB,'shots'), shotsOnTarget: gs(statsB,'shotsOnTarget'), corners: gs(statsB,'cornerKicks'), yellowCards: gs(statsB,'yellowCards'), redCards: gs(statsB,'redCards'), fouls: gs(statsB,'foulsCommitted'), offsides: gs(statsB,'offsides'), xGoals: gs(statsB,'expectedGoals'), aces: gs(statsB,'aces'), doubleFaults: gs(statsB,'doubleFaults'), firstServePct: gs(statsB,'firstServeIn') },
           };
+          }
         }
         return { found: false };
       } catch(e) { return null; }
