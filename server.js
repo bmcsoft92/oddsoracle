@@ -3315,6 +3315,8 @@ app.get('/api/check-result', async (req, res) => {
               for (const gc of (g.competitions || [])) {
                 const noteText = ((gc.notes||[])[0]||{}).text || '';
                 if (!noteText || noteText.indexOf(' bt ') === -1) continue;
+                // Filtrer par date de la compétition (évite de parcourir tout le tournoi)
+                if (date && gc.date && !gc.date.startsWith(date)) continue;
                 const nn = norm(noteText);
                 const hw = norm(home).split(' ').filter(function(w){ return w.length>3; })[0] || '';
                 const aw = norm(away).split(' ').filter(function(w){ return w.length>3; })[0] || '';
