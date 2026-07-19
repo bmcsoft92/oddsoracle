@@ -2358,7 +2358,7 @@ const ESPN_MAP = {
   // Tennis générique (toutes les semaines hors Grand Chelem)
   tennis_atp: 'tennis/atp', tennis_wta: 'tennis/wta',
   // Grand Chelems (endpoints ESPN spécifiques, requis pour check-result)
-  tennis_atp_wimbledon: 'tennis/wimbledon',   tennis_wta_wimbledon: 'tennis/wimbledon',
+  tennis_atp_wimbledon: 'tennis/atp',   tennis_wta_wimbledon: 'tennis/wta',
   tennis_atp_french_open: 'tennis/french-open', tennis_wta_french_open: 'tennis/french-open',
   tennis_atp_us_open: 'tennis/us-open',         tennis_wta_us_open: 'tennis/us-open',
   tennis_atp_australian_open: 'tennis/australian-open', tennis_wta_australian_open: 'tennis/australian-open',
@@ -3429,6 +3429,51 @@ app.get('/api/check-result', async (req, res) => {
         }
         return res.json({ result: result3, winner: winner3, score: hs3+'-'+as3, home, away, source: 'thesportsdb-eventsday' });
       } catch(e3) { /* timeout, essaie le label suivant */ }
+    }
+  }
+
+  // ── 4. Sofascore fallback (tennis + autres sports) ─────────────────────
+  // API non-officielle, la plus complète pour les résultats tennis individuels.
+  if (date) {
+    // Détermine le nom de sport Sofascore
+    const sfSport = /tennis/.test(sport) ? 'tennis'
+      : /soccer|football/.test(sport) ? 'football'
+      : /basketball/.test(sport) ? 'basketball'
+      : /icehockey/.test(sport) ? 'ice-hockey'
+      : /baseball/.test(sport) ? 'baseball'
+      : /americanfootball/.test(sport) ? 'american-football'
+      : null;
+    if (sfSport) {
+      try {
+        const ctrl4 = new AbortController();
+        setTimeout(function(){ ctrl4.abort(); }, 8000);
+        const r4 = await fetch(
+          'https://api.sofascore.com/api/v1/sport/' + sfSport + '/scheduled-events/' + date,
+          { signal: ctrl4.signal, headers: { 'User-Agent': 'Mozilla/5.0', 'Accept': 'application/json, */*' } }
+        );
+        if (debug) debugLog.push({ sofascore_url: r4.url, httpOk: r4.ok, status: r4.status });
+        if (r4.ok) {
+          const sf = await r4.json();
+          const sfEvents = sf.events || [];
+          if (debug) debugLog.push({ sofascore_total: sfEvents.length });
+          const sfMatch = sfEvents.find(function(ev) {
+            const ht = (ev.homeTeam && ev.homeTeam.name) || '';
+            const at = (ev.awayTeam && ev.awayTeam.name) || '';
+            return (teamMatch(ht, home) && teamMatch(at, away)) || (teamMatch(ht, away) && teamMatch(at, home));
+          });
+          if (sfMatch) {
+            const sfStatus = (sfMatch.status && sfMatch.status.type) || '';
+            if (sfStatus !== 'finished') return res.json({ result: 'pending', status: sfStatus });
+            const sfHs = (sfMatch.homeScore && sfMatch.homeScore.current) || 0;
+            const sfAs = (sfMatch.awayScore && sfMatch.awayScore.current) || 0;
+            const sfHt = (sfMatch.homeTeam && sfMatch.homeTeam.name) || home;
+            const sfAt = (sfMatch.awayTeam && sfMatch.awayTeam.name) || away;
+            let sfWinner = sfHs > sfAs ? sfHt : sfAs > sfHs ? sfAt : 'draw';
+            const sfResult = teamMatch(selection, sfWinner) ? 'win' : 'loss';
+            return res.json({ result: sfResult, winner: sfWinner, score: sfHs+'-'+sfAs, home, away, source: 'sofascore' });
+          }
+        }
+      } catch(e4) { /* timeout */ }
     }
   }
 
