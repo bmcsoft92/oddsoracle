@@ -1,5 +1,22 @@
 [
   {
+    "id": 1784975497435,
+    "date": "2026-07-25",
+    "sport": "baseball",
+    "sportKey": "baseball_kbo",
+    "match": "Hanwha Eagles vs LG Twins",
+    "type": "live",
+    "market": "Vainqueur match",
+    "selection": "Hanwha Eagles",
+    "cote": 1.9,
+    "stake": 60,
+    "edge": 11.9,
+    "result": "pending",
+    "reason": "[AUTO-BONNE] Score ajuste 71/100 -- Edge +11.9% -- Betclic (FR)",
+    "matchId": "633e59aed55e6502a0c470978e403ec0",
+    "autoForte": true
+  },
+  {
     "id": 1783097841498,
     "date": "2026-07-03",
     "sport": "tennis",
