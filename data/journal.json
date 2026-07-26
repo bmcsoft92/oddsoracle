@@ -1,5 +1,22 @@
 [
   {
+    "id": 1785041253411,
+    "date": "2026-07-26",
+    "sport": "baseball",
+    "sportKey": "baseball_npb",
+    "match": "Hokkaido Nippon-Ham Fighters vs Tohoku Rakuten Golden Eagles",
+    "type": "live",
+    "market": "Vainqueur match",
+    "selection": "Tohoku Rakuten Golden Eagles",
+    "cote": 2.67,
+    "stake": 60,
+    "edge": 10.4,
+    "result": "pending",
+    "reason": "[AUTO-BONNE] Score ajuste 46/100 -- Edge +10.4% -- Betclic (FR)",
+    "matchId": "59391b29c5fd8219ad841a7584b9e443",
+    "autoForte": true
+  },
+  {
     "id": 1784975497435,
     "date": "2026-07-25",
     "sport": "baseball",
