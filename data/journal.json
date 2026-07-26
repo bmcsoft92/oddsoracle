@@ -1,5 +1,22 @@
 [
   {
+    "id": 1785098854324,
+    "date": "2026-07-26",
+    "sport": "baseball",
+    "sportKey": "baseball_mlb",
+    "match": "St. Louis Cardinals vs Cincinnati Reds",
+    "type": "live",
+    "market": "Vainqueur match",
+    "selection": "Cincinnati Reds",
+    "cote": 2.25,
+    "stake": 60,
+    "edge": 6,
+    "result": "pending",
+    "reason": "[AUTO-BONNE] Score ajuste 50/100 -- Edge +6% -- Betclic (FR)",
+    "matchId": "9064f61fe767dfa3c4a613a4f02250d3",
+    "autoForte": true
+  },
+  {
     "id": 1785041253411,
     "date": "2026-07-26",
     "sport": "baseball",
