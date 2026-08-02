@@ -1,5 +1,22 @@
 [
   {
+    "id": 1785690452504,
+    "date": "2026-08-02",
+    "sport": "tennis",
+    "sportKey": "tennis_atp_canadian_open",
+    "match": "Michael Zheng vs Miomir Kecmanovic",
+    "type": "live",
+    "market": "Vainqueur match",
+    "selection": "Miomir Kecmanovic",
+    "cote": 1.67,
+    "stake": 100,
+    "edge": 30.6,
+    "result": "pending",
+    "reason": "[AUTO-FORTE] Score ajuste 99/100 -- Edge +30.6% -- William Hill",
+    "matchId": "80d0f22c6bbb11363e8bf8cc51e172f5",
+    "autoForte": true
+  },
+  {
     "id": 1785098854324,
     "date": "2026-07-26",
     "sport": "baseball",
